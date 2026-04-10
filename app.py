@@ -39,7 +39,8 @@ from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES, TOTAL_WEEKS
 from context.session import SessionContext
 from curriculum.syllabus import (
     format_week_context, _WEEK_TO_PHASE, get_phase_by_id,
-    PHASES, get_progress, get_task_key,
+    PHASES, get_task_key,
+    get_progress as syllabus_get_progress,
 )
 from orchestrator import Orchestrator
 import agents.practice_arena as practice_arena
@@ -719,7 +720,7 @@ async def syllabus_page(request: Request, session_id: str):
                 "pct":         round(done_count / len(phase_tasks) * 100) if phase_tasks else 0,
             })
 
-    overall = get_progress(session.syllabus_progress, [role])
+    overall = syllabus_get_progress(session.syllabus_progress, [role])
 
     return templates.TemplateResponse(
         request=request,
@@ -746,7 +747,7 @@ async def task_toggle(body: TaskToggleRequest):
     _save_session(body.session_id, session)
 
     role    = session.track.value
-    overall = get_progress(session.syllabus_progress, [role])
+    overall = syllabus_get_progress(session.syllabus_progress, [role])
     return {
         "task_key": body.task_key,
         "status":   body.status,
