@@ -34,14 +34,49 @@
     <div class="sidebar-section">
       <div class="sidebar-label">Quick Actions</div>
       <div class="quick-actions">
-        <button class="qa-btn" data-msg="Quiz me on {{ progress.phase_title }}">📝 Quiz Me</button>
-        <button class="qa-btn" data-msg="Give me interview questions for {{ progress.phase_title }}">🎯 Interview Prep</button>
-        <button class="qa-btn" data-msg="Recommend research papers for my current phase">📄 Papers</button>
+        <button class="qa-btn qa-pick" data-mode="quiz">📝 Quiz Me</button>
+        <button class="qa-btn qa-pick" data-mode="interview">🎯 Interview Prep</button>
+        <button class="qa-btn qa-pick" data-mode="learn">🧠 Learn About</button>
+        <button class="qa-btn qa-pick" data-mode="papers">📄 Papers</button>
         <button class="qa-btn" data-msg="Give me project ideas I can build this week">💡 Ideas</button>
         <button class="qa-btn" data-msg="What should I focus on next in the curriculum?">🗺️ What's Next</button>
       </div>
     </div>
   </aside>
+
+  <!-- ── Topic Picker Modal ─────────────────────────────────────────────── -->
+  <div id="topic-overlay" class="topic-overlay" onclick="closeTopicPicker()"></div>
+  <div id="topic-modal" class="topic-modal" role="dialog" aria-modal="true">
+    <div class="topic-modal-header">
+      <span id="topic-modal-title">Choose a topic</span>
+      <button class="topic-close" onclick="closeTopicPicker()" aria-label="Close">×</button>
+    </div>
+    <input
+      id="topic-input"
+      class="topic-input"
+      type="text"
+      placeholder="Type any topic…"
+      autocomplete="off"
+    >
+    <div class="topic-chips-label">Suggested topics</div>
+    <div class="topic-chips" id="topic-chips">
+      <button class="chip" onclick="setTopic(this)">AI Foundations</button>
+      <button class="chip" onclick="setTopic(this)">LLMs &amp; Transformers</button>
+      <button class="chip" onclick="setTopic(this)">Prompt Engineering</button>
+      <button class="chip" onclick="setTopic(this)">RAG Pipelines</button>
+      <button class="chip" onclick="setTopic(this)">Context Engineering</button>
+      <button class="chip" onclick="setTopic(this)">Evals &amp; Rubrics</button>
+      <button class="chip" onclick="setTopic(this)">LLM-as-Judge</button>
+      <button class="chip" onclick="setTopic(this)">Agri-Saathi</button>
+      <button class="chip" onclick="setTopic(this)">Multi-Agent Systems</button>
+      <button class="chip" onclick="setTopic(this)">Tool Use &amp; MCP</button>
+      <button class="chip" onclick="setTopic(this)">Chunking Strategies</button>
+      <button class="chip" onclick="setTopic(this)">Vector Databases</button>
+      <button class="chip" onclick="setTopic(this)">Interview Preparation</button>
+      <button class="chip" onclick="setTopic(this)">Portfolio Building</button>
+    </div>
+    <button class="topic-go-btn" onclick="submitTopic()">Go →</button>
+  </div>
 
   <!-- ── Chat area ─────────────────────────────────────────────────────── -->
   <div class="chat-main">
@@ -86,11 +121,64 @@
   });
 
   // ── Quick action buttons ───────────────────────────────────────────────
-  document.querySelectorAll('.qa-btn').forEach(btn => {
+  // Instant-send buttons (Ideas, What's Next)
+  document.querySelectorAll('.qa-btn:not(.qa-pick)').forEach(btn => {
     btn.addEventListener('click', () => {
       input.value = btn.dataset.msg;
       sendMessage();
     });
+  });
+
+  // Topic-picker buttons (Quiz Me, Interview Prep, Learn About, Papers)
+  document.querySelectorAll('.qa-pick').forEach(btn => {
+    btn.addEventListener('click', () => openTopicPicker(btn.dataset.mode));
+  });
+
+  // ── Topic picker modal ─────────────────────────────────────────────────
+  let _pickerMode = 'quiz';
+  const _modeConfig = {
+    quiz:      { title: '📝 What topic would you like to quiz on?',    msg: t => `Quiz me on ${t}` },
+    interview: { title: '🎯 What topic for interview prep?',           msg: t => `Give me interview questions for ${t}` },
+    learn:     { title: '🧠 What would you like to learn about?',      msg: t => `Explain ${t} to me` },
+    papers:    { title: '📄 What topic should I recommend papers for?', msg: t => `Recommend papers on ${t}` },
+  };
+
+  function openTopicPicker(mode) {
+    _pickerMode = mode;
+    const cfg = _modeConfig[mode];
+    document.getElementById('topic-modal-title').textContent = cfg.title;
+    document.getElementById('topic-input').value = document.getElementById('phase-title').textContent.trim();
+    document.getElementById('topic-overlay').classList.add('open');
+    document.getElementById('topic-modal').classList.add('open');
+    setTimeout(() => {
+      const ti = document.getElementById('topic-input');
+      ti.focus();
+      ti.select();
+    }, 50);
+  }
+
+  function closeTopicPicker() {
+    document.getElementById('topic-overlay').classList.remove('open');
+    document.getElementById('topic-modal').classList.remove('open');
+  }
+
+  function setTopic(chip) {
+    document.getElementById('topic-input').value = chip.textContent.trim();
+    document.getElementById('topic-input').focus();
+  }
+
+  function submitTopic() {
+    const topic = document.getElementById('topic-input').value.trim();
+    if (!topic) return;
+    closeTopicPicker();
+    input.value = _modeConfig[_pickerMode].msg(topic);
+    sendMessage();
+  }
+
+  // Close on Escape, submit on Enter inside the modal input
+  document.getElementById('topic-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); submitTopic(); }
+    if (e.key === 'Escape') { closeTopicPicker(); }
   });
 
   // ── Core send ─────────────────────────────────────────────────────────

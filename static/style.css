@@ -486,3 +486,67 @@ button { cursor: pointer; border: none; font-family: var(--font); }
   transition: border-color 0.2s, background 0.2s;
 }
 .syllabus-btn:hover { border-color: var(--accent); background: rgba(0,180,216,.08); }
+
+/* ── Topic picker modal ─────────────────────────────────────────────────── */
+.topic-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 100;
+}
+.topic-overlay.open { display: block; }
+
+.topic-modal {
+  display: none; position: fixed;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(480px, 92vw);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.5rem; z-index: 101;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+}
+.topic-modal.open { display: block; }
+
+.topic-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1rem;
+}
+.topic-modal-header span { font-size: 1rem; font-weight: 600; }
+.topic-close {
+  background: none; border: none; color: var(--text-dim);
+  font-size: 1.4rem; cursor: pointer; line-height: 1; padding: 0 0.25rem;
+}
+.topic-close:hover { color: var(--text); }
+
+.topic-input {
+  width: 100%; padding: 0.65rem 0.85rem;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 1rem; outline: none; box-sizing: border-box;
+  margin-bottom: 1rem;
+}
+.topic-input:focus { border-color: var(--accent); }
+
+.topic-chips-label {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-dim); margin-bottom: 0.5rem;
+}
+.topic-chips {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.25rem;
+}
+.chip {
+  padding: 0.3rem 0.75rem; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 20px;
+  color: var(--text-dim); font-size: 0.78rem; cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.chip:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(0,180,216,.08);
+}
+
+.topic-go-btn {
+  width: 100%; padding: 0.7rem;
+  background: linear-gradient(135deg, #7c6af7, #4fc3f7);
+  border: none; border-radius: var(--radius);
+  color: #fff; font-size: 1rem; font-weight: 600;
+  cursor: pointer; transition: opacity 0.15s;
+}
+.topic-go-btn:hover { opacity: 0.88; }
