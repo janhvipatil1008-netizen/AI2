@@ -6,8 +6,9 @@ Central constants, model IDs, and agent identities.
 from enum import Enum
 
 # ── Models ────────────────────────────────────────────────────────────────────
-ORCHESTRATOR_MODEL = "claude-opus-4-6"
-AGENT_MODEL = "claude-opus-4-6"
+# Sonnet for routing (fast, cheap classification) — Opus for sub-agents (quality generation)
+ORCHESTRATOR_MODEL = "claude-sonnet-4-6"
+AGENT_MODEL        = "claude-opus-4-6"
 
 # ── Career Tracks ─────────────────────────────────────────────────────────────
 class CareerTrack(str, Enum):
@@ -55,5 +56,6 @@ AGENT_MAX_TOKENS              = 2048   # Learning Coach, Idea Generator
 PRACTICE_AGENT_MAX_TOKENS     = 4096   # Practice Arena — 15-question sets are long
 SYNTHESIS_MAX_TOKENS          = 256    # Orchestrator framing — concise
 
-# Sub-agents that produce fully self-contained structured output (skip synthesis framing)
-NO_SYNTHESIS_AGENTS = {"practice_arena"}
+# Sub-agents whose output is returned directly (no synthesis framing round-trip)
+# learning_coach and idea_generator responses are already complete and well-framed
+NO_SYNTHESIS_AGENTS = {"practice_arena", "learning_coach", "idea_generator"}
