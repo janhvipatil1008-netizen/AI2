@@ -37,7 +37,10 @@ from slowapi.util import get_remote_address
 
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES, TOTAL_WEEKS
 from context.session import SessionContext
-from curriculum.syllabus import format_week_context, _WEEK_TO_PHASE, get_phase_by_id
+from curriculum.syllabus import (
+    format_week_context, _WEEK_TO_PHASE, get_phase_by_id,
+    PHASES, get_progress, get_task_key,
+)
 from orchestrator import Orchestrator
 import agents.practice_arena as practice_arena
 
@@ -426,6 +429,11 @@ class EvaluateRequest(BaseModel):
     answer:     str
     topic:      str = ""
 
+class TaskToggleRequest(BaseModel):
+    session_id: str
+    task_key:   str
+    status:     str = "done"   # "done" | "in_progress" | "todo"
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -670,6 +678,81 @@ async def evaluate(request: Request, body: EvaluateRequest):
         )
 
     return {"response": response_text, "progress": _session_progress(session)}
+
+
+@app.get("/syllabus/{session_id}", response_class=HTMLResponse)
+async def syllabus_page(request: Request, session_id: str):
+    data    = _get_session_data(session_id)
+    session = data["session"]
+    role    = session.track.value
+
+    # Build phase list with tasks filtered to this role + current completion status
+    phases_data = []
+    for phase in PHASES:
+        phase_tasks = []
+        for ti, track in enumerate(phase["tracks"]):
+            if role not in track["roles"]:
+                continue
+            for taski, task in enumerate(track["tasks"]):
+                if role not in task["roles"]:
+                    continue
+                key    = get_task_key(phase["id"], ti, taski)
+                status = session.syllabus_progress.get(key, "todo")
+                phase_tasks.append({
+                    "key":        key,
+                    "text":       task["text"],
+                    "track_name": track["name"],
+                    "status":     status,
+                })
+        if phase_tasks:
+            done_count = sum(1 for t in phase_tasks if t["status"] == "done")
+            phases_data.append({
+                "id":          phase["id"],
+                "phase":       phase["phase"],
+                "title":       phase["title"],
+                "weeks":       phase["weeks"],
+                "icon":        phase["icon"],
+                "description": phase["description"],
+                "tasks":       phase_tasks,
+                "done":        done_count,
+                "total":       len(phase_tasks),
+                "pct":         round(done_count / len(phase_tasks) * 100) if phase_tasks else 0,
+            })
+
+    overall = get_progress(session.syllabus_progress, [role])
+
+    return templates.TemplateResponse(
+        request=request,
+        name="syllabus.html",
+        context={
+            "session_id": session_id,
+            "progress":   _session_progress(session),
+            "phases":     phases_data,
+            "overall":    overall,
+            "test_mode":  bool(TEST_MODE),
+        },
+    )
+
+
+@app.post("/task/toggle")
+async def task_toggle(body: TaskToggleRequest):
+    valid_statuses = {"done", "in_progress", "todo"}
+    if body.status not in valid_statuses:
+        raise HTTPException(status_code=422, detail=f"status must be one of {valid_statuses}")
+
+    data    = _get_session_data(body.session_id)
+    session = data["session"]
+    session.mark_task(body.task_key, body.status)
+    _save_session(body.session_id, session)
+
+    role    = session.track.value
+    overall = get_progress(session.syllabus_progress, [role])
+    return {
+        "task_key": body.task_key,
+        "status":   body.status,
+        "overall":  overall,
+        "tasks_done": session.tasks_done_count(),
+    }
 
 
 @app.get("/chat/{session_id}", response_class=HTMLResponse)

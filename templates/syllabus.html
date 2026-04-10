@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}AI² — Syllabus Tracker{% endblock %}
+
+{% block content %}
+<div class="syl-layout">
+
+  <!-- ── Top bar ────────────────────────────────────────────────────── -->
+  <div class="syl-topbar">
+    <div class="syl-topbar-left">
+      <a href="/chat/{{ session_id }}" class="back-btn">← Back to Chat</a>
+      <div class="syl-title">
+        <span class="syl-track-badge">{{ progress.track_label }}</span>
+        Syllabus Tracker
+      </div>
+    </div>
+    <div class="syl-overall">
+      <div class="syl-overall-nums">
+        <span class="syl-done-count" id="overall-done">{{ overall.done }}</span>
+        <span class="syl-sep">/</span>
+        <span>{{ overall.total }}</span>
+        <span class="syl-tasks-label">tasks done</span>
+      </div>
+      <div class="overall-bar-wrap">
+        <div class="overall-bar" id="overall-bar" style="width:{{ overall.pct }}%"></div>
+      </div>
+      <div class="syl-pct" id="overall-pct">{{ overall.pct }}%</div>
+    </div>
+  </div>
+
+  <!-- ── Phase cards ───────────────────────────────────────────────── -->
+  <div class="syl-phases">
+    {% for phase in phases %}
+    <div class="syl-phase-card {% if phase.pct == 100 %}phase-complete{% endif %}" id="phase-{{ phase.id }}">
+
+      <div class="phase-card-header" onclick="togglePhase('{{ phase.id }}')">
+        <div class="phase-card-left">
+          <span class="phase-icon">{{ phase.icon }}</span>
+          <div>
+            <div class="phase-label">{{ phase.phase }} · {{ phase.weeks }}</div>
+            <div class="phase-title-text">{{ phase.title }}</div>
+            <div class="phase-desc-text">{{ phase.description }}</div>
+          </div>
+        </div>
+        <div class="phase-card-right">
+          <div class="phase-progress-wrap">
+            <div class="phase-progress-bar">
+              <div class="phase-progress-fill" id="bar-{{ phase.id }}"
+                   style="width:{{ phase.pct }}%"></div>
+            </div>
+            <div class="phase-progress-label">
+              <span id="done-{{ phase.id }}">{{ phase.done }}</span>/{{ phase.total }}
+              (<span id="pct-{{ phase.id }}">{{ phase.pct }}</span>%)
+            </div>
+          </div>
+          <span class="phase-chevron" id="chev-{{ phase.id }}">▼</span>
+        </div>
+      </div>
+
+      <div class="phase-tasks" id="tasks-{{ phase.id }}">
+        {% set ns = namespace(current_track="") %}
+        {% for task in phase.tasks %}
+          {% if task.track_name != ns.current_track %}
+            {% set ns.current_track = task.track_name %}
+            <div class="track-group-label">{{ task.track_name }}</div>
+          {% endif %}
+          <label class="task-row {% if task.status == 'done' %}task-done{% endif %}"
+                 id="row-{{ task.key }}">
+            <input
+              type="checkbox"
+              class="task-check"
+              data-key="{{ task.key }}"
+              {% if task.status == 'done' %}checked{% endif %}
+              onchange="toggleTask(this)"
+            >
+            <span class="task-text">{{ task.text }}</span>
+            <span class="task-status-badge status-{{ task.status }}">
+              {% if task.status == 'done' %}✓ Done
+              {% elif task.status == 'in_progress' %}⏳ In progress
+              {% else %}○ To do{% endif %}
+            </span>
+          </label>
+        {% endfor %}
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const SESSION_ID = "{{ session_id }}";
+  const OVERALL_TOTAL = {{ overall.total }};
+
+  // Track done count client-side
+  let overallDone = {{ overall.done }};
+
+  // ── Phase collapse/expand ───────────────────────────────────────────
+  function togglePhase(id) {
+    const tasks = document.getElementById('tasks-' + id);
+    const chev  = document.getElementById('chev-' + id);
+    const open  = tasks.style.display !== 'none';
+    tasks.style.display = open ? 'none' : 'block';
+    chev.textContent    = open ? '▶' : '▼';
+  }
+
+  // Collapse completed phases on load, expand first incomplete
+  document.addEventListener('DOMContentLoaded', () => {
+    let foundFirst = false;
+    document.querySelectorAll('.syl-phase-card').forEach(card => {
+      const id      = card.id.replace('phase-', '');
+      const pct     = parseInt(document.getElementById('pct-' + id)?.textContent || '0');
+      const tasks   = document.getElementById('tasks-' + id);
+      const chev    = document.getElementById('chev-' + id);
+      if (pct === 100) {
+        tasks.style.display = 'none';
+        chev.textContent    = '▶';
+      } else if (!foundFirst) {
+        foundFirst = true;
+        tasks.style.display = 'block';
+        chev.textContent    = '▼';
+      } else {
+        tasks.style.display = 'none';
+        chev.textContent    = '▶';
+      }
+    });
+  });
+
+  // ── Task toggle ────────────────────────────────────────────────────
+  async function toggleTask(checkbox) {
+    const key    = checkbox.dataset.key;
+    const status = checkbox.checked ? 'done' : 'todo';
+    const row    = document.getElementById('row-' + key);
+    const badge  = row.querySelector('.task-status-badge');
+
+    // Optimistic UI update
+    checkbox.disabled = true;
+    row.classList.toggle('task-done', checkbox.checked);
+    badge.className   = 'task-status-badge status-' + status;
+    badge.textContent = checkbox.checked ? '✓ Done' : '○ To do';
+    overallDone      += checkbox.checked ? 1 : -1;
+    updateOverallBar();
+
+    // Phase bar update
+    const phaseId = key.split('-')[0] + '-' + key.split('-')[1];
+
+    try {
+      const resp = await fetch('/task/toggle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ session_id: SESSION_ID, task_key: key, status })
+      });
+      if (!resp.ok) throw new Error('Server error');
+      const data = await resp.json();
+
+      // Update phase bar from server response
+      const overall = data.overall;
+      if (overall && overall.by_phase) {
+        for (const [pid, info] of Object.entries(overall.by_phase)) {
+          const bar  = document.getElementById('bar-' + pid);
+          const pct  = document.getElementById('pct-' + pid);
+          const done = document.getElementById('done-' + pid);
+          const card = document.getElementById('phase-' + pid);
+          if (bar)  bar.style.width  = info.pct + '%';
+          if (pct)  pct.textContent  = info.pct;
+          if (done) done.textContent = info.done;
+          if (card) card.classList.toggle('phase-complete', info.pct === 100);
+        }
+        // Sync overall from server
+        overallDone = overall.done;
+        updateOverallBar();
+      }
+    } catch (e) {
+      // Revert on error
+      checkbox.checked = !checkbox.checked;
+      row.classList.toggle('task-done', checkbox.checked);
+      badge.className   = 'task-status-badge status-' + (checkbox.checked ? 'done' : 'todo');
+      badge.textContent = checkbox.checked ? '✓ Done' : '○ To do';
+      overallDone      += checkbox.checked ? 1 : -1;
+      updateOverallBar();
+    } finally {
+      checkbox.disabled = false;
+    }
+  }
+
+  function updateOverallBar() {
+    const pct = OVERALL_TOTAL > 0 ? Math.round(overallDone / OVERALL_TOTAL * 100) : 0;
+    document.getElementById('overall-bar').style.width = pct + '%';
+    document.getElementById('overall-done').textContent = overallDone;
+    document.getElementById('overall-pct').textContent  = pct + '%';
+  }
+</script>
+{% endblock %}
