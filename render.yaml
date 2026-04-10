@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai2-platform
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # you will paste this in the Render dashboard
+      - key: APP_PASSWORD
+        sync: false          # optional: set to password-protect the app
+      - key: AI2_SESSION_DB
+        value: /tmp/sessions.db   # ephemeral on free tier; sessions reset on redeploy

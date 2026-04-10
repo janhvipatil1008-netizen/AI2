@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}AI² — Choose Your Track{% endblock %}
+
+{% block content %}
+<div class="landing">
+  <div class="landing-hero">
+    <h1>Your AI Career Starts Here</h1>
+    <p class="hero-sub">A 13-week adaptive learning system powered by multi-agent AI.<br>
+    Pick the role you're building toward.</p>
+  </div>
+
+  <form id="track-form" action="/session/start-redirect" method="post">
+    <div class="track-grid" id="track-grid">
+      {% for track in tracks %}
+      <label class="track-card" data-value="{{ track.value }}">
+        <input type="radio" name="track" value="{{ track.value }}" hidden />
+        <div class="track-icon">
+          {% if track.value == "aipm" %}📦
+          {% elif track.value == "evals" %}🔬
+          {% else %}🧩{% endif %}
+        </div>
+        <div class="track-name">{{ track.label }}</div>
+        <div class="track-tagline">{{ track.tagline }}</div>
+        <div class="track-select-btn">Select Track →</div>
+      </label>
+      {% endfor %}
+    </div>
+  </form>
+
+  <div class="landing-footer">
+    <div class="feature-pills">
+      <span class="pill">🧠 Learning Coach</span>
+      <span class="pill">📝 MCQ Quizzes</span>
+      <span class="pill">🎯 Interview Prep</span>
+      <span class="pill">💡 Idea Generator</span>
+      <span class="pill">📄 Research Papers</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Each card click immediately starts a session and redirects to the chat
+  document.querySelectorAll('.track-card').forEach(card => {
+    card.addEventListener('click', async () => {
+      const track = card.dataset.value;
+      card.classList.add('loading');
+      card.querySelector('.track-select-btn').textContent = 'Starting…';
+
+      const resp = await fetch('/session/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ track })
+      });
+      const data = await resp.json();
+      window.location.href = `/chat/${data.session_id}`;
+    });
+  });
+</script>
+{% endblock %}

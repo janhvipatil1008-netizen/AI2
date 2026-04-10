@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}AI² — {{ progress.track_label }}{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="track-badge">{{ progress.track_label }}</div>
+      <div class="week-badge">Week {{ progress.current_week }} / {{ progress.total_weeks }}</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="phase-title" id="phase-title">{{ progress.phase_title }}</div>
+      <div class="phase-desc"  id="phase-desc">{{ progress.phase_desc }}</div>
+    </div>
+
+    <div class="sidebar-section progress-stats">
+      <div class="stat-row"><span class="stat-label">Exchanges</span>
+        <span class="stat-val" id="stat-exchanges">{{ progress.exchanges }}</span></div>
+      <div class="stat-row"><span class="stat-label">Exercises</span>
+        <span class="stat-val" id="stat-exercises">{{ progress.exercises_done }}</span></div>
+      <div class="stat-row"><span class="stat-label">Tasks done</span>
+        <span class="stat-val" id="stat-tasks">{{ progress.tasks_done }}</span></div>
+      <div class="stat-row"><span class="stat-label">Quizzes</span>
+        <span class="stat-val" id="stat-quizzes">{{ progress.quizzes_taken }}</span></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Quick Actions</div>
+      <div class="quick-actions">
+        <button class="qa-btn" data-msg="Quiz me on {{ progress.phase_title }}">📝 Quiz Me</button>
+        <button class="qa-btn" data-msg="Give me interview questions for {{ progress.phase_title }}">🎯 Interview Prep</button>
+        <button class="qa-btn" data-msg="Recommend research papers for my current phase">📄 Papers</button>
+        <button class="qa-btn" data-msg="Give me project ideas I can build this week">💡 Ideas</button>
+        <button class="qa-btn" data-msg="What should I focus on next in the curriculum?">🗺️ What's Next</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Chat area ─────────────────────────────────────────────────────── -->
+  <div class="chat-main">
+    <div class="messages" id="messages">
+      <div class="msg-row assistant">
+        <div class="msg-bubble">
+          <div class="msg-agent-tag">AI² Orchestrator</div>
+          Welcome to the <strong>{{ progress.track_label }}</strong> track!
+          You're on <strong>{{ progress.phase_title }}</strong>.<br><br>
+          Ask me anything — I'll route your question to the right specialist.
+          Use the quick actions on the left to jump straight into a quiz or interview prep.
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <textarea
+        id="user-input"
+        placeholder="Ask anything, request a quiz, or say 'interview prep on RAG'…"
+        rows="1"
+        autofocus
+      ></textarea>
+      <button id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const SESSION_ID = "{{ session_id }}";
+
+  // ── Autosize textarea ──────────────────────────────────────────────────
+  const input = document.getElementById('user-input');
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  // ── Quick action buttons ───────────────────────────────────────────────
+  document.querySelectorAll('.qa-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      input.value = btn.dataset.msg;
+      sendMessage();
+    });
+  });
+
+  // ── Core send ─────────────────────────────────────────────────────────
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    appendMessage('user', text, 'You');
+    input.value = '';
+    input.style.height = 'auto';
+
+    const loadingId = appendLoading();
+    document.getElementById('send-btn').disabled = true;
+
+    try {
+      const resp = await fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ session_id: SESSION_ID, message: text })
+      });
+
+      removeLoading(loadingId);
+
+      if (resp.status === 429) {
+        appendError('Too many requests — please wait a moment before sending another message.');
+        return;
+      }
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        appendError(err.detail || err.error || `Server error ${resp.status}`);
+        return;
+      }
+
+      const data = await resp.json();
+      const agentLabel = formatAgentLabel(data.agent_used);
+      appendMessage('assistant', data.response, agentLabel);
+      updateProgress(data.progress);
+
+    } catch (err) {
+      removeLoading(loadingId);
+      appendError('Network error — please try again.');
+    } finally {
+      document.getElementById('send-btn').disabled = false;
+      input.focus();
+    }
+  }
+
+  // ── DOM helpers ────────────────────────────────────────────────────────
+  function appendMessage(role, text, label) {
+    const msgs = document.getElementById('messages');
+    const row  = document.createElement('div');
+    row.className = `msg-row ${role}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+
+    if (label) {
+      const tag = document.createElement('div');
+      tag.className = 'msg-agent-tag';
+      tag.textContent = label;
+      bubble.appendChild(tag);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+    body.innerHTML = formatResponse(text);
+    bubble.appendChild(body);
+
+    row.appendChild(bubble);
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function appendLoading() {
+    const id   = 'loading-' + Date.now();
+    const msgs = document.getElementById('messages');
+    const row  = document.createElement('div');
+    row.id = id;
+    row.className = 'msg-row assistant';
+    row.innerHTML = '<div class="msg-bubble loading-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+    return id;
+  }
+
+  function removeLoading(id) {
+    document.getElementById(id)?.remove();
+  }
+
+  function appendError(msg) {
+    const msgs  = document.getElementById('messages');
+    const row   = document.createElement('div');
+    row.className = 'msg-row error';
+    row.innerHTML = `<div class="msg-bubble error-bubble">⚠️ ${msg}</div>`;
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function updateProgress(p) {
+    document.getElementById('stat-exchanges').textContent = p.exchanges;
+    document.getElementById('stat-exercises').textContent = p.exercises_done;
+    document.getElementById('stat-tasks').textContent     = p.tasks_done;
+    document.getElementById('stat-quizzes').textContent   = p.quizzes_taken;
+    document.getElementById('phase-title').textContent    = p.phase_title;
+    document.getElementById('phase-desc').textContent     = p.phase_desc;
+  }
+
+  function formatAgentLabel(agent) {
+    const map = {
+      learning_coach:  '🧠 Learning Coach',
+      practice_arena:  '📝 Practice Arena',
+      idea_generator:  '💡 Idea Generator',
+      orchestrator:    '🎛️ AI² Orchestrator',
+    };
+    return map[agent] || agent;
+  }
+
+  // ── Response text formatting ───────────────────────────────────────────
+  // Converts plain text with Unicode quiz/interview markers into styled HTML.
+  function formatResponse(text) {
+    // Escape HTML entities first
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Bold **text**
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic _text_
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+
+    // Section headers (lines starting with ━)
+    html = html.replace(/(━+[^\n]+━+)/g, '<div class="resp-divider">$1</div>');
+
+    // Difficulty headers
+    html = html.replace(/(🟢 BEGINNER[^\n]*)/g,   '<div class="diff-header beginner">$1</div>');
+    html = html.replace(/(🟡 INTERMEDIATE[^\n]*)/g,'<div class="diff-header intermediate">$1</div>');
+    html = html.replace(/(🔴 ADVANCED[^\n]*)/g,    '<div class="diff-header advanced">$1</div>');
+    html = html.replace(/(💬 CONCEPTUAL[^\n]*)/g,  '<div class="diff-header conceptual">$1</div>');
+    html = html.replace(/(⚙️  TECHNICAL[^\n]*)/g,  '<div class="diff-header technical">$1</div>');
+    html = html.replace(/(🏗️  SCENARIO[^\n]*)/g,   '<div class="diff-header scenario">$1</div>');
+
+    // Question lines Q1. Q2. …
+    html = html.replace(/^(Q\d+\..+)$/gm, '<div class="q-stem">$1</div>');
+
+    // Answer reveal
+    html = html.replace(/(✅ Answer:.+)/g,  '<div class="q-answer">$1</div>');
+    html = html.replace(/(💡 Why:.+)/g,     '<div class="q-why">$1</div>');
+
+    // Paper recommendations
+    html = html.replace(/(📄 .+)/g, '<div class="paper-rec">$1</div>');
+
+    // Score rows
+    html = html.replace(/(TOTAL\s+:.+)/g, '<div class="score-total">$1</div>');
+
+    // Preserve newlines
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+  }
+</script>
+{% endblock %}
