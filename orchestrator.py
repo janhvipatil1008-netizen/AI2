@@ -247,7 +247,7 @@ class Orchestrator:
             tools       = ORCHESTRATOR_TOOLS,
             tool_choice = {"type": "any"},   # force exactly one tool call
             messages    = messages,
-            thinking    = {"type": "adaptive"},  # let Opus reason about routing
+            # Note: thinking cannot be used together with tool_choice="any"
         )
 
         # Append orchestrator routing turn
