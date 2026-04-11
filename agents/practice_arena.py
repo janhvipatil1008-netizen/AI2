@@ -376,7 +376,6 @@ def generate_mcq_quiz(
         max_tokens=AGENT_MAX_TOKENS,
         system=_cached_system(_MCQ_SYSTEM_PROMPT, session),
         messages=[{"role": "user", "content": user_content}],
-        thinking={"type": "adaptive"},
     )
 
     reply = response.content[-1].text if response.content else ""
@@ -430,7 +429,6 @@ def generate_interview_questions(
         max_tokens=AGENT_MAX_TOKENS,
         system=_cached_system(_INTERVIEW_SYSTEM_PROMPT, session),
         messages=[{"role": "user", "content": user_content}],
-        thinking={"type": "adaptive"},
     )
 
     reply = response.content[-1].text if response.content else ""
@@ -482,7 +480,6 @@ def evaluate_answer(
             "cache_control": {"type": "ephemeral"},
         }],
         messages=[{"role": "user", "content": user_content}],
-        thinking={"type": "adaptive"},
     )
 
     reply = response.content[-1].text if response.content else ""

@@ -462,7 +462,6 @@ def respond(
         max_tokens=AGENT_MAX_TOKENS,
         system=_build_system_prompt(session),
         messages=[{"role": "user", "content": user_content}],
-        thinking={"type": "adaptive"},
     )
 
     reply = response.content[-1].text if response.content else ""
