@@ -550,3 +550,206 @@ button { cursor: pointer; border: none; font-family: var(--font); }
   cursor: pointer; transition: opacity 0.15s;
 }
 .topic-go-btn:hover { opacity: 0.88; }
+
+/* ── Interactive Quiz Cards ─────────────────────────────────────────────── */
+
+/* The card wraps the whole quiz question inside the chat bubble */
+.quiz-card {
+  background:    var(--surface-2);
+  border:        1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow:      hidden;
+  margin-top:    4px;
+}
+
+/* Thin progress bar across the top — fills as questions advance */
+.quiz-top-bar {
+  height:     4px;
+  background: var(--surface);
+}
+.quiz-progress-fill {
+  height:     100%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  transition: width 0.5s ease;
+  min-width:  4px;
+}
+
+/* Level badge + Q counter row */
+.quiz-meta {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     center;
+  padding:         0.7rem 1rem 0.4rem;
+}
+.quiz-level-badge {
+  font-size:     0.7rem;
+  font-weight:   700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding:       0.2rem 0.65rem;
+  border-radius: 20px;
+}
+.quiz-level-badge.beginner     { background: rgba(63,185,80,.15);  color: var(--beginner);     }
+.quiz-level-badge.intermediate { background: rgba(210,153,34,.15); color: var(--intermediate); }
+.quiz-level-badge.advanced     { background: rgba(248,81,73,.15);  color: var(--advanced);     }
+.quiz-qnum {
+  font-size:   0.75rem;
+  color:       var(--text-dim);
+  font-weight: 600;
+}
+
+/* Question stem */
+.quiz-stem {
+  padding:     0.5rem 1rem 1rem;
+  font-size:   0.95rem;
+  font-weight: 600;
+  line-height: 1.55;
+  color:       var(--text);
+}
+
+/* Option buttons grid */
+.quiz-options {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.4rem;
+  padding:        0 0.75rem 0.85rem;
+}
+.quiz-opt {
+  display:       flex;
+  align-items:   center;
+  gap:           0.65rem;
+  width:         100%;
+  padding:       0.6rem 0.85rem;
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: var(--radius);
+  color:         var(--text);
+  font-size:     0.88rem;
+  text-align:    left;
+  cursor:        pointer;
+  transition:    border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.quiz-opt:hover:not(:disabled) {
+  border-color: var(--accent);
+  background:   rgba(0,180,216,.08);
+  transform:    translateY(-1px);
+}
+.quiz-opt:active:not(:disabled) { transform: translateY(0); }
+.quiz-opt:disabled { cursor: default; opacity: 0.65; }
+
+/* Letter circle (A / B / C / D) */
+.opt-letter {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           1.6rem;
+  height:          1.6rem;
+  border-radius:   50%;
+  background:      var(--surface-2);
+  border:          1px solid var(--border);
+  font-size:       0.75rem;
+  font-weight:     700;
+  flex-shrink:     0;
+  transition:      background 0.15s, border-color 0.15s;
+}
+.opt-text { flex: 1; line-height: 1.4; }
+
+/* Selected state — shown immediately on click before response arrives */
+.quiz-opt.selected {
+  border-color: var(--accent);
+  background:   rgba(0,180,216,.12);
+}
+.quiz-opt.selected .opt-letter {
+  background:   var(--accent);
+  border-color: var(--accent);
+  color:        #000;
+}
+
+/* ── Answer Reveal ───────────────────────────────────────────────────────── */
+
+.quiz-reveal {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.6rem;
+}
+
+/* Green / red result banner */
+.reveal-result {
+  display:       flex;
+  align-items:   center;
+  gap:           0.5rem;
+  padding:       0.6rem 0.9rem;
+  border-radius: var(--radius);
+  font-weight:   700;
+  font-size:     1rem;
+}
+.reveal-result.correct {
+  background: rgba(63,185,80,.15);
+  color:      var(--success);
+  border:     1px solid rgba(63,185,80,.3);
+}
+.reveal-result.wrong {
+  background: rgba(248,81,73,.12);
+  color:      var(--error);
+  border:     1px solid rgba(248,81,73,.25);
+}
+
+/* Answer + explanation box */
+.reveal-answer-box {
+  background:    rgba(63,185,80,.07);
+  border:        1px solid rgba(63,185,80,.2);
+  border-radius: var(--radius);
+  padding:       0.65rem 0.9rem;
+}
+.reveal-answer-line {
+  font-weight: 600;
+  color:       var(--success);
+  margin-bottom: 0.35rem;
+}
+.reveal-why {
+  font-size:   0.85rem;
+  color:       var(--text-dim);
+  line-height: 1.55;
+}
+
+/* Score pill */
+.reveal-score {
+  font-size:  0.82rem;
+  color:      var(--text-dim);
+  text-align: right;
+}
+.reveal-score strong { color: var(--text); }
+
+/* Separator between reveal and next question */
+.reveal-divider {
+  border:  none;
+  border-top: 1px solid var(--border);
+  margin: 0.25rem 0;
+}
+
+/* ── Quiz Complete Card ───────────────────────────────────────────────────── */
+
+.quiz-complete-card {
+  background:    linear-gradient(135deg, rgba(124,106,247,.15), rgba(79,195,247,.1));
+  border:        1px solid rgba(124,106,247,.35);
+  border-radius: var(--radius-lg);
+  padding:       1.25rem 1.25rem 1rem;
+  text-align:    center;
+  margin-top:    0.4rem;
+}
+.quiz-complete-title {
+  font-size:   1rem;
+  font-weight: 700;
+  color:       var(--text);
+  margin-bottom: 0.35rem;
+}
+.quiz-complete-score {
+  font-size:   1.5rem;
+  font-weight: 700;
+  color:       var(--accent);
+  margin-bottom: 0.25rem;
+}
+.quiz-complete-grade {
+  font-size: 0.85rem;
+  color:     var(--text-dim);
+}
