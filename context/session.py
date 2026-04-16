@@ -45,6 +45,9 @@ class SessionContext:
     quiz_scores:        list[dict]           = field(default_factory=list)
     # Topics that have been quizzed at least once (for progress awareness)
     topics_quizzed:     set[str]             = field(default_factory=set)
+    # Active interactive quiz state — populated by practice_arena, cleared on completion
+    # Schema: {topic, questions: [...], current_q: int, score: int, user_answers: [...]}
+    quiz_state:         dict                 = field(default_factory=dict)
 
     # ── Progress helpers ──────────────────────────────────────────────────────
 
@@ -173,6 +176,7 @@ class SessionContext:
             "topics_explored":  list(self.topics_explored),
             "papers_seen":      list(self.papers_seen),
             "topics_quizzed":   list(self.topics_quizzed),
+            "quiz_state":       self.quiz_state,
             "history": [
                 {
                     "user_message":    r.user_message,
@@ -199,6 +203,7 @@ class SessionContext:
         session.topics_explored = set(data.get("topics_explored", []))
         session.papers_seen     = set(data.get("papers_seen",     []))
         session.topics_quizzed  = set(data.get("topics_quizzed",  []))
+        session.quiz_state      = data.get("quiz_state", {})
         session.history = [
             ExchangeRecord(
                 user_message    = r["user_message"],

@@ -16,6 +16,7 @@ Both modes are personalised to the learner's track (AIPM / Evals / Context Engin
 and calibrated to the current phase of the curriculum.
 """
 
+import re
 import anthropic
 from context.session import SessionContext
 from curriculum.syllabus import get_full_track_summary, format_week_context, _WEEK_TO_PHASE
@@ -333,6 +334,190 @@ CURRENT WEEK CONTEXT
 """
 
 
+# ── Interactive quiz helpers ──────────────────────────────────────────────────
+
+_LEVEL_EMOJI = {"beginner": "🟢", "intermediate": "🟡", "advanced": "🔴"}
+
+
+def _parse_quiz_questions(text: str) -> list[dict]:
+    """
+    Parse the raw generated quiz text into a list of question dicts.
+
+    HOW IT WORKS:
+      1. Split the full text on newline-before-Q{n}. boundaries
+         Each chunk is one question block (plus a header chunk before Q1)
+      2. For each chunk: extract stem, A/B/C/D options, correct answer, explanation
+      3. Normalize whitespace (multi-line options → single line)
+      4. Return only well-formed questions (all 4 options + answer present)
+
+    The fallback in generate_mcq_quiz() returns the raw text if < 5 questions parse.
+    """
+    questions = []
+    # Prepend newline so the split pattern fires on Q1 too
+    blocks = re.split(r'\n(?=Q\d+\.)', '\n' + text)
+
+    for block in blocks:
+        # Must start with Q{n}.
+        qnum_m = re.match(r'\s*Q(\d+)\.\s*', block)
+        if not qnum_m:
+            continue
+        qnum = int(qnum_m.group(1))
+
+        # Stem: text between "Q{n}. " and the first "A)"
+        stem_m = re.search(r'Q\d+\.\s+(.+?)\n\s*A\)', block, re.DOTALL)
+        if not stem_m:
+            continue
+        stem = ' '.join(stem_m.group(1).split())  # collapse multiline/extra spaces
+
+        # Options: each letter to the next letter (or ✅ for D)
+        options: dict[str, str] = {}
+        for i, letter in enumerate('ABCD'):
+            if i < 3:
+                nxt = 'ABCD'[i + 1]
+                pat = rf'{letter}\)\s+(.+?)\n\s*{nxt}\)'
+            else:
+                pat = r'D\)\s+(.+?)(?=\n\s*✅|\Z)'
+            m = re.search(pat, block, re.DOTALL)
+            if m:
+                options[letter] = ' '.join(m.group(1).split())
+
+        if len(options) < 4:
+            continue
+
+        # Correct answer letter
+        ans_m = re.search(r'✅\s*Answer:\s*([A-D])\)', block)
+        if not ans_m:
+            continue
+        answer = ans_m.group(1)
+
+        # Explanation
+        why_m = re.search(r'💡\s*Why:\s*(.+?)$', block, re.DOTALL)
+        explanation = ' '.join(why_m.group(1).split()) if why_m else ""
+
+        level = "beginner" if qnum <= 5 else "intermediate" if qnum <= 10 else "advanced"
+        questions.append({
+            "number": qnum, "level": level, "stem": stem,
+            "options": options, "answer": answer, "explanation": explanation,
+        })
+
+    return questions
+
+
+def _format_question_card(q: dict, total: int) -> str:
+    """
+    Render a single question WITHOUT the answer — shown to the learner.
+    Uses the same Unicode markers as the existing quiz format so
+    formatResponse() in chat.html styles it correctly.
+    """
+    emoji = _LEVEL_EMOJI.get(q["level"], "📝")
+    return (
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{emoji} Question {q['number']} of {total} — {q['level'].upper()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Q{q['number']}. {q['stem']}\n\n"
+        f"   A) {q['options'].get('A', '')}\n"
+        f"   B) {q['options'].get('B', '')}\n"
+        f"   C) {q['options'].get('C', '')}\n"
+        f"   D) {q['options'].get('D', '')}\n\n"
+        f"Reply **A**, **B**, **C**, or **D** to answer."
+    )
+
+
+def _format_answer_reveal(
+    q: dict,
+    user_answer: str,
+    next_q: dict | None,
+    score: int,
+    answered: int,
+    total: int,
+    topic: str,
+) -> str:
+    """
+    Reveal the correct answer + explanation AFTER the learner has answered,
+    then either show the next question or the final score summary.
+    """
+    correct     = user_answer == q["answer"]
+    result_line = "✅ Correct!" if correct else f"❌ Not quite."
+
+    lines = [
+        result_line,
+        "",
+        f"✅ Answer: {q['answer']}) {q['options'].get(q['answer'], '')}",
+        f"💡 Why: {q['explanation']}",
+        "",
+        f"Score so far: **{score}/{answered}**",
+    ]
+
+    if next_q:
+        lines += ["", "─────────────────────────────────────────────────────", ""]
+        lines += _format_question_card(next_q, total).split("\n")
+    else:
+        pct = round(score / total * 100) if total else 0
+        if pct >= 90:
+            grade = "🏆 Outstanding"
+        elif pct >= 75:
+            grade = "⭐⭐⭐ Strong"
+        elif pct >= 50:
+            grade = "⭐⭐ Good progress"
+        else:
+            grade = "⭐ Keep practicing"
+        lines += [
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📊 QUIZ COMPLETE — {topic}",
+            f"   Final score: {score}/{total} ({pct}%) {grade}",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "",
+            "Well done finishing the quiz! Ask me anything or start a new quiz anytime.",
+        ]
+
+    return "\n".join(lines)
+
+
+def handle_quiz_answer(session: SessionContext, user_answer: str) -> str:
+    """
+    Handle a single A/B/C/D answer during an active interactive quiz.
+    No API call — uses stored quiz_state. Returns answer reveal + next question
+    (or final score summary when the last question is answered).
+
+    Called directly from app.py before routing to the orchestrator,
+    so quiz answers bypass Claude entirely and respond instantly.
+    """
+    state     = session.quiz_state
+    questions = state["questions"]
+    idx       = state["current_q"]
+
+    if idx >= len(questions):
+        session.quiz_state = {}
+        return "The quiz is already complete. Start a new one anytime!"
+
+    q       = questions[idx]
+    correct = user_answer == q["answer"]
+    if correct:
+        state["score"] += 1
+    state["user_answers"].append(user_answer)
+    state["current_q"] = idx + 1
+    answered = idx + 1
+
+    next_q = questions[idx + 1] if idx + 1 < len(questions) else None
+    reply  = _format_answer_reveal(
+        q=q, user_answer=user_answer,
+        next_q=next_q,
+        score=state["score"], answered=answered,
+        total=len(questions), topic=state["topic"],
+    )
+
+    if next_q is None:
+        # Record completed quiz and clear state
+        session.record_quiz(
+            topic=state["topic"], mode="mcq_quiz",
+            score=state["score"], total=len(questions),
+        )
+        session.quiz_state = {}
+
+    return reply
+
+
 # ── Public interface ──────────────────────────────────────────────────────────
 
 def generate_mcq_quiz(
@@ -378,10 +563,32 @@ def generate_mcq_quiz(
         messages=[{"role": "user", "content": user_content}],
     )
 
-    reply = response.content[-1].text if response.content else ""
+    raw = response.content[-1].text if response.content else ""
     session.note_topic(topic)
     session.mark_exercise_done()
-    return reply
+
+    # Parse into individual question dicts and set up interactive state.
+    # If parsing produces < 5 questions (Claude didn't follow the format),
+    # fall back to returning the raw text unchanged.
+    questions = _parse_quiz_questions(raw)
+    if len(questions) >= 5:
+        session.quiz_state = {
+            "topic":        topic,
+            "questions":    questions,
+            "current_q":    0,
+            "score":        0,
+            "user_answers": [],
+        }
+        return (
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📝  QUIZ: {topic} — {session.track.value.upper()} Track\n"
+            f"    {len(questions)} questions · one at a time · answers revealed after each\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            + _format_question_card(questions[0], len(questions))
+        )
+
+    # Fallback: return full raw output (answers visible, as before)
+    return raw
 
 
 def generate_interview_questions(

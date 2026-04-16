@@ -570,6 +570,22 @@ async def chat(request: Request, body: ChatRequest):
     if not body.message.strip():
         raise HTTPException(status_code=422, detail="Message cannot be empty")
 
+    # ── Interactive quiz intercept ─────────────────────────────────────────────
+    # If the learner is mid-quiz and types A/B/C/D, handle it directly without
+    # going to the orchestrator. This makes quiz answers instant (no API call).
+    if session.quiz_state and session.quiz_state.get("questions"):
+        cleaned = body.message.strip().rstrip(".!?,").upper()
+        if cleaned in ("A", "B", "C", "D"):
+            response_text = practice_arena.handle_quiz_answer(session, cleaned)
+            agent_used    = "practice_arena"
+            session.add_exchange(body.message, response_text[:500], agent_used)
+            _save_session(body.session_id, session)
+            return {
+                "response":   response_text,
+                "agent_used": agent_used,
+                "progress":   _session_progress(session),
+            }
+
     if TEST_MODE:
         response_text, agent_used = _mock_orchestrator_response(body.message, session)
         session.add_exchange(body.message, response_text[:500], agent_used)
