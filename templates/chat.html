@@ -364,7 +364,8 @@
 
   function renderAnswerReveal(text) {
     // Split at the ─── separator between reveal and next question
-    const parts = text.split(/\n─{10,}\n/);
+    // Backend emits \n\n─────\n\n (blank lines on both sides) so use \n+
+    const parts = text.split(/\n+─{10,}\n+/);
     const revealText = parts[0] || '';
     const nextText   = parts[1] ? parts[1].trim() : null;
 
@@ -377,7 +378,7 @@
     const answerLine = ansMatch ? ansMatch[1].trim() : '';
 
     // Extract explanation after 💡 Why:
-    const whyMatch = revealText.match(/💡\s*Why:\s*([\s\S]+?)(?=\nScore|\Z)/);
+    const whyMatch = revealText.match(/💡\s*Why:\s*(.+)/);
     const whyText  = whyMatch ? whyMatch[1].trim() : '';
 
     // Extract score  "Score so far: **X/Y**"
