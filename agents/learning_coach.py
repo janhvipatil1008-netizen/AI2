@@ -6,6 +6,11 @@ the learner through the curriculum with a clear eye on where they've been and
 where they're going.
 """
 
+import json
+import urllib.request
+import urllib.parse
+import xml.etree.ElementTree as ET
+
 import anthropic
 from context.session import SessionContext
 from curriculum.syllabus import (
@@ -16,6 +21,34 @@ from curriculum.syllabus import (
     _WEEK_TO_PHASE,
 )
 from config import AGENT_MODEL, AGENT_MAX_TOKENS
+
+# ── Tool definition ────────────────────────────────────────────────────────────
+# This is the contract between Claude and our code.
+# "description" = what Claude reads to decide WHEN to call it.
+# "input_schema" = what Claude must fill in (and what _fetch_arxiv_papers receives).
+_PAPER_SEARCH_TOOL = {
+    "name": "paper_search",
+    "description": (
+        "Search arXiv for research papers on a topic. "
+        "Use when the learner asks for papers, citations, reading lists, "
+        "or wants to go deeper on any concept."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search terms, e.g. 'retrieval augmented generation LLM'",
+            },
+            "max_results": {
+                "type": "integer",
+                "description": "Papers to return (1–5)",
+                "default": 3,
+            },
+        },
+        "required": ["query"],
+    },
+}
 
 # ── Curated paper / resource database ─────────────────────────────────────────
 # Keyed by phase_id. Each entry has:
@@ -262,6 +295,50 @@ PHASE_PAPERS: dict[str, list[dict]] = {
 }
 
 
+# ── Live arXiv paper fetch ─────────────────────────────────────────────────────
+
+def _fetch_arxiv_papers(query: str, max_results: int = 3) -> list[dict]:
+    """
+    Fetch papers from arXiv's free Atom API.
+
+    HOW IT WORKS:
+      1. Build the URL with urllib.parse.urlencode — safely encodes spaces/special chars
+      2. urllib.request.urlopen fetches the HTTP response (timeout=8s prevents hanging)
+      3. arXiv returns Atom XML — xml.etree.ElementTree parses it
+      4. Each <entry> is one paper; we extract title, authors, year, abstract, URL
+      5. Return a list of dicts Claude will read as tool_result
+
+    The Atom namespace prefix "atom:" is required because arXiv uses
+    xmlns="http://www.w3.org/2005/Atom" in the XML root.
+    """
+    base = "https://export.arxiv.org/api/query"
+    params = urllib.parse.urlencode({
+        "search_query": f"all:{query}",
+        "max_results": max_results,
+        "sortBy": "relevance",
+    })
+    with urllib.request.urlopen(f"{base}?{params}", timeout=8) as resp:
+        xml_data = resp.read()
+
+    ns = {"atom": "http://www.w3.org/2005/Atom"}
+    root = ET.fromstring(xml_data)
+    papers = []
+    for entry in root.findall("atom:entry", ns):
+        title   = entry.find("atom:title", ns).text.strip().replace("\n", " ")
+        authors = ", ".join(
+            a.find("atom:name", ns).text
+            for a in entry.findall("atom:author", ns)[:3]
+        )
+        summary = entry.find("atom:summary", ns).text.strip()[:300]
+        url     = entry.find("atom:id", ns).text.strip()
+        year    = entry.find("atom:published", ns).text[:4]
+        papers.append({
+            "title": title, "authors": authors,
+            "year": year, "summary": summary, "url": url,
+        })
+    return papers
+
+
 # ── System prompt ──────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT_TEMPLATE = """\
@@ -381,19 +458,6 @@ def _build_learner_context(session: SessionContext, depth: str) -> str:
         if session.goals else "  (not stated — infer from track and phase)"
     )
 
-    # Available papers for current phase
-    phase_papers = _get_papers_for_phase(phase_id, role_key)
-    available_papers = [
-        p for p in phase_papers
-        if p["title"].lower() not in session.papers_seen
-    ]
-    paper_library_text = "\n".join(
-        f"  📄 {p['title']} — {p['cite']}\n"
-        f"     Why: {p['why']}\n"
-        f"     Topics: {', '.join(p['topics'])}"
-        for p in available_papers
-    ) or "  (all phase papers already recommended)"
-
     phase_title = phase["title"] if phase else f"Week {session.current_week}"
     phase_desc = phase["description"] if phase else ""
 
@@ -420,9 +484,6 @@ UPCOMING TASKS (next 3 on the learner's plate)
 
 PAPERS ALREADY SEEN THIS SESSION (do NOT recommend these again)
   {papers_seen_text}
-
-AVAILABLE PAPERS FOR THIS PHASE (recommend from this list when relevant)
-{paper_library_text}
 ════════════════════════════════════════"""
 
 
@@ -457,13 +518,64 @@ def respond(
         f"━━━ STUDENT QUESTION (depth: {depth}) ━━━\n{query}"
     )
 
+    # ── First API call ─────────────────────────────────────────────────────────
+    # We pass tools=[_PAPER_SEARCH_TOOL] so Claude knows it CAN search arXiv.
+    # If Claude decides to search, stop_reason == "tool_use" and response.content
+    # contains a tool_use block with the query Claude chose.
+    # If Claude answers directly, stop_reason == "end_turn" and we're done.
+    messages = [{"role": "user", "content": user_content}]
+
     response = client.messages.create(
         model=AGENT_MODEL,
         max_tokens=AGENT_MAX_TOKENS,
         system=_build_system_prompt(session),
-        messages=[{"role": "user", "content": user_content}],
+        tools=[_PAPER_SEARCH_TOOL],
+        messages=messages,
     )
 
+    # ── Tool use loop ──────────────────────────────────────────────────────────
+    # Runs 0 or 1 times for paper_search (Claude rarely needs to search twice).
+    # The loop structure handles the general case correctly regardless.
+    while response.stop_reason == "tool_use":
+        # Find the tool_use block Claude returned — it contains the tool name
+        # and the inputs Claude chose (e.g. {"query": "RAG pipelines", "max_results": 3})
+        tool_block = next(b for b in response.content if b.type == "tool_use")
+
+        # Execute our function with the inputs Claude chose
+        try:
+            results = _fetch_arxiv_papers(
+                query=tool_block.input["query"],
+                max_results=tool_block.input.get("max_results", 3),
+            )
+        except Exception:
+            # arXiv is down or timed out — fall back to the curated PHASE_PAPERS list
+            phase_id = _WEEK_TO_PHASE.get(session.current_week, "portfolio")
+            results  = _get_papers_for_phase(phase_id, session.track.value)[:3]
+
+        # Grow the messages list:
+        #   assistant turn = Claude's response including the tool_use block
+        #   user turn      = our tool_result (tool results always go in a user turn)
+        # tool_use_id links this result to the exact tool call Claude made.
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({
+            "role": "user",
+            "content": [{
+                "type": "tool_result",
+                "tool_use_id": tool_block.id,
+                "content": json.dumps({"papers": results}),
+            }],
+        })
+
+        # Second API call — Claude now reads the arXiv results and writes its answer
+        response = client.messages.create(
+            model=AGENT_MODEL,
+            max_tokens=AGENT_MAX_TOKENS,
+            system=_build_system_prompt(session),
+            tools=[_PAPER_SEARCH_TOOL],
+            messages=messages,
+        )
+
+    # stop_reason == "end_turn" — Claude has written its final answer
     reply = response.content[-1].text if response.content else ""
 
     # Track topics and any papers mentioned in this response
