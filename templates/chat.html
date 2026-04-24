@@ -313,45 +313,43 @@
     return /^[✅❌]/.test(text.trim());
   }
 
-  // Parse the structured quiz question text into a plain object.
-  // Returns null if the text doesn't match the expected format.
   function parseQuizQuestion(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-
     let emoji = '📝', qnum = 0, total = 15, level = 'beginner';
     for (const line of lines) {
       const m = line.match(/([🟢🟡🔴📝])\s*Question\s+(\d+)\s+of\s+(\d+)\s*[—-]\s*(.+)/u);
       if (m) { emoji = m[1]; qnum = +m[2]; total = +m[3]; level = m[4].toLowerCase().trim(); break; }
     }
     if (!qnum) return null;
-
     let stem = '';
     for (const line of lines) {
       if (/^Q\d+\./.test(line)) { stem = line.replace(/^Q\d+\.\s*/, ''); break; }
     }
     if (!stem) return null;
-
     const options = {};
     for (const line of lines) {
       const m = line.match(/^([ABCD])\)\s+(.+)/);
       if (m) options[m[1]] = m[2];
     }
     if (Object.keys(options).length < 4) return null;
-
     return { emoji, qnum, total, level, stem, options };
   }
 
+  // Render a quiz question card. Marks it as the active card for answer handling.
   function renderQuizCard(d) {
-    const pct = Math.round((d.qnum - 1) / d.total * 100);
-    const levelKey = d.level.split(' ')[0]; // "beginner", "intermediate", "advanced"
-    const opts = ['A','B','C','D'].map(l =>
+    // Deactivate any previous card
+    document.querySelectorAll('.active-quiz-card').forEach(c => c.classList.remove('active-quiz-card'));
+
+    const pct      = Math.round((d.qnum - 1) / d.total * 100);
+    const levelKey = d.level.split(' ')[0];
+    const opts     = ['A','B','C','D'].map(l =>
       `<button class="quiz-opt" data-letter="${l}" onclick="submitQuizAnswer('${l}')">
          <span class="opt-letter">${l}</span>
          <span class="opt-text">${esc(d.options[l] || '')}</span>
        </button>`
     ).join('');
     return `
-      <div class="quiz-card">
+      <div class="quiz-card active-quiz-card">
         <div class="quiz-top-bar"><div class="quiz-progress-fill" style="width:${pct}%"></div></div>
         <div class="quiz-meta">
           <span class="quiz-level-badge ${levelKey}">${d.emoji} ${levelKey.toUpperCase()}</span>
@@ -359,79 +357,183 @@
         </div>
         <div class="quiz-stem">Q${d.qnum}. ${esc(d.stem)}</div>
         <div class="quiz-options">${opts}</div>
+        <div class="quiz-footer"></div>
       </div>`;
   }
 
+  // Click handler: locks buttons, fetches answer, reveals in-place.
+  async function submitQuizAnswer(letter) {
+    const card = document.querySelector('.active-quiz-card');
+    if (!card) return;
+
+    // Lock all buttons immediately, highlight selected
+    card.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
+    const sel = card.querySelector(`.quiz-opt[data-letter="${letter}"]`);
+    if (sel) sel.classList.add('selected');
+
+    // Show checking dots in footer
+    const footer = card.querySelector('.quiz-footer');
+    if (footer) footer.innerHTML = '<div class="quiz-checking"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+
+    document.getElementById('send-btn').disabled = true;
+
+    try {
+      const resp = await fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ session_id: SESSION_ID, message: letter })
+      });
+      if (!resp.ok) throw new Error('Server error ' + resp.status);
+      const data = await resp.json();
+      updateProgress(data.progress);
+      revealQuizAnswer(card, data.response, letter);
+    } catch(e) {
+      card.querySelectorAll('.quiz-opt').forEach(b => b.disabled = false);
+      if (sel) sel.classList.remove('selected');
+      if (footer) footer.innerHTML = '';
+      appendError('Network error — please try again.');
+    } finally {
+      document.getElementById('send-btn').disabled = false;
+      input.focus();
+    }
+  }
+
+  // Update the current card in-place: color options, show explanation, add Next button.
+  function revealQuizAnswer(card, responseText, selectedLetter) {
+    const ansMatch     = responseText.match(/✅\s*Answer:\s*([A-D])\)/);
+    const correctLetter = ansMatch ? ansMatch[1] : null;
+    const isCorrect    = correctLetter === selectedLetter;
+
+    // Color option buttons: green = correct, red = wrong pick, dimmed = others
+    card.querySelectorAll('.quiz-opt').forEach(btn => {
+      const l = btn.dataset.letter;
+      if (l === correctLetter)                          btn.classList.add('opt-correct');
+      else if (l === selectedLetter && !isCorrect)       btn.classList.add('opt-wrong');
+      else                                               btn.classList.add('opt-other');
+    });
+
+    // Parse explanation content from the reveal part (before the ─── separator)
+    const revealPart  = responseText.split(/\n+─{10,}\n+/)[0];
+    const ansLine     = ansMatch ? (responseText.match(/✅\s*Answer:\s*([A-D]\).+)/)?.[1] || '') : '';
+    const whyMatch    = revealPart.match(/💡\s*Why:\s*([\s\S]+?)(?=\n\n|$)/);
+    const whyText     = whyMatch ? whyMatch[1].replace(/\s+/g, ' ').trim() : '';
+    const scoreMatch  = responseText.match(/Score so far:\s*\*\*(.+?)\*\*/);
+    const scoreText   = scoreMatch ? scoreMatch[1] : '';
+    const isComplete  = responseText.includes('📊 QUIZ COMPLETE');
+
+    const badge = isCorrect ? 'correct' : 'wrong';
+    const label = isCorrect ? '✅ Correct!' : '❌ Not quite.';
+
+    let html = `<div class="quiz-inline-reveal ${badge}">
+      <div class="reveal-result-badge ${badge}">${label}</div>
+      ${ansLine   ? `<div class="reveal-ans-line">${esc(ansLine)}</div>` : ''}
+      ${whyText   ? `<div class="reveal-why-text">💡 ${esc(whyText)}</div>` : ''}
+      ${scoreText ? `<div class="reveal-score-inline">Score: <strong>${esc(scoreText)}</strong></div>` : ''}
+    </div>`;
+
+    // Quiz complete: show summary card, no Next button
+    if (isComplete) {
+      const finalMatch = responseText.match(/Final score:\s*(.+)/);
+      const finalScore = finalMatch ? finalMatch[1].trim().replace(/\n.*/,'') : '';
+      html += `<div class="quiz-complete-inline">
+        <div class="quiz-complete-title">📊 Quiz Complete!</div>
+        <div class="quiz-complete-score">${esc(finalScore)}</div>
+        <div class="quiz-complete-grade">Type anything to keep learning, or start a new quiz!</div>
+      </div>`;
+      const footer = card.querySelector('.quiz-footer');
+      if (footer) footer.innerHTML = html;
+      card.classList.remove('active-quiz-card');
+      return;
+    }
+
+    // Parse next question and attach it to the Next button via data attribute
+    const parts    = responseText.split(/\n+─{10,}\n+/);
+    const nextText = parts[1] ? parts[1].trim() : '';
+    const nextData = (nextText && isQuizQuestion(nextText)) ? nextText : '';
+
+    // Store next question via a global map keyed by a unique ID (avoids HTML attribute issues with newlines)
+    const nextId = 'nq-' + Date.now();
+    window._quizNextMap = window._quizNextMap || {};
+    window._quizNextMap[nextId] = nextData;
+
+    html += `<button class="quiz-next-btn" data-next-id="${nextId}" onclick="advanceToNextQuestion(this)">
+      Next Question →
+    </button>`;
+
+    const footer = card.querySelector('.quiz-footer');
+    if (footer) footer.innerHTML = html;
+    card.classList.remove('active-quiz-card');
+
+    // Scroll so reveal is visible
+    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  }
+
+  // Append the next question as a new card, scroll to it.
+  function advanceToNextQuestion(btn) {
+    const nextId   = btn.dataset.nextId;
+    const nextText = (window._quizNextMap || {})[nextId] || '';
+    if (!nextText || !isQuizQuestion(nextText)) return;
+    const parsed = parseQuizQuestion(nextText);
+    if (!parsed) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+
+    const msgs   = document.getElementById('messages');
+    const row    = document.createElement('div');
+    row.className = 'msg-row assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    const body   = document.createElement('div');
+    body.className  = 'msg-body';
+    body.innerHTML  = renderQuizCard(parsed);
+    bubble.appendChild(body);
+    row.appendChild(bubble);
+    msgs.appendChild(row);
+    msgs.scrollTop = msgs.scrollHeight;
+    btn.remove();
+  }
+
+  // Fallback reveal renderer — used when quiz_state wasn't set (raw text fallback).
   function renderAnswerReveal(text) {
-    // Split at the ─── separator between reveal and next question
-    // Backend emits \n\n─────\n\n (blank lines on both sides) so use \n+
-    const parts = text.split(/\n+─{10,}\n+/);
+    const parts      = text.split(/\n+─{10,}\n+/);
     const revealText = parts[0] || '';
     const nextText   = parts[1] ? parts[1].trim() : null;
-
-    const isCorrect   = revealText.includes('✅ Correct!');
-    const resultLabel = isCorrect ? '✅ Correct!' : '❌ Not quite.';
+    const isCorrect  = revealText.includes('✅ Correct!');
     const resultClass = isCorrect ? 'correct' : 'wrong';
-
-    // Extract answer line (letter + text after ✅ Answer:)
-    const ansMatch = revealText.match(/✅\s*Answer:\s*([A-D]\).+)/);
+    const resultLabel = isCorrect ? '✅ Correct!' : '❌ Not quite.';
+    const ansMatch   = revealText.match(/✅\s*Answer:\s*([A-D]\).+)/);
     const answerLine = ansMatch ? ansMatch[1].trim() : '';
-
-    // Extract explanation after 💡 Why:
-    const whyMatch = revealText.match(/💡\s*Why:\s*(.+)/);
-    const whyText  = whyMatch ? whyMatch[1].trim() : '';
-
-    // Extract score  "Score so far: **X/Y**"
+    const whyMatch   = revealText.match(/💡\s*Why:\s*(.+)/);
+    const whyText    = whyMatch ? whyMatch[1].trim() : '';
     const scoreMatch = revealText.match(/Score so far:\s*\*\*(.+?)\*\*/);
     const scoreText  = scoreMatch ? scoreMatch[1] : '';
 
     let html = `<div class="quiz-reveal">
       <div class="reveal-result ${resultClass}">${resultLabel}</div>`;
-
     if (answerLine || whyText) {
       html += `<div class="reveal-answer-box">
         ${answerLine ? `<div class="reveal-answer-line">✅ ${esc(answerLine)}</div>` : ''}
         ${whyText    ? `<div class="reveal-why">💡 ${esc(whyText)}</div>` : ''}
       </div>`;
     }
-
-    if (scoreText) {
-      html += `<div class="reveal-score">Score so far: <strong>${esc(scoreText)}</strong></div>`;
-    }
-
+    if (scoreText) html += `<div class="reveal-score">Score so far: <strong>${esc(scoreText)}</strong></div>`;
     html += '</div>';
 
-    // Quiz complete?
     if (text.includes('📊 QUIZ COMPLETE')) {
-      const scoreLineMatch = text.match(/Final score:\s*(.+)/);
-      const finalScore = scoreLineMatch ? scoreLineMatch[1].trim() : '';
+      const m = text.match(/Final score:\s*(.+)/);
       html += `<div class="quiz-complete-card">
         <div class="quiz-complete-title">📊 Quiz Complete</div>
-        <div class="quiz-complete-score">${esc(finalScore)}</div>
+        <div class="quiz-complete-score">${esc(m ? m[1].trim() : '')}</div>
         <div class="quiz-complete-grade">Type anything to keep learning, or start a new quiz!</div>
       </div>`;
       return html;
     }
-
-    // Next question card
     if (nextText && isQuizQuestion(nextText)) {
       const parsed = parseQuizQuestion(nextText);
-      if (parsed) {
-        html += `<hr class="reveal-divider">` + renderQuizCard(parsed);
-      }
+      if (parsed) html += `<hr class="reveal-divider">` + renderQuizCard(parsed);
     }
-
     return html;
-  }
-
-  // Called when a learner clicks an option button.
-  // Disables all options (prevents double-submit), marks selected, sends the letter.
-  function submitQuizAnswer(letter) {
-    document.querySelectorAll('.quiz-opt').forEach(b => b.disabled = true);
-    const sel = document.querySelector(`.quiz-opt[data-letter="${letter}"]`);
-    if (sel) sel.classList.add('selected');
-    input.value = letter;
-    sendMessage();
   }
 
   // Escape HTML entities for safe insertion into innerHTML

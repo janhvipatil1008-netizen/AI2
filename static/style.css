@@ -698,6 +698,123 @@ button { cursor: pointer; border: none; font-family: var(--font); }
   color:        #000;
 }
 
+/* Revealed states — colored after answer arrives */
+.quiz-opt.opt-correct {
+  border-color: var(--success);
+  background:   rgba(63,185,80,.12);
+  cursor:       default;
+}
+.quiz-opt.opt-correct .opt-letter {
+  background:   var(--success);
+  border-color: var(--success);
+  color:        #000;
+}
+.quiz-opt.opt-wrong {
+  border-color: var(--error);
+  background:   rgba(248,81,73,.12);
+  cursor:       default;
+}
+.quiz-opt.opt-wrong .opt-letter {
+  background:   var(--error);
+  border-color: var(--error);
+  color:        #fff;
+}
+.quiz-opt.opt-other {
+  opacity:      0.4;
+  cursor:       default;
+}
+
+/* Footer area inside the card — checking dots + reveal panel live here */
+.quiz-footer {
+  padding: 0 0.75rem 0;
+}
+
+/* Loading dots inside the card while waiting for the server */
+.quiz-checking {
+  display:     flex;
+  gap:         5px;
+  padding:     0.6rem 0.25rem;
+  align-items: center;
+}
+
+/* ── In-place reveal panel ───────────────────────────────────────────────── */
+.quiz-inline-reveal {
+  border-radius: var(--radius);
+  padding:       0.75rem 0.85rem;
+  margin-bottom: 0.65rem;
+  animation:     fadeSlideIn 0.25s ease both;
+}
+.quiz-inline-reveal.correct {
+  background:   rgba(63,185,80,.1);
+  border:       1px solid rgba(63,185,80,.3);
+}
+.quiz-inline-reveal.wrong {
+  background:   rgba(248,81,73,.1);
+  border:       1px solid rgba(248,81,73,.3);
+}
+
+.reveal-result-badge {
+  font-size:   0.88rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.reveal-result-badge.correct { color: var(--success); }
+.reveal-result-badge.wrong   { color: var(--error); }
+
+.reveal-ans-line {
+  font-size:     0.84rem;
+  font-weight:   600;
+  color:         var(--success);
+  margin-bottom: 0.35rem;
+}
+.reveal-why-text {
+  font-size:   0.82rem;
+  color:       var(--text-dim);
+  line-height: 1.55;
+  margin-bottom: 0.4rem;
+}
+.reveal-score-inline {
+  font-size:  0.78rem;
+  color:      var(--text-dim);
+  text-align: right;
+}
+.reveal-score-inline strong { color: var(--text); }
+
+/* "Next Question →" button */
+.quiz-next-btn {
+  display:       block;
+  width:         100%;
+  margin:        0.1rem 0 0.75rem;
+  padding:       0.65rem 1rem;
+  background:    linear-gradient(135deg, #7c6af7, var(--accent));
+  border:        none;
+  border-radius: var(--radius);
+  color:         #fff;
+  font-size:     0.9rem;
+  font-weight:   600;
+  cursor:        pointer;
+  transition:    opacity 0.15s, transform 0.1s;
+  text-align:    center;
+}
+.quiz-next-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.quiz-next-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Quiz complete inside the card */
+.quiz-complete-inline {
+  background:    linear-gradient(135deg, rgba(124,106,247,.15), rgba(79,195,247,.1));
+  border:        1px solid rgba(124,106,247,.35);
+  border-radius: var(--radius);
+  padding:       1rem;
+  margin-bottom: 0.75rem;
+  text-align:    center;
+  animation:     fadeSlideIn 0.3s ease both;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Answer Reveal ───────────────────────────────────────────────────────── */
 
 .quiz-reveal {
