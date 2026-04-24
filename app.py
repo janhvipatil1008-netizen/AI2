@@ -39,7 +39,7 @@ from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES, TOTAL_WEEKS
 from context.session import SessionContext
 from curriculum.syllabus import (
     format_week_context, _WEEK_TO_PHASE, get_phase_by_id,
-    PHASES, get_task_key,
+    PHASES, get_task_key, ROLE_TRACKS,
     get_progress as syllabus_get_progress,
 )
 from orchestrator import Orchestrator
@@ -703,26 +703,30 @@ async def syllabus_page(request: Request, session_id: str):
     session = data["session"]
     role    = session.track.value
 
-    # Build phase list with tasks filtered to this role + current completion status
+    # Build phase list — ALL tasks across all roles, with role metadata.
+    # Progress bar counts only the learner's own role (so it stays meaningful).
     phases_data = []
     for phase in PHASES:
-        phase_tasks = []
+        all_tasks  = []
+        role_done  = 0
+        role_total = 0
         for ti, track in enumerate(phase["tracks"]):
-            if role not in track["roles"]:
-                continue
             for taski, task in enumerate(track["tasks"]):
-                if role not in task["roles"]:
-                    continue
                 key    = get_task_key(phase["id"], ti, taski)
                 status = session.syllabus_progress.get(key, "todo")
-                phase_tasks.append({
+                all_tasks.append({
                     "key":        key,
                     "text":       task["text"],
                     "track_name": track["name"],
                     "status":     status,
+                    "roles":      task["roles"],
+                    "is_my_role": role in task["roles"],
                 })
-        if phase_tasks:
-            done_count = sum(1 for t in phase_tasks if t["status"] == "done")
+                if role in task["roles"]:
+                    role_total += 1
+                    if status == "done":
+                        role_done += 1
+        if all_tasks:
             phases_data.append({
                 "id":          phase["id"],
                 "phase":       phase["phase"],
@@ -730,10 +734,10 @@ async def syllabus_page(request: Request, session_id: str):
                 "weeks":       phase["weeks"],
                 "icon":        phase["icon"],
                 "description": phase["description"],
-                "tasks":       phase_tasks,
-                "done":        done_count,
-                "total":       len(phase_tasks),
-                "pct":         round(done_count / len(phase_tasks) * 100) if phase_tasks else 0,
+                "tasks":       all_tasks,
+                "done":        role_done,
+                "total":       role_total,
+                "pct":         round(role_done / role_total * 100) if role_total > 0 else 0,
             })
 
     overall = syllabus_get_progress(session.syllabus_progress, [role])
@@ -742,11 +746,13 @@ async def syllabus_page(request: Request, session_id: str):
         request=request,
         name="syllabus.html",
         context={
-            "session_id": session_id,
-            "progress":   _session_progress(session),
-            "phases":     phases_data,
-            "overall":    overall,
-            "test_mode":  bool(TEST_MODE),
+            "session_id":  session_id,
+            "progress":    _session_progress(session),
+            "phases":      phases_data,
+            "overall":     overall,
+            "test_mode":   bool(TEST_MODE),
+            "user_role":   role,
+            "role_tracks": ROLE_TRACKS,
         },
     )
 

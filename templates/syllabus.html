@@ -4,6 +4,17 @@
 {% block content %}
 <div class="syl-layout">
 
+  <!-- ── Role colour legend ───────────────────────────────────────────── -->
+  <div class="role-legend">
+    <span class="role-legend-label">Track colours:</span>
+    {% for key, info in role_tracks.items() %}
+    <span class="role-pill role-pill-{{ key }}{% if key == user_role %} role-pill-mine{% endif %}">
+      {{ info.icon }} {{ info.label }}{% if key == user_role %} — your track{% endif %}
+    </span>
+    {% endfor %}
+    <span class="role-legend-hint">Tasks with multiple dots are shared across tracks</span>
+  </div>
+
   <!-- ── Top bar ────────────────────────────────────────────────────── -->
   <div class="syl-topbar">
     <div class="syl-topbar-left">
@@ -18,7 +29,7 @@
         <span class="syl-done-count" id="overall-done">{{ overall.done }}</span>
         <span class="syl-sep">/</span>
         <span>{{ overall.total }}</span>
-        <span class="syl-tasks-label">tasks done</span>
+        <span class="syl-tasks-label">my tasks done</span>
       </div>
       <div class="overall-bar-wrap">
         <div class="overall-bar" id="overall-bar" style="width:{{ overall.pct }}%"></div>
@@ -63,7 +74,7 @@
             {% set ns.current_track = task.track_name %}
             <div class="track-group-label">{{ task.track_name }}</div>
           {% endif %}
-          <label class="task-row {% if task.status == 'done' %}task-done{% endif %}"
+          <label class="task-row {% if task.status == 'done' %}task-done{% endif %} {% if not task.is_my_role %}task-other-role{% endif %}"
                  id="row-{{ task.key }}">
             <input
               type="checkbox"
@@ -73,6 +84,11 @@
               onchange="toggleTask(this)"
             >
             <span class="task-text">{{ task.text }}</span>
+            <span class="task-role-dots">
+              {% for r in task.roles %}
+              <span class="role-dot role-dot-{{ r }}" title="{{ role_tracks[r].label }}">{{ role_tracks[r].icon }}</span>
+              {% endfor %}
+            </span>
             <span class="task-status-badge status-{{ task.status }}">
               {% if task.status == 'done' %}✓ Done
               {% elif task.status == 'in_progress' %}⏳ In progress
@@ -143,9 +159,6 @@
     overallDone      += checkbox.checked ? 1 : -1;
     updateOverallBar();
 
-    // Phase bar update
-    const phaseId = key.split('-')[0] + '-' + key.split('-')[1];
-
     try {
       const resp = await fetch('/task/toggle', {
         method: 'POST',
@@ -168,7 +181,6 @@
           if (done) done.textContent = info.done;
           if (card) card.classList.toggle('phase-complete', info.pct === 100);
         }
-        // Sync overall from server
         overallDone = overall.done;
         updateOverallBar();
       }
