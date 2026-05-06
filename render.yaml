@@ -7,8 +7,8 @@ services:
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ANTHROPIC_API_KEY
-        sync: false          # you will paste this in the Render dashboard
-      - key: APP_PASSWORD
-        sync: false          # optional: set to password-protect the app
+        sync: false          # paste your sk-ant-... key in the Render dashboard
+      - key: AUTH_SECRET
+        sync: false          # paste your 64-char hex secret from .env
       - key: AI2_SESSION_DB
         value: /tmp/sessions.db   # ephemeral on free tier; sessions reset on redeploy
