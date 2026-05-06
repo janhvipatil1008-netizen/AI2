@@ -427,7 +427,23 @@ def _get_papers_for_phase(phase_id: str, role_key: str) -> list[dict]:
     return PHASE_PAPERS.get(phase_id, [])
 
 
-def _build_learner_context(session: SessionContext, depth: str) -> str:
+def _long_term_block(profile) -> str:
+    if not profile:
+        return ""
+    mastered   = ", ".join(sorted(profile.topics_mastered)[-6:])   or "none yet"
+    struggling = ", ".join(sorted(profile.topics_struggling)[-4:]) or "none"
+    goals      = "; ".join(profile.career_goals[-3:])              or "not stated"
+    return (
+        f"\n\nCROSS-SESSION MEMORY\n"
+        f"  Topics mastered (>80%): {mastered}\n"
+        f"  Topics to revisit (<60%): {struggling}\n"
+        f"  Career goals: {goals}\n"
+        f"  All-time papers seen: {len(profile.papers_seen_all)}\n"
+        f"  Total exchanges across all sessions: {profile.total_exchanges}"
+    )
+
+
+def _build_learner_context(session: SessionContext, depth: str, profile=None) -> str:
     """
     Build a rich, dynamic context block injected into every Learning Coach call.
     This is what makes the coach feel like it knows the learner personally.
@@ -484,7 +500,7 @@ UPCOMING TASKS (next 3 on the learner's plate)
 
 PAPERS ALREADY SEEN THIS SESSION (do NOT recommend these again)
   {papers_seen_text}
-════════════════════════════════════════"""
+════════════════════════════════════════{_long_term_block(profile)}"""
 
 
 # ── Public interface ───────────────────────────────────────────────────────────
@@ -494,6 +510,7 @@ def respond(
     query:   str,
     session: SessionContext,
     depth:   str = "intermediate",
+    profile=None,
 ) -> str:
     """
     Learning Coach response to a learner query.
@@ -503,11 +520,12 @@ def respond(
         query:   The learner's question or topic to explain
         session: Current session context (track, week, history, progress, goals)
         depth:   "introductory" | "intermediate" | "advanced"
+        profile: Optional LearnerProfile for cross-session memory
 
     Returns:
         str: The mentor's teaching response (may include paper recommendations)
     """
-    learner_context = _build_learner_context(session, depth)
+    learner_context = _build_learner_context(session, depth, profile)
     recent_history  = session.format_history_for_prompt(n=5)
     week_context    = format_week_context(session.track.value, session.current_week)
 
@@ -589,6 +607,7 @@ def recommend_papers(
     client:  anthropic.Anthropic,
     topic:   str,
     session: SessionContext,
+    profile=None,
 ) -> str:
     """
     Dedicated paper / resource recommendation for a given topic.
@@ -599,6 +618,7 @@ def recommend_papers(
         query=f"Give me a curated reading list for: {topic}. Include the most important papers and resources, explain why each matters for my track and current phase, and tell me what order to read them in.",
         session=session,
         depth="intermediate",
+        profile=profile,
     )
 
 

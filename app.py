@@ -14,7 +14,6 @@ Test mode (no live Claude calls, mock responses):
 
 import asyncio
 import functools
-import hashlib
 import json
 import os
 import sqlite3
@@ -35,8 +34,15 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from auth import (
+    AUTH_COOKIE, hash_password, verify_password,
+    create_auth_token, get_current_user_id,
+)
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES, TOTAL_WEEKS
 from context.session import SessionContext
+from context.learner_profile import (
+    LearnerProfile, load_profile, save_profile,
+)
 from curriculum.syllabus import (
     format_week_context, _WEEK_TO_PHASE, get_phase_by_id,
     PHASES, get_task_key, ROLE_TRACKS,
@@ -50,7 +56,6 @@ load_dotenv()
 # ── Config ────────────────────────────────────────────────────────────────────
 
 TEST_MODE       = os.getenv("AI2_TEST_MODE") == "1"
-APP_PASSWORD    = os.getenv("APP_PASSWORD", "").strip()
 SESSION_DB_PATH = os.getenv("AI2_SESSION_DB", "sessions.db")
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -74,10 +79,6 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 _sessions: dict[str, dict] = {}
 _executor = ThreadPoolExecutor(max_workers=4)
 
-# Auth — cookie value is the SHA-256 of the password (stable across restarts)
-_AUTH_COOKIE      = "ai2_auth"
-_AUTH_COOKIE_VAL  = hashlib.sha256(APP_PASSWORD.encode()).hexdigest() if APP_PASSWORD else ""
-
 # Thread lock for SQLite writes
 _db_lock = threading.Lock()
 
@@ -91,10 +92,44 @@ def _init_db() -> None:
         with sqlite3.connect(SESSION_DB_PATH) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id       TEXT PRIMARY KEY,
+                    email         TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    display_name  TEXT,
+                    created_at    TEXT NOT NULL,
+                    updated_at    TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id   TEXT PRIMARY KEY,
                     session_data TEXT NOT NULL,
                     created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL,
+                    user_id      TEXT REFERENCES users(user_id)
+                )
+            """)
+            # Add user_id column to existing sessions table if upgrading
+            try:
+                conn.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS conversation_history (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id         TEXT NOT NULL REFERENCES users(user_id),
+                    session_id      TEXT NOT NULL,
+                    user_message    TEXT NOT NULL,
+                    assistant_reply TEXT NOT NULL,
+                    agent_used      TEXT NOT NULL,
+                    timestamp       TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS learner_profiles (
+                    user_id      TEXT PRIMARY KEY REFERENCES users(user_id),
+                    profile_data TEXT NOT NULL,
                     updated_at   TEXT NOT NULL
                 )
             """)
@@ -112,11 +147,51 @@ def _save_session(session_id: str, session: SessionContext) -> None:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 "INSERT OR REPLACE INTO sessions "
-                "(session_id, session_data, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?)",
-                (session_id, data, session.start_time, now),
+                "(session_id, session_data, created_at, updated_at, user_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (session_id, data, session.start_time, now, session.user_id or None),
             )
             conn.commit()
+
+
+def _save_exchange_to_history(
+    user_id: str, session_id: str,
+    user_message: str, assistant_reply: str, agent_used: str,
+) -> None:
+    """Append a single exchange to the permanent conversation_history table."""
+    if TEST_MODE or not user_id:
+        return
+    now = datetime.now().isoformat()
+    with _db_lock:
+        with sqlite3.connect(SESSION_DB_PATH) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute(
+                "INSERT INTO conversation_history "
+                "(user_id, session_id, user_message, assistant_reply, agent_used, timestamp) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, session_id, user_message, assistant_reply, agent_used, now),
+            )
+            conn.commit()
+
+
+def _save_profile_db(profile: LearnerProfile) -> None:
+    """Persist a LearnerProfile to SQLite."""
+    if TEST_MODE:
+        return
+    with _db_lock:
+        with sqlite3.connect(SESSION_DB_PATH) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            save_profile(profile, conn)
+
+
+def _load_profile_db(user_id: str) -> Optional[LearnerProfile]:
+    if TEST_MODE or not user_id:
+        return None
+    try:
+        with sqlite3.connect(SESSION_DB_PATH) as conn:
+            return load_profile(user_id, conn)
+    except Exception:
+        return None
 
 
 def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
@@ -135,31 +210,89 @@ def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
     return None
 
 
+def _get_user_sessions(user_id: str, limit: int = 10) -> list[dict]:
+    """Return recent sessions for a user, ordered by updated_at desc."""
+    if TEST_MODE or not user_id:
+        return []
+    try:
+        with sqlite3.connect(SESSION_DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT session_id, session_data, updated_at FROM sessions "
+                "WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        result = []
+        for session_id, data_json, updated_at in rows:
+            try:
+                data = json.loads(data_json)
+                result.append({
+                    "session_id":   session_id,
+                    "track":        data.get("track", ""),
+                    "current_week": data.get("current_week", 1),
+                    "updated_at":   updated_at,
+                })
+            except Exception:
+                continue
+        return result
+    except Exception:
+        return []
+
+
+def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
+    """Return full conversation history for a user from the permanent table."""
+    if TEST_MODE or not user_id:
+        return []
+    try:
+        with sqlite3.connect(SESSION_DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT session_id, user_message, assistant_reply, agent_used, timestamp "
+                "FROM conversation_history WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        return [
+            {
+                "session_id":      r[0],
+                "user_message":    r[1],
+                "assistant_reply": r[2],
+                "agent_used":      r[3],
+                "timestamp":       r[4],
+            }
+            for r in rows
+        ]
+    except Exception:
+        return []
+
+
 # Initialise the DB at module load time (no-op in TEST_MODE)
 _init_db()
 
 
 # ── Authentication middleware ─────────────────────────────────────────────────
 
+_PUBLIC_PATHS = {"/login", "/signup", "/health"}
+
+
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """
-    If APP_PASSWORD is set, require the ai2_auth cookie on all routes
-    except /login, /health, and /static/*.
-    API callers receive 401 JSON; browser requests are redirected to /login.
+    Per-user auth: decode ai2_user_token cookie → attach user_id to request.state.
+    Unauthenticated access to protected routes → redirect /login (browser) or 401 (API).
+    TEST_MODE bypasses all auth so tests are never blocked.
     """
-    if not APP_PASSWORD or TEST_MODE:
-        return await call_next(request)
-
     path = request.url.path
-    if path in ("/login", "/health") or path.startswith("/static"):
+
+    # Attach user_id to state for all requests (even public ones)
+    user_id = None if TEST_MODE else get_current_user_id(request)
+    request.state.user_id = user_id
+
+    if TEST_MODE or path in _PUBLIC_PATHS or path.startswith("/static"):
         return await call_next(request)
 
-    if request.cookies.get(_AUTH_COOKIE) != _AUTH_COOKIE_VAL:
+    if not user_id:
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             return RedirectResponse(url="/login", status_code=302)
-        return JSONResponse({"detail": "Unauthorized — set APP_PASSWORD in .env"}, status_code=401)
+        return JSONResponse({"detail": "Unauthorized — please log in."}, status_code=401)
 
     return await call_next(request)
 
@@ -453,9 +586,10 @@ def _get_session_data(session_id: str) -> dict:
     if not TEST_MODE:
         session = _load_session_from_db(session_id)
         if session is not None:
-            client = _make_client()
-            orch   = Orchestrator(client=client, session=session)
-            _sessions[session_id] = {"session": session, "orch": orch, "client": client}
+            client  = _make_client()
+            profile = _load_profile_db(session.user_id) if session.user_id else None
+            orch    = Orchestrator(client=client, session=session, profile=profile)
+            _sessions[session_id] = {"session": session, "orch": orch, "client": client, "profile": profile}
             return _sessions[session_id]
 
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
@@ -500,8 +634,8 @@ async def health():
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    if not APP_PASSWORD:
-        return RedirectResponse(url="/", status_code=302)
+    if request.state.user_id:
+        return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse(
         request=request, name="login.html", context={"error": ""},
     )
@@ -510,24 +644,123 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login_submit(request: Request):
     form     = await request.form()
+    email    = str(form.get("email", "")).strip().lower()
     password = str(form.get("password", ""))
-    if hashlib.sha256(password.encode()).hexdigest() == _AUTH_COOKIE_VAL:
-        resp = RedirectResponse(url="/", status_code=302)
-        resp.set_cookie(
-            _AUTH_COOKIE, _AUTH_COOKIE_VAL,
-            httponly=True, samesite="lax",
-            max_age=7 * 24 * 3600,
-        )
-        return resp
+
+    if not TEST_MODE:
+        try:
+            with sqlite3.connect(SESSION_DB_PATH) as conn:
+                row = conn.execute(
+                    "SELECT user_id, password_hash FROM users WHERE email = ?", (email,)
+                ).fetchone()
+        except Exception:
+            row = None
+
+        if not row or not verify_password(password, row[1]):
+            return templates.TemplateResponse(
+                request=request, name="login.html",
+                context={"error": "Incorrect email or password — please try again."},
+                status_code=401,
+            )
+        user_id = row[0]
+    else:
+        user_id = "test-user"
+
+    token = create_auth_token(user_id)
+    resp  = RedirectResponse(url="/dashboard", status_code=302)
+    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600)
+    return resp
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    if request.state.user_id:
+        return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse(
-        request=request, name="login.html",
-        context={"error": "Incorrect password — please try again."},
-        status_code=401,
+        request=request, name="signup.html", context={"error": ""},
     )
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+@app.post("/signup")
+async def signup_submit(request: Request):
+    form         = await request.form()
+    email        = str(form.get("email", "")).strip().lower()
+    display_name = str(form.get("display_name", "")).strip()
+    password     = str(form.get("password", ""))
+    confirm      = str(form.get("confirm_password", ""))
+
+    if not email or not password:
+        return templates.TemplateResponse(
+            request=request, name="signup.html",
+            context={"error": "Email and password are required."},
+            status_code=422,
+        )
+    if password != confirm:
+        return templates.TemplateResponse(
+            request=request, name="signup.html",
+            context={"error": "Passwords do not match."},
+            status_code=422,
+        )
+    if len(password) < 8:
+        return templates.TemplateResponse(
+            request=request, name="signup.html",
+            context={"error": "Password must be at least 8 characters."},
+            status_code=422,
+        )
+
+    user_id      = str(uuid.uuid4())
+    password_hash = hash_password(password)
+    now          = datetime.now().isoformat()
+
+    try:
+        with _db_lock:
+            with sqlite3.connect(SESSION_DB_PATH) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute(
+                    "INSERT INTO users (user_id, email, password_hash, display_name, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (user_id, email, password_hash, display_name or email.split("@")[0], now, now),
+                )
+                conn.commit()
+    except sqlite3.IntegrityError:
+        return templates.TemplateResponse(
+            request=request, name="signup.html",
+            context={"error": "An account with that email already exists."},
+            status_code=409,
+        )
+
+    token = create_auth_token(user_id)
+    resp  = RedirectResponse(url="/dashboard", status_code=302)
+    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600)
+    return resp
+
+
+@app.get("/logout")
+async def logout():
+    resp = RedirectResponse(url="/login", status_code=302)
+    resp.delete_cookie(AUTH_COOKIE)
+    return resp
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    user_id = request.state.user_id or "test-user"
+
+    display_name = "Learner"
+    if not TEST_MODE:
+        try:
+            with sqlite3.connect(SESSION_DB_PATH) as conn:
+                row = conn.execute(
+                    "SELECT display_name FROM users WHERE user_id = ?", (user_id,)
+                ).fetchone()
+            if row:
+                display_name = row[0] or display_name
+        except Exception:
+            pass
+
+    recent_sessions = _get_user_sessions(user_id, limit=5)
+    profile         = _load_profile_db(user_id)
+
     tracks = [
         {
             "value":   str(t.value),
@@ -536,23 +769,65 @@ async def index(request: Request):
         }
         for t in CareerTrack
     ]
+
+    stats = {
+        "session_count":   profile.session_count   if profile else 0,
+        "total_quizzes":   profile.total_quizzes    if profile else 0,
+        "topics_mastered": len(profile.topics_mastered) if profile else 0,
+        "total_exchanges": profile.total_exchanges  if profile else 0,
+    }
+
     return templates.TemplateResponse(
         request=request,
-        name="index.html",
-        context={"tracks": tracks, "test_mode": bool(TEST_MODE)},
+        name="dashboard.html",
+        context={
+            "display_name":    display_name,
+            "recent_sessions": recent_sessions,
+            "tracks":          tracks,
+            "stats":           stats,
+            "test_mode":       bool(TEST_MODE),
+        },
     )
+
+
+@app.get("/history", response_class=HTMLResponse)
+async def history_page(request: Request):
+    user_id = request.state.user_id or "test-user"
+    entries = _get_user_history(user_id, limit=200)
+    return templates.TemplateResponse(
+        request=request,
+        name="history.html",
+        context={
+            "entries":   entries,
+            "test_mode": bool(TEST_MODE),
+        },
+    )
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    if TEST_MODE or request.state.user_id:
+        return RedirectResponse(url="/dashboard", status_code=302)
+    return RedirectResponse(url="/login", status_code=302)
 
 
 @app.post("/session/start")
 @limiter.limit(_CHAT_RATE_LIMIT)
 async def start_session(request: Request, body: StartSessionRequest):
+    user_id = getattr(request.state, "user_id", None) or ""
     track   = _track_from_str(body.track)
-    session = SessionContext(track=track, current_week=max(1, min(body.week, TOTAL_WEEKS)))
+    session = SessionContext(track=track, user_id=user_id, current_week=max(1, min(body.week, TOTAL_WEEKS)))
     client  = None if TEST_MODE else _make_client()
-    orch    = None if TEST_MODE else Orchestrator(client=client, session=session)
+
+    # Load or create learner profile
+    profile = _load_profile_db(user_id) if user_id else None
+    if profile is None and user_id:
+        profile = LearnerProfile.new_for_user(user_id, track)
+
+    orch = None if TEST_MODE else Orchestrator(client=client, session=session, profile=profile)
 
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = {"session": session, "orch": orch, "client": client}
+    _sessions[session_id] = {"session": session, "orch": orch, "client": client, "profile": profile}
     _save_session(session_id, session)
 
     return {
@@ -599,6 +874,23 @@ async def chat(request: Request, body: ChatRequest):
             raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
 
     _save_session(body.session_id, session)
+
+    # Persist this exchange to the permanent history table
+    _save_exchange_to_history(
+        user_id=session.user_id,
+        session_id=body.session_id,
+        user_message=body.message,
+        assistant_reply=response_text[:2000],
+        agent_used=agent_used,
+    )
+
+    # Update learner profile after each exchange
+    profile: Optional[LearnerProfile] = data.get("profile")
+    if profile and session.user_id:
+        profile.total_exchanges = sum(
+            1 for _ in session.history
+        )
+        _save_profile_db(profile)
 
     return {
         "response":   response_text,

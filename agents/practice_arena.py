@@ -288,20 +288,38 @@ def _cached_system(template: str, session: SessionContext) -> list[dict]:
 
 # ── Learner context block ─────────────────────────────────────────────────────
 
-def _learner_block(session: SessionContext, topic: str, mode: str) -> str:
+def _learner_block(session: SessionContext, topic: str, mode: str, profile=None) -> str:
     """Rich context injected into every practice call."""
     role_key   = session.track.value
     phase_id   = _WEEK_TO_PHASE.get(session.current_week, "portfolio")
     week_ctx   = format_week_context(role_key, session.current_week)
     lens       = _ROLE_LENS.get(role_key, "")
 
-    # Quiz history for this topic
+    # Quiz history for this topic (session-level)
     best = session.best_score_for(topic)
     history_line = (
         f"Best previous score on '{topic}': {best['score']}/{best['total']} "
         f"({best['pct']}%) [{best['mode']}]"
-        if best else f"First time practicing '{topic}'"
+        if best else f"First time practicing '{topic}' this session"
     )
+
+    # Cross-session history from profile
+    lifetime_line = ""
+    if profile:
+        lifetime_attempts = sum(
+            1 for q in profile.all_quiz_scores
+            if q.get("topic", "").lower() == topic.lower()
+        )
+        if topic.lower() in profile.topics_mastered:
+            mastery = "MASTERED — expect advanced questions"
+        elif topic.lower() in profile.topics_struggling:
+            mastery = "NEEDS REVIEW — focus on fundamentals"
+        else:
+            mastery = "building knowledge"
+        lifetime_line = (
+            f"\nAll-time attempts on '{topic}': {lifetime_attempts} "
+            f"[{mastery}]"
+        )
 
     goals_text = (
         "\n".join(f"  • {g}" for g in session.goals)
@@ -317,7 +335,7 @@ Week:        {session.current_week} / 13
 Phase:       {phase_id}
 Mode:        {mode}
 Topic:       {topic}
-{history_line}
+{history_line}{lifetime_line}
 
 Question framing angle:
   {lens}
@@ -525,6 +543,7 @@ def generate_mcq_quiz(
     topic:      str,
     session:    SessionContext,
     difficulty: str = "all",
+    profile=None,
 ) -> str:
     """
     Generate a 15-question MCQ quiz for a specific topic.
@@ -548,7 +567,7 @@ def generate_mcq_quiz(
         )
 
     user_content = (
-        f"{_learner_block(session, topic, 'MCQ Quiz')}\n"
+        f"{_learner_block(session, topic, 'MCQ Quiz', profile)}\n"
         f"━━━ QUIZ REQUEST ━━━\n"
         f"Topic: {topic}\n"
         f"Difficulty: {difficulty}\n"
@@ -596,6 +615,7 @@ def generate_interview_questions(
     topic:      str,
     session:    SessionContext,
     difficulty: str = "all",
+    profile=None,
 ) -> str:
     """
     Generate 15 interview questions for a specific topic across 3 levels.
@@ -623,7 +643,7 @@ def generate_interview_questions(
         )
 
     user_content = (
-        f"{_learner_block(session, topic, 'Interview Prep')}\n"
+        f"{_learner_block(session, topic, 'Interview Prep', profile)}\n"
         f"━━━ INTERVIEW PREP REQUEST ━━━\n"
         f"Topic: {topic}\n"
         f"Level focus: {difficulty}\n"
@@ -702,6 +722,7 @@ def respond(
     practice_type: str = "quiz",
     topic:         str = "",
     difficulty:    str = "all",
+    profile=None,
 ) -> str:
     """
     Main entry point — routes to the correct practice engine.
@@ -744,6 +765,7 @@ def respond(
             topic=resolved_topic,
             session=session,
             difficulty=difficulty,
+            profile=profile,
         )
 
     if mode == "interview_prep":
@@ -754,6 +776,7 @@ def respond(
             topic=resolved_topic,
             session=session,
             difficulty=resolved_difficulty,
+            profile=profile,
         )
 
     if mode == "evaluate_answer":

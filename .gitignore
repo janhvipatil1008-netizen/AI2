@@ -5,3 +5,5 @@ __pycache__/
 .playwright/
 sessions.db
 *.db
+*.db-shm
+*.db-wal

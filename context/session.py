@@ -29,6 +29,7 @@ class SessionContext:
       - Progress tracking and continuity
     """
     track:              CareerTrack
+    user_id:            str = ""
     current_week:       int = 1
     history:            list[ExchangeRecord] = field(default_factory=list)
     topics_explored:    set[str]             = field(default_factory=set)
@@ -167,6 +168,7 @@ class SessionContext:
         """Serialise to a JSON-safe dict (for SQLite persistence)."""
         return {
             "track":            self.track.value,
+            "user_id":          self.user_id,
             "current_week":     self.current_week,
             "exercises_done":   self.exercises_done,
             "start_time":       self.start_time,
@@ -193,6 +195,7 @@ class SessionContext:
         """Reconstruct a SessionContext from a serialised dict."""
         session = cls(
             track          = CareerTrack(data["track"]),
+            user_id        = data.get("user_id", ""),
             current_week   = data["current_week"],
             exercises_done = data["exercises_done"],
             start_time     = data["start_time"],

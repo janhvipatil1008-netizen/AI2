@@ -63,6 +63,7 @@ def respond(
     theme:    str,
     session:  SessionContext,
     context:  str = "",
+    profile=None,
 ) -> str:
     """
     Idea Generator response to a creative brainstorm request.
@@ -72,6 +73,7 @@ def respond(
         theme:    The theme or topic to generate ideas around
         session:  Current session context
         context:  Optional additional context (goals, constraints, interests)
+        profile:  Optional LearnerProfile for cross-session memory
 
     Returns:
         str: Creative project ideas and inspiration
@@ -81,8 +83,19 @@ def respond(
 
     additional = f"\nAdditional context: {context}" if context else ""
 
+    memory_block = ""
+    if profile:
+        mastered = ", ".join(sorted(profile.topics_mastered)[-5:]) or "none yet"
+        goals    = "; ".join(profile.career_goals[-2:])             or "not stated"
+        memory_block = (
+            f"\nCROSS-SESSION MEMORY\n"
+            f"  Topics mastered: {mastered}\n"
+            f"  Career goals: {goals}\n\n"
+        )
+
     user_content = (
         f"{session.as_prompt_context()}\n\n"
+        f"{memory_block}"
         f"CURRENT WEEK CONTENT\n{week_context}\n\n"
         f"RECENT CONVERSATION\n{recent_history}\n\n"
         f"--- IDEA REQUEST ---\n"

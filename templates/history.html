@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI² — Learning History</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- Standalone header -->
+  <header style="background: #161b22; border-bottom: 1px solid var(--border);
+                 display: flex; align-items: center; justify-content: space-between;
+                 padding: 0 1.5rem; height: 52px; gap: 1rem;">
+    <div style="display: flex; flex-direction: column; justify-content: center;">
+      <span style="font-weight: 700; font-size: 1rem; color: var(--text);">Learning History</span>
+      <span style="color: var(--muted); font-size: 0.78rem;">Every exchange across all sessions</span>
+    </div>
+    <a href="/dashboard" style="color: var(--muted); font-size: 0.85rem; text-decoration: none; white-space: nowrap;">← Dashboard</a>
+  </header>
+
+  <main style="max-width: 820px; margin: 0 auto; padding: 2rem 1rem;">
+
+    {% if not entries %}
+    <div style="text-align: center; padding: 3rem; color: var(--muted);">
+      <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📭</div>
+      <div>No history yet — start a learning session to build your record.</div>
+      <a href="/dashboard" style="display: inline-block; margin-top: 1rem; color: #7c6af7; text-decoration: none;">Go to Dashboard →</a>
+    </div>
+    {% else %}
+
+    <!-- Filter bar: all on one row -->
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+      <input id="filter-input" type="text" placeholder="Search messages…"
+             style="flex: 1; padding: 0.5rem 0.75rem; background: var(--surface);
+                    border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+                    font-size: 0.875rem; outline: none;">
+      <select id="agent-filter"
+              style="width: 150px; padding: 0.5rem 0.75rem; background: var(--surface);
+                     border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+                     font-size: 0.875rem; outline: none;">
+        <option value="">All agents</option>
+        <option value="learning_coach">Learning Coach</option>
+        <option value="practice_arena">Practice Arena</option>
+        <option value="idea_generator">Idea Generator</option>
+        <option value="orchestrator">Orchestrator</option>
+      </select>
+      <span style="white-space: nowrap; font-size: 0.78rem; color: var(--muted);">
+        {{ entries|length }} exchange{{ 's' if entries|length != 1 else '' }} (most recent first)
+      </span>
+    </div>
+
+    <!-- Exchange list -->
+    <div id="history-list" style="display: flex; flex-direction: column; gap: 1.25rem;">
+      {% for e in entries %}
+      <div class="history-entry" data-agent="{{ e.agent_used }}" data-text="{{ e.user_message|lower }}">
+        <!-- User message -->
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 0.4rem;">
+          <div style="max-width: 80%; background: var(--surface-2, #1c2128); border: 1px solid var(--border);
+                      border-radius: 12px 12px 2px 12px; padding: 0.7rem 1rem;
+                      font-size: 0.9rem; color: var(--text);">
+            {{ e.user_message }}
+          </div>
+        </div>
+        <!-- Agent reply -->
+        <div style="display: flex; gap: 0.6rem; align-items: flex-start;">
+          <div style="flex-shrink: 0; font-size: 1rem; margin-top: 0.1rem;">
+            {% if e.agent_used == "learning_coach" %}🧠
+            {% elif e.agent_used == "practice_arena" %}📝
+            {% elif e.agent_used == "idea_generator" %}💡
+            {% else %}🤖{% endif %}
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.7rem; margin-bottom: 0.3rem;">
+              <span style="font-weight: 600;
+                {% if e.agent_used == 'learning_coach' %}color: #f87171;
+                {% elif e.agent_used == 'practice_arena' %}color: #4fc3f7;
+                {% elif e.agent_used == 'idea_generator' %}color: #a3e635;
+                {% else %}color: var(--muted);{% endif %}">
+                {{ e.agent_used.replace('_', ' ')|title }}
+              </span>
+              <span style="color: var(--muted);">· {{ e.timestamp[:16].replace('T', ' ') }}</span>
+              <span style="font-family: monospace; font-size: 0.65rem; color: var(--muted);">· {{ e.session_id[:8] }}…</span>
+            </div>
+            <div style="background: var(--surface); border: 1px solid var(--border);
+                        border-radius: 2px 12px 12px 12px; padding: 0.7rem 1rem;
+                        font-size: 0.875rem; color: var(--text); white-space: pre-wrap; word-break: break-word;
+                        max-height: 200px; overflow: hidden; position: relative;">
+              {{ e.assistant_reply[:600] }}{% if e.assistant_reply|length > 600 %}…{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% endif %}
+  </main>
+
+  <script>
+    const filterInput = document.getElementById('filter-input');
+    const agentFilter = document.getElementById('agent-filter');
+
+    function applyFilters() {
+      const text  = (filterInput?.value || '').toLowerCase();
+      const agent = agentFilter?.value || '';
+      document.querySelectorAll('.history-entry').forEach(el => {
+        const matchText  = !text  || el.dataset.text.includes(text);
+        const matchAgent = !agent || el.dataset.agent === agent;
+        el.style.display = (matchText && matchAgent) ? '' : 'none';
+      });
+    }
+
+    filterInput?.addEventListener('input', applyFilters);
+    agentFilter?.addEventListener('change', applyFilters);
+  </script>
+</body>
+</html>

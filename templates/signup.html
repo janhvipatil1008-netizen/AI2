@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI² — Login</title>
+  <title>AI² — Create Account</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
     .login-wrap {
@@ -15,15 +15,16 @@
     .login-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 20px;
       padding: 2.5rem 3rem;
       width: 100%;
-      max-width: 360px;
+      max-width: 400px;
     }
     .login-title {
       font-size: 2rem;
       font-weight: 700;
       margin-bottom: 0.25rem;
+      text-align: center;
       background: linear-gradient(135deg, #7c6af7, #4fc3f7);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -32,15 +33,14 @@
       color: var(--muted);
       font-size: 0.9rem;
       margin-bottom: 2rem;
+      text-align: center;
     }
     .login-field { margin-bottom: 1.25rem; }
     .login-field label {
       display: block;
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 600;
       color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
       margin-bottom: 0.4rem;
     }
     .login-field input {
@@ -60,7 +60,7 @@
       padding: 0.75rem;
       background: linear-gradient(135deg, #7c6af7, #4fc3f7);
       border: none;
-      border-radius: 8px;
+      border-radius: 50px;
       color: #fff;
       font-size: 1rem;
       font-weight: 600;
@@ -77,33 +77,45 @@
       border-radius: 6px;
       border-left: 3px solid #f87171;
     }
+    .hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
   </style>
 </head>
 <body>
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-title">AI²</div>
-      <div class="login-subtitle">Adaptive AI Learning Platform</div>
+      <div class="login-subtitle">Adaptive AI Learning</div>
 
       {% if error %}
       <div class="login-error">{{ error }}</div>
       {% endif %}
 
-      <form method="post" action="/login">
+      <form method="post" action="/signup">
         <div class="login-field">
           <label for="email">Email</label>
           <input type="email" id="email" name="email"
                  placeholder="you@example.com" autofocus required>
         </div>
         <div class="login-field">
+          <label for="display_name">Display Name <span style="font-weight:400">(optional)</span></label>
+          <input type="text" id="display_name" name="display_name"
+                 placeholder="How should we address you?">
+        </div>
+        <div class="login-field">
           <label for="password">Password</label>
           <input type="password" id="password" name="password"
-                 placeholder="Your password" required>
+                 placeholder="At least 8 characters" required minlength="8">
+          <div class="hint">Minimum 8 characters</div>
         </div>
-        <button type="submit" class="login-btn">Sign In</button>
+        <div class="login-field">
+          <label for="confirm_password">Confirm Pass</label>
+          <input type="password" id="confirm_password" name="confirm_password"
+                 placeholder="Repeat your password" required>
+        </div>
+        <button type="submit" class="login-btn">Create Account</button>
       </form>
       <p style="text-align:center; margin-top:1.25rem; font-size:0.875rem; color:var(--muted);">
-        No account? <a href="/signup" style="color:#7c6af7; text-decoration:none;">Create one →</a>
+        Already have an account? <a href="/login" style="color:#7c6af7; text-decoration:none;">Sign in →</a>
       </p>
     </div>
   </div>

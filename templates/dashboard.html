@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI² — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .dash-header {
+      background: #161b22;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      height: 52px;
+      gap: 1rem;
+    }
+    .dash-logo-chip {
+      background: #1c6ef5;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+    .dash-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+    }
+    .dash-welcome {
+      color: var(--text);
+      font-size: 0.95rem;
+      flex: 1;
+    }
+    .dash-nav-link {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .dash-signout {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+      border-bottom: 2px solid #00b4d8;
+    }
+    .resume-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+    }
+    .resume-btn {
+      background: linear-gradient(135deg, #7c6af7, #4fc3f7);
+      color: #fff;
+      border: none;
+      border-radius: 50px;
+      padding: 0.45rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      display: inline-block;
+    }
+    .progress-track {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #7c6af7, #4fc3f7);
+    }
+    .track-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .track-card:hover { border-color: #7c6af7; }
+    .track-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Custom header -->
+  <header class="dash-header">
+    <span class="dash-logo-chip">AI²</span>
+    <div class="dash-divider"></div>
+    <span class="dash-welcome">Welcome back, <strong>{{ display_name }}</strong></span>
+    {% if test_mode %}<span class="test-badge">TEST MODE</span>{% endif %}
+    <a href="/history" class="dash-nav-link">📜 History</a>
+    <a href="/logout" class="dash-signout">Sign out</a>
+  </header>
+
+  <main style="max-width: 900px; margin: 0 auto; padding: 2rem 1rem;">
+
+    <!-- Hero -->
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.7rem; font-weight: 700; color: #00b4d8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem;">Learner Home</div>
+      <h1 style="margin: 0 0 0.4rem; font-size: 1.75rem; font-weight: 700;">Your adaptive learning dashboard</h1>
+      <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Track progress, jump back into your current course, or start something new.</p>
+    </div>
+
+    <!-- Stats bar -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
+      {% set stat_items = [
+        ("Sessions", stats.session_count),
+        ("Quizzes taken", stats.total_quizzes),
+        ("Topics mastered", stats.topics_mastered),
+        ("Total exchanges", stats.total_exchanges)
+      ] %}
+      {% for label, val in stat_items %}
+      <div class="stat-card">
+        <div style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;">{{ label }}</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: var(--text);">{{ val }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Continue Learning — most recent session only -->
+    {% if recent_sessions %}
+    {% set s = recent_sessions[0] %}
+    {% set pct = ((s.current_week / 13) * 100)|int %}
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Continue Learning</div>
+      <div class="resume-card">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <span style="font-size: 1.6rem;">
+            {% if s.track == "aipm" %}📦
+            {% elif s.track == "evals" %}🔬
+            {% else %}🧩{% endif %}
+          </span>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 1rem;">
+              {% if s.track == "aipm" %}AI Product Manager
+              {% elif s.track == "evals" %}AI Evals Specialist
+              {% else %}Context Engineer{% endif %}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--muted);">
+              Week {{ s.current_week }} / 13 ·
+              {% if s.current_week <= 3 %}Foundations
+              {% elif s.current_week <= 6 %}Core Skills
+              {% elif s.current_week <= 9 %}Advanced Topics
+              {% else %}Capstone{% endif %}
+            </div>
+          </div>
+          <a href="/chat/{{ s.session_id }}" class="resume-btn">Resume →</a>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width: {{ pct }}%;"></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Feature pills -->
+    <div class="feature-pills" style="margin-bottom: 2rem;">
+      <span class="pill">🧠 Learning Coach</span>
+      <span class="pill">📝 MCQ Quizzes</span>
+      <span class="pill">🎯 Interview Practice</span>
+      <span class="pill">📦 Portfolio Tasks</span>
+      <span class="pill">⚡ Daily Review</span>
+    </div>
+
+    <!-- Start new track -->
+    <div>
+      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Start New Track</div>
+      <div class="track-grid" id="track-grid">
+        {% for track in tracks %}
+        <div class="track-card" data-value="{{ track.value }}">
+          <div style="font-size: 1.4rem; margin-bottom: 0.5rem;">
+            {% if track.value == "aipm" %}📦
+            {% elif track.value == "evals" %}🔬
+            {% else %}🧩{% endif %}
+          </div>
+          <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem;">{{ track.label }}</div>
+          <div style="font-size: 0.82rem; color: var(--muted);">{{ track.tagline }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    document.querySelectorAll('.track-card').forEach(card => {
+      card.addEventListener('click', async () => {
+        const track = card.dataset.value;
+        card.style.opacity = '0.6';
+        const resp = await fetch('/session/start', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ track })
+        });
+        const data = await resp.json();
+        window.location.href = `/chat/${data.session_id}`;
+      });
+    });
+  </script>
+</body>
+</html>

@@ -29,6 +29,7 @@ from typing import Generator
 import anthropic
 
 from context.session import SessionContext
+from context.learner_profile import LearnerProfile
 from curriculum.syllabus import format_week_context, get_week
 from config import (
     ORCHESTRATOR_MODEL,
@@ -153,9 +154,10 @@ ORCHESTRATOR_TOOLS = [
 
 # ── Orchestrator System Prompt ────────────────────────────────────────────────
 
-def _build_orchestrator_system(session: SessionContext) -> str:
+def _build_orchestrator_system(session: SessionContext, profile: "LearnerProfile | None" = None) -> str:
     week_data = get_week(session.track.value, session.current_week)
     track_name = TRACK_DISPLAY_NAMES[session.track]
+    memory_block = f"\n\n{profile.mastery_summary()}" if profile else ""
 
     return f"""\
 You are the AI² Orchestrator — the intelligent coordinator of a personalized AI learning platform.
@@ -172,7 +174,7 @@ THE LEARNER
 Track:        {track_name}
 Current Week: {session.current_week} — {week_data['title']}
 Exchanges:    {len(session.history)} so far this session
-Exercises:    {session.exercises_done} completed
+Exercises:    {session.exercises_done} completed{memory_block}
 
 ROUTING DECISION RULES
 • ANY question about "what is", "how does", "explain", "I don't understand", "teach me"
@@ -222,9 +224,10 @@ class Orchestrator:
       5. Return full response to caller
     """
 
-    def __init__(self, client: anthropic.Anthropic, session: SessionContext):
+    def __init__(self, client: anthropic.Anthropic, session: SessionContext, profile: LearnerProfile | None = None):
         self.client  = client
         self.session = session
+        self.profile = profile
 
     def process(self, user_message: str) -> str:
         """
@@ -234,7 +237,7 @@ class Orchestrator:
         Streaming can be layered on top of this by the caller.
         """
         messages = self._build_messages(user_message)
-        system   = _build_orchestrator_system(self.session)
+        system   = _build_orchestrator_system(self.session, self.profile)
 
         # ── Phase 1: Routing + Sub-Agent Execution ─────────────────────────
         # The orchestrator MUST call a tool (tool_choice="any").
@@ -320,12 +323,14 @@ class Orchestrator:
                     client  = self.client,
                     topic   = tool_input["query"],
                     session = self.session,
+                    profile = self.profile,
                 )
             return learning_coach.respond(
                 client  = self.client,
                 query   = tool_input["query"],
                 session = self.session,
                 depth   = tool_input.get("depth", "intermediate"),
+                profile = self.profile,
             )
 
         if tool_name == "consult_practice_arena":
@@ -336,6 +341,7 @@ class Orchestrator:
                 practice_type = tool_input.get("practice_type", "mcq_quiz"),
                 topic         = tool_input.get("topic", ""),
                 difficulty    = tool_input.get("difficulty", "all"),
+                profile       = self.profile,
             )
 
         if tool_name == "consult_idea_generator":
@@ -344,6 +350,7 @@ class Orchestrator:
                 theme   = tool_input["theme"],
                 session = self.session,
                 context = tool_input.get("context", ""),
+                profile = self.profile,
             )
 
         return f"[Unknown tool: {tool_name}]"
