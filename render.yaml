@@ -5,10 +5,13 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false          # paste your sk-ant-... key in the Render dashboard
       - key: AUTH_SECRET
         sync: false          # paste your 64-char hex secret from .env
+      - key: SUPABASE_DATABASE_URL
+        sync: false          # paste your postgres:// connection string in the Render dashboard
       - key: AI2_SESSION_DB
         value: /tmp/sessions.db   # ephemeral on free tier; sessions reset on redeploy
