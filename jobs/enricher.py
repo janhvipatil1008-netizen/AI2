@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 
 import anthropic
+import psycopg2.extras
 
 from config import AGENT_MODEL
 
@@ -93,7 +94,9 @@ def enrich_job(job_id: str, learner_context: dict = None) -> dict:
     from jobs.database import get_conn
 
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM jobs WHERE id = %s", (job_id,))
+            row = cur.fetchone()
 
     if not row:
         raise ValueError(f"Job {job_id} not found in jobs.db")
@@ -172,28 +175,36 @@ def enrich_job(job_id: str, learner_context: dict = None) -> dict:
     now = datetime.now(timezone.utc).isoformat()
 
     from jobs.database import get_conn
+    _summary    = json.dumps(data.get("summary", {}))
+    _skills     = json.dumps(data.get("skills_needed", {}))
+    _questions  = json.dumps(data.get("possible_questions", []))
+    _guide      = json.dumps(data.get("learning_guide", {}))
+    _quiz       = json.dumps(data.get("quiz", []))
+    _score      = int(data.get("match_score", 0))
+    _reasoning  = str(data.get("match_reasoning", ""))
     with get_conn() as conn:
-        conn.execute(
-            """INSERT OR REPLACE INTO job_enrichments
-               (id, job_id, summary, skills_needed, possible_questions,
-                learning_guide, quiz, match_score, match_reasoning, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (
-                enrichment_id,
-                job_id,
-                json.dumps(data.get("summary", {})),
-                json.dumps(data.get("skills_needed", {})),
-                json.dumps(data.get("possible_questions", [])),
-                json.dumps(data.get("learning_guide", {})),
-                json.dumps(data.get("quiz", [])),
-                int(data.get("match_score", 0)),
-                str(data.get("match_reasoning", "")),
-                now,
-            ),
-        )
-        conn.execute(
-            "UPDATE jobs SET enriched=1, enriched_at=? WHERE id=?",
-            (now, job_id),
-        )
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO job_enrichments
+                   (id, job_id, summary, skills_needed, possible_questions,
+                    learning_guide, quiz, match_score, match_reasoning, created_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   ON CONFLICT (job_id) DO UPDATE SET
+                     id=%s, summary=%s, skills_needed=%s, possible_questions=%s,
+                     learning_guide=%s, quiz=%s, match_score=%s,
+                     match_reasoning=%s, created_at=%s""",
+                (
+                    enrichment_id, job_id,
+                    _summary, _skills, _questions, _guide, _quiz,
+                    _score, _reasoning, now,
+                    enrichment_id,
+                    _summary, _skills, _questions, _guide, _quiz,
+                    _score, _reasoning, now,
+                ),
+            )
+            cur.execute(
+                "UPDATE jobs SET enriched=1, enriched_at=%s WHERE id=%s",
+                (now, job_id),
+            )
 
     return data

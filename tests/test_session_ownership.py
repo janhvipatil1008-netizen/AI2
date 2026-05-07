@@ -1,20 +1,22 @@
 """
 Session ownership tests.
 
-These require a real (non-TEST_MODE) server so that auth middleware
-and the SQL-level ownership check in _get_session_data are exercised.
-A second server is started on port 8766 with a temp SQLite DB and a
-known AUTH_SECRET; the existing port-8765 test suite is unaffected.
+These require a real (non-TEST_MODE) server backed by PostgreSQL so that
+auth middleware and the SQL-level ownership check in _get_session_data are
+exercised. Skipped automatically when SUPABASE_DATABASE_URL is not set.
+A second server is started on port 8766; the existing port-8765 suite is unaffected.
 """
 
 import os
 import sys
 import time
-import tempfile
 import subprocess
 
 import requests
 import pytest
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -22,24 +24,28 @@ _AUTH_PORT   = "8766"
 _AUTH_BASE   = f"http://localhost:{_AUTH_PORT}"
 _AUTH_SECRET = "a" * 64
 
+_DB_URL = os.getenv("SUPABASE_DATABASE_URL", "")
+
+pytestmark = pytest.mark.skipif(
+    not _DB_URL,
+    reason="SUPABASE_DATABASE_URL not set — skipping ownership integration tests",
+)
+
 
 # ── Server fixture ────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def auth_server():
     """
-    Start a non-TEST_MODE server on port 8766 with a temp DB.
+    Start a non-TEST_MODE server on port 8766 backed by PostgreSQL.
     Yields the base URL; tears down after all tests in this module complete.
     """
-    db_fd, db_path = tempfile.mkstemp(suffix=".db")
-    os.close(db_fd)
-
     env = {
         **os.environ,
-        "AI2_TEST_MODE":     "0",
-        "ANTHROPIC_API_KEY": "test-key",
-        "AUTH_SECRET":       _AUTH_SECRET,
-        "AI2_SESSION_DB":    db_path,
+        "AI2_TEST_MODE":        "0",
+        "ANTHROPIC_API_KEY":    "test-key",
+        "AUTH_SECRET":          _AUTH_SECRET,
+        "SUPABASE_DATABASE_URL": _DB_URL,
     }
     proc = subprocess.Popen(
         [
@@ -71,10 +77,6 @@ def auth_server():
 
     proc.terminate()
     proc.wait(timeout=5)
-    try:
-        os.unlink(db_path)
-    except OSError:
-        pass
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

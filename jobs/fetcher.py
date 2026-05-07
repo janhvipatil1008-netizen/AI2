@@ -65,9 +65,10 @@ def fetch_and_store(category: str = "all") -> dict:
 
     # ── Prune stale rows before fetching new ones ─────────────────────────────
     with get_conn() as conn:
-        cur     = conn.execute("DELETE FROM jobs WHERE created_at < datetime('now', '-7 days')")
-        deleted = cur.rowcount
-        conn.execute("DELETE FROM job_enrichments WHERE job_id NOT IN (SELECT id FROM jobs)")
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM jobs WHERE created_at::timestamptz < NOW() - INTERVAL '7 days'")
+            deleted = cur.rowcount
+            cur.execute("DELETE FROM job_enrichments WHERE job_id NOT IN (SELECT id FROM jobs)")
     if deleted:
         logger.info(f"Pruned {deleted} stale job(s) older than 7 days")
 
@@ -92,9 +93,11 @@ def fetch_and_store(category: str = "all") -> dict:
                         seen_urls.add(url)
 
                         ext_id = compute_external_id(url)
-                        exists = conn.execute(
-                            "SELECT 1 FROM jobs WHERE external_id = ?", (ext_id,)
-                        ).fetchone()
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "SELECT 1 FROM jobs WHERE external_id = %s", (ext_id,)
+                            )
+                            exists = cur.fetchone()
                         if exists:
                             skipped += 1
                             continue
@@ -102,27 +105,28 @@ def fetch_and_store(category: str = "all") -> dict:
                         # Cap description to 10 000 chars to keep DB lean
                         desc = str(job.get("description") or "")[:10_000]
 
-                        conn.execute(
-                            """INSERT INTO jobs
-                               (id, external_id, source, title, company, location,
-                                salary, description, date_posted, job_url,
-                                role_category, created_at)
-                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                            (
-                                str(uuid.uuid4()),
-                                ext_id,
-                                str(job.get("site") or "unknown"),
-                                str(job.get("title") or "").strip(),
-                                str(job.get("company") or "").strip(),
-                                str(job.get("location") or location).strip(),
-                                str(job.get("min_amount") or "").strip(),
-                                desc,
-                                str(job.get("date_posted") or "").strip(),
-                                url,
-                                cat,
-                                datetime.now(timezone.utc).isoformat(),
-                            ),
-                        )
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                """INSERT INTO jobs
+                                   (id, external_id, source, title, company, location,
+                                    salary, description, date_posted, job_url,
+                                    role_category, created_at)
+                                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                                (
+                                    str(uuid.uuid4()),
+                                    ext_id,
+                                    str(job.get("site") or "unknown"),
+                                    str(job.get("title") or "").strip(),
+                                    str(job.get("company") or "").strip(),
+                                    str(job.get("location") or location).strip(),
+                                    str(job.get("min_amount") or "").strip(),
+                                    desc,
+                                    str(job.get("date_posted") or "").strip(),
+                                    url,
+                                    cat,
+                                    datetime.now(timezone.utc).isoformat(),
+                                ),
+                            )
                         new += 1
 
     logger.info(f"Fetch complete — fetched={fetched}, new={new}, skipped={skipped}")

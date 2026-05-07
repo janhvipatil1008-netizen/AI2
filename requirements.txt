@@ -14,6 +14,9 @@ slowapi>=0.1.9
 bcrypt>=4.0.0
 itsdangerous>=2.1.2
 
+# Database
+psycopg2-binary>=2.9.0
+
 # Job search
 python-jobspy>=0.2.0
 

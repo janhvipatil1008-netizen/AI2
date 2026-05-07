@@ -16,13 +16,13 @@ import asyncio
 import functools
 import json
 import os
-import sqlite3
 import logging
-import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
+
+import psycopg2
 
 import anthropic
 from dotenv import load_dotenv
@@ -39,6 +39,7 @@ from auth import (
     AUTH_COOKIE, hash_password, verify_password,
     create_auth_token, get_current_user_id,
 )
+from database.pool import get_conn
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES, TOTAL_WEEKS
 from context.session import SessionContext
 from context.learner_profile import (
@@ -56,10 +57,8 @@ load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-TEST_MODE       = os.getenv("AI2_TEST_MODE") == "1"
-_DB_DIR         = "." if TEST_MODE else os.getenv("DB_DIR", "/data")
-SESSION_DB_PATH = os.getenv("AI2_SESSION_DB", os.path.join(_DB_DIR, "sessions.db"))
-logger          = logging.getLogger(__name__)
+TEST_MODE = os.getenv("AI2_TEST_MODE") == "1"
+logger    = logging.getLogger(__name__)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -82,79 +81,27 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 _sessions: dict[str, dict] = {}
 _executor = ThreadPoolExecutor(max_workers=4)
 
-# Thread lock for SQLite writes
-_db_lock = threading.Lock()
 
-
-# ── Session persistence (SQLite) ──────────────────────────────────────────────
-
-def _init_db() -> None:
-    if TEST_MODE:
-        return
-    with _db_lock:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id       TEXT PRIMARY KEY,
-                    email         TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    display_name  TEXT,
-                    created_at    TEXT NOT NULL,
-                    updated_at    TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS sessions (
-                    session_id   TEXT PRIMARY KEY,
-                    session_data TEXT NOT NULL,
-                    created_at   TEXT NOT NULL,
-                    updated_at   TEXT NOT NULL,
-                    user_id      TEXT REFERENCES users(user_id)
-                )
-            """)
-            # Add user_id column to existing sessions table if upgrading
-            try:
-                conn.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
-            except sqlite3.OperationalError:
-                pass  # column already exists
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS conversation_history (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id         TEXT NOT NULL REFERENCES users(user_id),
-                    session_id      TEXT NOT NULL,
-                    user_message    TEXT NOT NULL,
-                    assistant_reply TEXT NOT NULL,
-                    agent_used      TEXT NOT NULL,
-                    timestamp       TEXT NOT NULL
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS learner_profiles (
-                    user_id      TEXT PRIMARY KEY REFERENCES users(user_id),
-                    profile_data TEXT NOT NULL,
-                    updated_at   TEXT NOT NULL
-                )
-            """)
-            conn.commit()
+# ── Session persistence (PostgreSQL) ─────────────────────────────────────────
 
 
 def _save_session(session_id: str, session: SessionContext) -> None:
-    """Write-through: persist session to SQLite after every mutation."""
+    """Write-through: persist session to PostgreSQL after every mutation."""
     if TEST_MODE:
         return
     data = json.dumps(session.to_dict())
     now  = datetime.now().isoformat()
-    with _db_lock:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute(
-                "INSERT OR REPLACE INTO sessions "
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO sessions "
                 "(session_id, session_data, created_at, updated_at, user_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (session_id, data, session.start_time, now, session.user_id or None),
+                "VALUES (%s, %s, %s, %s, %s) "
+                "ON CONFLICT (session_id) DO UPDATE "
+                "SET session_data=%s, updated_at=%s, user_id=%s",
+                (session_id, data, session.start_time, now, session.user_id or None,
+                 data, now, session.user_id or None),
             )
-            conn.commit()
 
 
 def _save_exchange_to_history(
@@ -165,47 +112,44 @@ def _save_exchange_to_history(
     if TEST_MODE or not user_id:
         return
     now = datetime.now().isoformat()
-    with _db_lock:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute(
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
                 "INSERT INTO conversation_history "
                 "(user_id, session_id, user_message, assistant_reply, agent_used, timestamp) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "VALUES (%s, %s, %s, %s, %s, %s)",
                 (user_id, session_id, user_message, assistant_reply, agent_used, now),
             )
-            conn.commit()
 
 
 def _save_profile_db(profile: LearnerProfile) -> None:
-    """Persist a LearnerProfile to SQLite."""
+    """Persist a LearnerProfile to PostgreSQL."""
     if TEST_MODE:
         return
-    with _db_lock:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            save_profile(profile, conn)
+    with get_conn() as conn:
+        save_profile(profile, conn)
 
 
 def _load_profile_db(user_id: str) -> Optional[LearnerProfile]:
     if TEST_MODE or not user_id:
         return None
     try:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
+        with get_conn() as conn:
             return load_profile(user_id, conn)
     except Exception:
         return None
 
 
 def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
-    """Load a session from SQLite (used on cache miss — e.g. after restart)."""
+    """Load a session from PostgreSQL (used on cache miss — e.g. after restart)."""
     try:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            row = conn.execute(
-                "SELECT session_data FROM sessions WHERE session_id = ?",
-                (session_id,),
-            ).fetchone()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT session_data FROM sessions WHERE session_id = %s",
+                    (session_id,),
+                )
+                row = cur.fetchone()
         if row:
             return SessionContext.from_dict(json.loads(row[0]))
     except Exception:
@@ -218,12 +162,14 @@ def _get_user_sessions(user_id: str, limit: int = 10) -> list[dict]:
     if TEST_MODE or not user_id:
         return []
     try:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            rows = conn.execute(
-                "SELECT session_id, session_data, updated_at FROM sessions "
-                "WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?",
-                (user_id, limit),
-            ).fetchall()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT session_id, session_data, updated_at FROM sessions "
+                    "WHERE user_id = %s ORDER BY updated_at DESC LIMIT %s",
+                    (user_id, limit),
+                )
+                rows = cur.fetchall()
         result = []
         for session_id, data_json, updated_at in rows:
             try:
@@ -246,12 +192,14 @@ def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
     if TEST_MODE or not user_id:
         return []
     try:
-        with sqlite3.connect(SESSION_DB_PATH) as conn:
-            rows = conn.execute(
-                "SELECT session_id, user_message, assistant_reply, agent_used, timestamp "
-                "FROM conversation_history WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?",
-                (user_id, limit),
-            ).fetchall()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT session_id, user_message, assistant_reply, agent_used, timestamp "
+                    "FROM conversation_history WHERE user_id = %s ORDER BY timestamp DESC LIMIT %s",
+                    (user_id, limit),
+                )
+                rows = cur.fetchall()
         return [
             {
                 "session_id":      r[0],
@@ -266,33 +214,41 @@ def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
         return []
 
 
-# Initialise the DB at module load time (no-op in TEST_MODE)
 def _startup_db() -> None:
-    """Ensure data dir exists; create schema on first deploy; log if fresh."""
+    """Run schema.sql against PostgreSQL if tables don't yet exist. No-op in TEST_MODE."""
     if TEST_MODE:
         return
-    data_dir = os.path.dirname(SESSION_DB_PATH)
-    if data_dir and data_dir != ".":
-        os.makedirs(data_dir, exist_ok=True)
-    fresh = not os.path.exists(SESSION_DB_PATH)
-    _init_db()
-    if fresh:
-        logger.info(f"First-deploy: created fresh schema at {SESSION_DB_PATH}")
+    schema_path = os.path.join(os.path.dirname(__file__), "database", "schema.sql")
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT EXISTS (SELECT FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_name = 'users')"
+                )
+                tables_exist = cur.fetchone()[0]
+                if not tables_exist:
+                    with open(schema_path) as f:
+                        schema_sql = f.read()
+                    for stmt in schema_sql.split(";"):
+                        s = stmt.strip()
+                        if s:
+                            cur.execute(s)
+                    logger.info("First-deploy: created schema from database/schema.sql")
+    except Exception as exc:
+        logger.warning(f"_startup_db skipped: {exc}")
 
 _startup_db()
 
-# Initialise jobs.db (always — no TEST_MODE guard, jobs.db is read-only safe)
+# Import jobs DB helpers — schema is created centrally by _startup_db via schema.sql
 try:
     from jobs.database import (
-        init_db as _init_jobs_db,
         get_jobs as _get_jobs,
         get_job_with_enrichment as _get_job_detail,
         get_stats as _get_jobs_stats,
     )
-    _init_jobs_db()
 except Exception as _jobs_db_err:
-    import logging as _log
-    _log.getLogger(__name__).warning(f"jobs.db init skipped: {_jobs_db_err}")
+    logger.warning(f"jobs helpers import failed: {_jobs_db_err}")
 
 
 # ── Authentication middleware ─────────────────────────────────────────────────
@@ -619,30 +575,33 @@ def _get_session_data(session_id: str, user_id: str = "") -> dict:
     # ── DB restore (cache miss after restart / multi-worker) ─────────────────
     if not TEST_MODE:
         try:
-            with sqlite3.connect(SESSION_DB_PATH) as conn:
-                conn.execute("PRAGMA journal_mode=WAL")
-                if user_id:
-                    # Fetch only if session belongs to this user
-                    row = conn.execute(
-                        "SELECT session_data FROM sessions WHERE session_id = ? AND user_id = ?",
-                        (session_id, user_id),
-                    ).fetchone()
-                    if row is None:
-                        # Distinguish 404 (doesn't exist) from 403 (exists, wrong user)
-                        exists = conn.execute(
-                            "SELECT user_id FROM sessions WHERE session_id = ?",
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    if user_id:
+                        cur.execute(
+                            "SELECT session_data FROM sessions "
+                            "WHERE session_id = %s AND user_id = %s",
+                            (session_id, user_id),
+                        )
+                        row = cur.fetchone()
+                        if row is None:
+                            # Distinguish 404 (doesn't exist) from 403 (exists, wrong user)
+                            cur.execute(
+                                "SELECT user_id FROM sessions WHERE session_id = %s",
+                                (session_id,),
+                            )
+                            exists = cur.fetchone()
+                            if exists is None:
+                                raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+                            raise HTTPException(status_code=403, detail="Access denied.")
+                    else:
+                        cur.execute(
+                            "SELECT session_data FROM sessions WHERE session_id = %s",
                             (session_id,),
-                        ).fetchone()
-                        if exists is None:
+                        )
+                        row = cur.fetchone()
+                        if row is None:
                             raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-                        raise HTTPException(status_code=403, detail="Access denied.")
-                else:
-                    row = conn.execute(
-                        "SELECT session_data FROM sessions WHERE session_id = ?",
-                        (session_id,),
-                    ).fetchone()
-                    if row is None:
-                        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
             session = SessionContext.from_dict(json.loads(row[0]))
             client  = _make_client()
@@ -712,10 +671,12 @@ async def login_submit(request: Request):
 
     if not TEST_MODE:
         try:
-            with sqlite3.connect(SESSION_DB_PATH) as conn:
-                row = conn.execute(
-                    "SELECT user_id, password_hash FROM users WHERE email = ?", (email,)
-                ).fetchone()
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT user_id, password_hash FROM users WHERE email = %s", (email,)
+                    )
+                    row = cur.fetchone()
         except Exception:
             row = None
 
@@ -776,16 +737,14 @@ async def signup_submit(request: Request):
     now          = datetime.now().isoformat()
 
     try:
-        with _db_lock:
-            with sqlite3.connect(SESSION_DB_PATH) as conn:
-                conn.execute("PRAGMA journal_mode=WAL")
-                conn.execute(
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
                     "INSERT INTO users (user_id, email, password_hash, display_name, created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
                     (user_id, email, password_hash, display_name or email.split("@")[0], now, now),
                 )
-                conn.commit()
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
         return templates.TemplateResponse(
             request=request, name="signup.html",
             context={"error": "An account with that email already exists."},
@@ -812,10 +771,12 @@ async def dashboard(request: Request):
     display_name = "Learner"
     if not TEST_MODE:
         try:
-            with sqlite3.connect(SESSION_DB_PATH) as conn:
-                row = conn.execute(
-                    "SELECT display_name FROM users WHERE user_id = ?", (user_id,)
-                ).fetchone()
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT display_name FROM users WHERE user_id = %s", (user_id,)
+                    )
+                    row = cur.fetchone()
             if row:
                 display_name = row[0] or display_name
         except Exception:

@@ -6,7 +6,6 @@ Persistent, cross-session learner data. Separate from SessionContext
 """
 
 import json
-import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -145,21 +144,24 @@ class LearnerProfile:
 
 # ── Storage helpers ───────────────────────────────────────────────────────────
 
-def load_profile(user_id: str, conn: sqlite3.Connection) -> Optional[LearnerProfile]:
-    row = conn.execute(
-        "SELECT profile_data FROM learner_profiles WHERE user_id = ?", (user_id,)
-    ).fetchone()
+def load_profile(user_id: str, conn) -> Optional[LearnerProfile]:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT profile_data FROM learner_profiles WHERE user_id = %s", (user_id,)
+        )
+        row = cur.fetchone()
     if row:
         return LearnerProfile.from_dict(json.loads(row[0]))
     return None
 
 
-def save_profile(profile: LearnerProfile, conn: sqlite3.Connection) -> None:
+def save_profile(profile: LearnerProfile, conn) -> None:
     now  = datetime.now().isoformat()
     data = json.dumps(profile.to_dict())
-    conn.execute(
-        "INSERT OR REPLACE INTO learner_profiles (user_id, profile_data, updated_at) "
-        "VALUES (?, ?, ?)",
-        (profile.user_id, data, now),
-    )
-    conn.commit()
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO learner_profiles (user_id, profile_data, updated_at) "
+            "VALUES (%s, %s, %s) "
+            "ON CONFLICT (user_id) DO UPDATE SET profile_data=%s, updated_at=%s",
+            (profile.user_id, data, now, data, now),
+        )
