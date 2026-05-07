@@ -1,12 +1,15 @@
 """
-AI² — The Career Roadmap syllabus data.
+AI² — Career Roadmap syllabus data (v2.0).
 
-Single source of truth for the 13-week curriculum.
-All phases, tracks, tasks, and role assignments live here.
+5-week compressed curriculum at 8-10 hrs/day intensity.
+Agri-Saathi is the one real build project (Weeks 3–4).
+AI² multi-agent system is a design/analysis exercise only (Day 18–19).
 
-Task keys follow the pattern "<phase_id>-<track_idx>-<task_idx>"
-and are stored in the learner's profile under "syllabus_progress".
+Task keys: "w{week_num}-d{day_idx}-{scope}-{task_idx}"
+  scope = "all" | "aipm" | "evals" | "context"
 """
+
+MAX_WEEKS = 5
 
 # ── Role definitions ───────────────────────────────────────────────────────────
 
@@ -16,462 +19,598 @@ ROLE_TRACKS = {
     "context": {"label": "Context Engineer",    "icon": "🧩", "color": "#AED581"},
 }
 
-# ── 6-Phase Roadmap ────────────────────────────────────────────────────────────
+# ── 5-Week Roadmap ─────────────────────────────────────────────────────────────
 
-PHASES = [
+WEEKS = [
     {
-        "id": "foundation",
-        "phase": "Phase 1",
-        "title": "AI Foundations & PM Core",
-        "weeks": "Weeks 1–2",
-        "icon": "🧠",
-        "description": "Build unshakeable AI literacy + sharpen PM fundamentals",
-        "artifact": "AI PM Handbook + Eval Metrics Cheat Sheet + Context Engineering Map",
-        "tracks": [
+        "num": 1,
+        "title": "AI Foundations & Core Fluency",
+        "subtitle": "Build the knowledge base all three roles share",
+        "color": "#E85D26",
+        "week_hours": "50 hrs — 10 hrs/day × 5 days",
+        "theme": "Understand AI systems deeply enough to make product decisions, design evaluations, and architect context pipelines.",
+        "days": [
             {
-                "name": "AI Fundamentals",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Write 1-page explainers: AI vs ML vs DL, supervised vs unsupervised",        "roles": ["aipm", "evals", "context"]},
-                    {"text": "Understand overfitting/underfitting — what PMs do about it",                  "roles": ["aipm"]},
-                    {"text": "Build a toy classifier (Google Teachable Machine / no-code AutoML)",          "roles": ["aipm", "evals"]},
-                    {"text": "Study loss functions, gradient descent (conceptual, not math-heavy)",         "roles": ["aipm", "evals"]},
-                    {"text": "Create 'AI PM Handbook' doc with sections matching your skill checklist",     "roles": ["aipm"]},
+                "day_label": "Day 1–2",
+                "day_idx": 0,
+                "title": "AI/ML Foundations",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "AI vs ML vs DL — draw the Venn diagram, explain each to a 5-year-old and a CTO",
+                    "How models learn: training, loss functions, gradient descent (intuition, not math)",
+                    "Overfitting, underfitting, regularization — why they matter for product decisions",
+                    "Supervised vs unsupervised vs reinforcement learning — when to use each",
+                    "Neural network anatomy: layers, weights, activation functions (visual intuition)",
+                ],
+                "tracks": {
+                    "aipm": ["Write a 1-page explainer: 'AI/ML for stakeholders' — translate technical concepts into business language"],
+                    "evals": ["Create a cheat sheet: 'What can go wrong at each stage of model training' — overfitting, data leakage, label noise"],
+                    "context": ["Map: 'Where does context enter the ML pipeline?' — training data, prompt, retrieval, system instructions"],
+                },
+                "artifact": "AI Foundations Cheat Sheet (1-page visual reference per role)",
+                "resources": [
+                    "3Blue1Brown Neural Networks series",
+                    "fast.ai Practical Deep Learning Ch.1",
+                    "Andrej Karpathy — Neural Networks: Zero to Hero",
                 ],
             },
             {
-                "name": "LLMs & Transformers",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Read 'The Illustrated Transformer' → write 10-bullet summary",                         "roles": ["aipm", "evals", "context"]},
-                    {"text": "1-page cheat sheet: tokens, context windows, embeddings, attention",                   "roles": ["aipm", "evals", "context"]},
-                    {"text": "Understand hallucinations — causes, mitigation strategies for products",               "roles": ["aipm", "evals", "context"]},
-                    {"text": "Study attention mechanics: U-shaped curves, 'lost-in-the-middle' phenomenon",          "roles": ["context"]},
-                    {"text": "Map token budget math: how context window size affects cost, latency, and quality",    "roles": ["context"]},
+                "day_label": "Day 3–4",
+                "day_idx": 1,
+                "title": "LLMs, Transformers & Token Economics",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "Transformer architecture: attention mechanism, self-attention, multi-head attention",
+                    "Tokenization: BPE, token budgets, why token count ≠ word count",
+                    "Embeddings: what they are, how they encode meaning, why they enable similarity search",
+                    "LLM inference: temperature, top-p, frequency penalty — how each affects output",
+                    "Model landscape: GPT-4o vs Claude vs Gemini vs Llama — capabilities, costs, trade-offs",
+                    "Hallucinations: why they happen, taxonomy of failure modes, mitigation strategies",
+                ],
+                "tracks": {
+                    "aipm": ["Write a model selection decision framework: 'When to use which LLM' with cost/quality/latency matrix"],
+                    "evals": ["Build a hallucination taxonomy: 5 types with detection strategies for each"],
+                    "context": ["Create a token budget calculator: allocate tokens across system prompt, RAG context, chat history, output"],
+                },
+                "artifact": "LLM Decision Matrix + Hallucination Taxonomy + Token Budget Template",
+                "resources": [
+                    "The Illustrated Transformer (jalammar.github.io)",
+                    "Anthropic Claude model cards",
+                    "OpenAI tokenizer",
                 ],
             },
             {
-                "name": "PM Fundamentals Refresh",
-                "roles": ["aipm"],
-                "tasks": [
-                    {"text": "Review RICE & MoSCoW prioritization — practice scoring 10 backlog items",  "roles": ["aipm"]},
-                    {"text": "Define North Star metrics, funnel metrics, cohort analysis concepts",      "roles": ["aipm"]},
-                    {"text": "Write a mini PRD for any product feature you use daily",                   "roles": ["aipm"]},
-                ],
-            },
-            {
-                "name": "Evaluation Foundations",
-                "roles": ["evals"],
-                "tasks": [
-                    {"text": "Study core metrics: accuracy, precision, recall, F1, BLEU, ROUGE",                "roles": ["evals"]},
-                    {"text": "Understand train/val/test splits — why they matter, common mistakes",             "roles": ["evals"]},
-                    {"text": "Learn difference: offline eval vs online A/B testing vs human eval",              "roles": ["evals"]},
-                    {"text": "Read OpenAI's eval guidance (3-step workflow)",                                   "roles": ["evals"]},
-                ],
-            },
-            {
-                "name": "Context Engineering Foundations",
-                "roles": ["context"],
-                "tasks": [
-                    {"text": "Read Anthropic's 'Effective Context Engineering for AI Agents' guide",                        "roles": ["context"]},
-                    {"text": "Understand context vs prompt: system prompts, tool defs, message history, retrieved docs",   "roles": ["context"]},
-                    {"text": "Study RAG basics: why retrieval grounds AI, chunking strategies, embedding models",           "roles": ["context"]},
-                    {"text": "Map the context engineering landscape: rules, skills, memory, tools, retrieval",              "roles": ["context"]},
+                "day_label": "Day 5",
+                "day_idx": 2,
+                "title": "Track-Specific Foundations",
+                "hours": "10 hrs",
+                "all_tracks": [],
+                "tracks": {
+                    "aipm": [
+                        "PRD structure for AI products (differs from traditional PRDs)",
+                        "RICE/MoSCoW for AI feature prioritization",
+                        "North Star metrics for AI products (accuracy ≠ success)",
+                        "Stakeholder communication: translating AI uncertainty to business confidence",
+                        "Write a mini-PRD for an AI feature you'd add to a product you use daily",
+                    ],
+                    "evals": [
+                        "Evaluation metrics: accuracy, precision, recall, F1, BLEU, ROUGE",
+                        "Train/val/test splits for LLM evaluation",
+                        "Offline vs online evaluation — what each catches",
+                        "Human vs automated evaluation: cost, speed, quality trade-offs",
+                        "Read OpenAI's eval guidance + Anthropic's eval best practices",
+                    ],
+                    "context": [
+                        "Read Anthropic's Context Engineering guide (the definitive reference)",
+                        "Context vs prompt: why the distinction matters",
+                        "RAG fundamentals: chunking, embedding, retrieval, re-ranking",
+                        "Context assembly pipeline: what goes in, in what order, and why",
+                        "Map the CE landscape: RAG, function calling, system prompts, few-shot, memory",
+                    ],
+                },
+                "artifact": "Mini-PRD + Eval Metrics Cheat Sheet + Context Engineering Landscape Map",
+                "resources": [
+                    "Anthropic Context Engineering guide",
+                    "OpenAI Evals docs",
+                    "Lenny's Newsletter PRD templates",
+                    "Eugene Yan's eval posts",
                 ],
             },
         ],
     },
     {
-        "id": "prompts-apis",
-        "phase": "Phase 2",
-        "title": "APIs, Prompts & Core Techniques",
-        "weeks": "Weeks 3–4",
-        "icon": "⚡",
-        "description": "Master API calls, prompt/context craft, and eval thinking",
-        "artifact": "Prompt Library + Eval Harness v0 + Context Assembly Spec + Agent Patterns Sheet",
-        "tracks": [
+        "num": 2,
+        "title": "APIs, Prompting & Applied Techniques",
+        "subtitle": "Get hands-on with the tools each role uses daily",
+        "color": "#7C3AED",
+        "week_hours": "50 hrs — 10 hrs/day × 5 days",
+        "theme": "Move from understanding to doing. Build your prompt library, your first eval harness, and your first context pipeline.",
+        "days": [
             {
-                "name": "APIs & Tooling",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Install Postman → send first REST request to any public API",                             "roles": ["aipm"]},
-                    {"text": "Create OpenAI developer account → complete API quickstart",                               "roles": ["aipm", "evals", "context"]},
-                    {"text": "Make 3 API calls: plain chat, structured JSON output, cost-aware (capped tokens)",        "roles": ["aipm", "evals", "context"]},
-                    {"text": "Write stakeholder-ready note: temperature, tokens, latency, cost tradeoffs",              "roles": ["aipm"]},
+                "day_label": "Day 6–7",
+                "day_idx": 0,
+                "title": "APIs + Prompt → Context Engineering",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "API fundamentals: REST, authentication, rate limits, error handling",
+                    "Claude/OpenAI API hands-on: 5 calls (chat, JSON mode, streaming, function calling, vision)",
+                    "Prompt engineering progression: zero-shot → few-shot → CoT → system prompts → structured outputs",
+                    "Advanced prompting: meta-prompting, prompt chaining, self-consistency, decomposition",
+                    "Build a 20-prompt library: classification, extraction, generation, analysis, evaluation",
+                ],
+                "tracks": {
+                    "aipm": ["Write a stakeholder memo: 'API cost analysis for our AI feature' — model costs, latency, reliability trade-offs"],
+                    "evals": ["Design 10 eval test cases for your prompt library — input, expected output, rubric, edge case per test"],
+                    "context": ["Build a context assembly spec: system prompt template + dynamic context injection + output schema"],
+                },
+                "artifact": "20-Prompt Library + API Cost Memo + 10 Eval Test Cases + Context Assembly Spec",
+                "resources": [
+                    "Anthropic Prompt Engineering guide",
+                    "OpenAI Cookbook",
+                    "promptingguide.ai",
+                    "Brex Prompt Engineering guide",
                 ],
             },
             {
-                "name": "Prompt Engineering → Context Engineering",
-                "roles": ["aipm", "context"],
-                "tasks": [
-                    {"text": "Build prompt library (20+ prompts): extraction, classification, summarization, safety",                   "roles": ["aipm", "context"]},
-                    {"text": "Study prompt frameworks: chain-of-thought, few-shot, system/user roles",                                  "roles": ["aipm", "context"]},
-                    {"text": "Learn structured outputs (JSON mode, function calling)",                                                  "roles": ["aipm", "context"]},
-                    {"text": "Advance to context engineering: dynamic system prompts, persona prompting, least-to-most",               "roles": ["context"]},
-                    {"text": "Build a 'context assembly pipeline': user metadata + task context + retrieved docs + tool schemas",      "roles": ["context"]},
-                    {"text": "Experiment: same task with minimal vs rich context — document quality delta",                             "roles": ["context"]},
+                "day_label": "Day 8–9",
+                "day_idx": 1,
+                "title": "Evaluation Deep Dive + Agent Architecture",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "LLM-as-Judge: using one model to evaluate another — prompt design, calibration, bias",
+                    "Eval frameworks: RAGAS, DeepEval, Phoenix — when to use which",
+                    "Agent architecture: single-agent vs multi-agent, orchestrator patterns, tool use",
+                    "Agent protocols: MCP (Model Context Protocol), A2A, tool calling standards",
+                    "7 agentic design patterns: ReAct, Plan-and-Execute, Reflection, Multi-Agent Debate, etc.",
+                ],
+                "tracks": {
+                    "aipm": ["Write a 1-pager: 'Should we build an agent or a pipeline?' — decision framework for PMs"],
+                    "evals": ["Build eval harness v0: 10 test cases + LLM-as-Judge scoring + pass/fail report"],
+                    "context": ["Design agent context flow: how context moves between orchestrator and specialists, what compresses vs passes through"],
+                },
+                "artifact": "Agent Decision Framework + Eval Harness v0 + Agent Context Flow Diagram",
+                "resources": [
+                    "RAGAS docs",
+                    "DeepEval docs",
+                    "Anthropic — Building Effective Agents",
+                    "LangGraph docs",
                 ],
             },
             {
-                "name": "Eval Methodologies Deep Dive",
-                "roles": ["evals"],
-                "tasks": [
-                    {"text": "Study LLM-as-a-Judge: direct scoring, pairwise comparison, rubric generation",           "roles": ["evals"]},
-                    {"text": "Learn eval frameworks: RAGAS, DeepEval, Phoenix/TruLens, OpenAI Evals",                  "roles": ["evals"]},
-                    {"text": "Build 10 'unit-test-like' eval cases for prompts (pass/fail with rubrics)",              "roles": ["evals"]},
-                    {"text": "Understand bias in evals: position bias, verbosity bias, self-enhancement bias",          "roles": ["evals"]},
-                    {"text": "Create a simple automated eval harness (script that runs questions + scores outputs)",    "roles": ["evals"]},
-                    {"text": "Study human-in-the-loop evaluation design: when to use humans vs LLM judges",            "roles": ["evals"]},
+                "day_label": "Day 10",
+                "day_idx": 2,
+                "title": "RAG Architecture & Context Pipelines",
+                "hours": "10 hrs",
+                "all_tracks": [
+                    "RAG end-to-end: ingestion → chunking → embedding → vector DB → retrieval → re-ranking → generation",
+                    "Chunking strategies: fixed-size, semantic, recursive, document-aware",
+                    "Vector databases: pgvector vs Pinecone vs Chroma vs Weaviate — trade-offs",
+                    "Retrieval quality: precision@k, recall@k, MRR — how to measure if your RAG is working",
+                    "Context window management: what happens when retrieved context exceeds token limits",
                 ],
-            },
-            {
-                "name": "Agents & Protocols",
-                "roles": ["aipm", "context"],
-                "tasks": [
-                    {"text": "Understand Agents vs LLMs — tool use, orchestration, planning patterns",                                      "roles": ["aipm", "context"]},
-                    {"text": "Study MCP (Model Context Protocol) and A2A — the new interoperability standards",                             "roles": ["aipm", "context"]},
-                    {"text": "Map the 7 agentic design patterns: ReAct, Reflection, Tool Use, Planning, Multi-Agent, Sequential, Human-in-Loop", "roles": ["aipm", "context"]},
-                    {"text": "Study tool design principles: self-contained, token-efficient returns, clear schemas",                         "roles": ["context"]},
-                ],
-            },
-        ],
-    },
-    {
-        "id": "agrisaathi",
-        "phase": "Phase 3",
-        "title": "Agri-Saathi MVP Build",
-        "weeks": "Weeks 5–7",
-        "icon": "🌾",
-        "description": "Flagship project — RAG + citations + weather tool + safety rails + evals",
-        "artifact": "Working Agri-Saathi MVP + Architecture Diagram + Context Pipeline Spec + PRD v1",
-        "tracks": [
-            {
-                "name": "Week 5: PRD + Knowledge Base + UI",
-                "roles": ["aipm", "context"],
-                "tasks": [
-                    {"text": "Define target user (small farmers / agri retailers / extension workers)",             "roles": ["aipm"]},
-                    {"text": "Conduct 8 user conversations (informal farmer/retailer interviews)",                  "roles": ["aipm"]},
-                    {"text": "Write Agri-Saathi PRD v1: persona, JTBD, MVP features, non-goals, risks",            "roles": ["aipm"]},
-                    {"text": "Create 'Top 20 FAQs farmers ask' list (seed for eval set)",                          "roles": ["aipm", "evals"]},
-                    {"text": "Build knowledge pack: 15-30 pages trusted sources for 1 crop",                       "roles": ["aipm", "context"]},
-                    {"text": "Create sources.csv: source name, type, date, trust level",                           "roles": ["aipm", "context"]},
-                    {"text": "Define 'What Agri-Saathi will NOT answer' safety list",                              "roles": ["aipm", "evals"]},
-                    {"text": "Build prototype UI (Lovable): onboarding, chat screen, citations drawer",            "roles": ["aipm"]},
-                    {"text": "Define UX contract (API shape: answer, citations, confidence, follow-up)",           "roles": ["aipm"]},
-                ],
-            },
-            {
-                "name": "Week 6: RAG Backend + Context Pipeline",
-                "roles": ["aipm", "context"],
-                "tasks": [
-                    {"text": "Implement: doc ingestion → chunking → embeddings → vector store (Chroma)",                       "roles": ["aipm", "context"]},
-                    {"text": "Experiment with chunking strategies: size, overlap, semantic vs fixed",                           "roles": ["context"]},
-                    {"text": "Design the context assembly: system prompt + user profile + retrieved chunks + tool outputs",     "roles": ["context"]},
-                    {"text": "Implement context compression: summarize long retrievals, trim irrelevant chunks",                "roles": ["context"]},
-                    {"text": "Build /chat endpoint: embed query → retrieve top-k → LLM with context → citations",             "roles": ["aipm", "context"]},
-                    {"text": "Add 'I don't know' behavior when retrieval confidence is low",                                    "roles": ["aipm", "context"]},
-                    {"text": "Create 1-page architecture diagram (boxes + arrows)",                                             "roles": ["aipm"]},
-                ],
-            },
-            {
-                "name": "Week 7: Weather Tool + Weekly Plan (Agent Feature)",
-                "roles": ["aipm", "context"],
-                "tasks": [
-                    {"text": "Add get_weather() tool — design token-efficient response format",                                 "roles": ["context"]},
-                    {"text": "Build 'Weekly Crop Plan' agentic workflow: weather call → RAG → 7-day plan",                    "roles": ["aipm", "context"]},
-                    {"text": "Implement dynamic context switching: different tool/retrieval configs per query type",            "roles": ["context"]},
-                    {"text": "Add guardrails: no precise pesticide dosing without citation",                                    "roles": ["aipm"]},
-                    {"text": "Build Weekly Plan screen in UI",                                                                  "roles": ["aipm"]},
-                    {"text": "Write 1-page 'tool calling / workflow' spec",                                                    "roles": ["aipm"]},
+                "tracks": {
+                    "aipm": ["Write a RAG build-vs-buy analysis: when to build custom RAG vs use off-the-shelf"],
+                    "evals": ["Design a RAG eval suite: 15 test queries with ground truth, relevance scoring, retrieval quality metrics"],
+                    "context": ["Build a context pipeline spec: ingestion → chunking → embedding → retrieval → assembly → generation with optimization notes per stage"],
+                },
+                "artifact": "RAG Build-vs-Buy Analysis + RAG Eval Suite + Context Pipeline Spec",
+                "resources": [
+                    "LlamaIndex docs",
+                    "LangChain RAG tutorials",
+                    "Pinecone learning center",
+                    "pgvector GitHub",
                 ],
             },
         ],
     },
     {
-        "id": "evals-deep",
-        "phase": "Phase 4",
-        "title": "Evaluation & Metrics Mastery",
-        "weeks": "Week 8",
-        "icon": "📊",
-        "description": "The phase that separates prompt hobbyists from real AIPMs & Eval specialists",
-        "artifact": "Eval Report + LLM Judge Pipeline + Context Ablation Study + Metrics Tree",
-        "tracks": [
+        "num": 3,
+        "title": "Advanced Skills & Agri-Saathi Build Part 1",
+        "subtitle": "Role-specific depth + full data pipeline build (Days 11–15)",
+        "color": "#16A34A",
+        "week_hours": "50 hrs — 10 hrs/day × 5 days",
+        "theme": "Days 11–15 are dual-purpose: build the Agri-Saathi data pipeline while developing advanced role-specific skills through the project lens.",
+        "days": [
             {
-                "name": "Golden Set & Offline Evals",
-                "roles": ["aipm", "evals"],
-                "tasks": [
-                    {"text": "Create golden_set.csv: 60 questions with expected answers, must-cite sources, failure tags",  "roles": ["aipm", "evals"]},
-                    {"text": "Define scoring rubric (0/1/2): groundedness, helpfulness, safety, localization",              "roles": ["aipm", "evals"]},
-                    {"text": "Run Agri-Saathi against full golden set",                                                     "roles": ["aipm", "evals"]},
-                    {"text": "Produce Eval Report v1: baseline scores, top 10 failures, 3 concrete fixes",                 "roles": ["aipm", "evals"]},
-                    {"text": "Show before/after: 'Groundedness improved from X → Y after change Z'",                       "roles": ["aipm", "evals"]},
+                "day_label": "Day 11",
+                "day_idx": 0,
+                "title": "Project Setup + Data Source Mapping",
+                "hours": "10 hrs",
+                "agrisaathi_day": 1,
+                "all_tracks": [
+                    "Set up project repo: agri-saathi/ with clean folder structure (downloaders/, processors/, storage/, api/, scheduler/, tests/)",
+                    "Create requirements.txt: fastapi, uvicorn, apscheduler, sqlalchemy, pgvector, chromadb, httpx, pandas, geopandas, rasterio, anthropic, openai",
+                    "Write config.py: all API keys, DB URLs, schedule intervals loaded from .env",
+                    "Design the DataSource abstract base class: every downloader inherits from it (download, validate, normalize, store)",
+                    "Map all data sources: URL/API, auth method, rate limits, update frequency, data format, license, coverage",
+                    "Create sources_registry.json: single source of truth for all data sources",
                 ],
+                "tracks": {
+                    "aipm": [
+                        "AI product lifecycle deep dive: ideation → data strategy → model selection → eval → deployment → monitoring",
+                        "Write the Data Strategy 1-pager: which sources, why, what farmer decisions they enable, data quality trade-offs",
+                        "Case study: Agri-Saathi as a product — user personas, North Star metric, success criteria",
+                    ],
+                    "evals": [
+                        "Design data quality eval schema: freshness score, completeness, accuracy signal, coverage score per source",
+                    ],
+                    "context": [
+                        "Advanced RAG: hybrid search (keyword + semantic), re-ranking models, multi-hop retrieval",
+                        "Design the context schema: how each data type gets formatted for RAG injection (tabular → narrative, NDVI → human-readable)",
+                    ],
+                },
+                "artifact": "Project skeleton + sources_registry.json + DataSource base class + Data Strategy 1-pager",
             },
             {
-                "name": "Advanced Eval Techniques",
-                "roles": ["evals"],
-                "tasks": [
-                    {"text": "Build LLM-as-Judge pipeline: design rubrics, test for judge consistency/bias",                "roles": ["evals"]},
-                    {"text": "Create adversarial test set: prompt injection, jailbreak attempts, edge cases",               "roles": ["evals"]},
-                    {"text": "Implement multi-dimensional scoring: faithfulness, relevance, coherence, safety (RAGAS-style)", "roles": ["evals"]},
-                    {"text": "Design regression testing: automated checks that catch quality drops on code changes",         "roles": ["evals"]},
-                    {"text": "Build eval dashboard: visualize scores over time, failure mode distribution",                 "roles": ["evals"]},
-                    {"text": "Study synthetic data generation for scaling eval sets with LLMs",                             "roles": ["evals"]},
-                    {"text": "Write Eval Methodology doc: when to use human eval vs LLM judge vs heuristic",               "roles": ["evals"]},
+                "day_label": "Day 12",
+                "day_idx": 1,
+                "title": "Weather + Market Price Downloaders",
+                "hours": "10 hrs",
+                "agrisaathi_day": 2,
+                "all_tracks": [
+                    "Build WeatherDownloader: Open-Meteo + IMD — current, 7-day forecast, historical data per district",
+                    "Parameters: temperature, rainfall, humidity, wind, UV index, evapotranspiration",
+                    "Build MarketPriceDownloader: Agmarknet + commodity API — daily mandi prices per crop per market",
+                    "Normalize price data: quintal → kg, handle missing values, 7-day rolling average",
+                    "Store both: raw JSON to file store, cleaned data to PostgreSQL with timestamp + source metadata",
+                    "Write unit tests with mock HTTP responses (pytest + respx)",
+                    "Add retry logic: 3 retries with exponential backoff, log each failure",
                 ],
+                "tracks": {
+                    "aipm": ["Write farmer user story: 'As a farmer, I want to know if tomorrow's price for wheat will be higher so I can decide when to sell'"],
+                    "evals": ["Build freshness eval: check if downloaded data is within expected update window — alert if stale"],
+                    "context": ["Write context formatter for weather + price data: converts raw numbers to farmer-friendly narratives"],
+                },
+                "artifact": "WeatherDownloader + MarketPriceDownloader (tested, with retry) + Context formatters",
             },
             {
-                "name": "Context Quality Evaluation",
-                "roles": ["context", "evals"],
-                "tasks": [
-                    {"text": "Measure retrieval quality: precision@k, recall@k, MRR for your RAG pipeline",                "roles": ["context", "evals"]},
-                    {"text": "A/B test context configurations: minimal vs rich context, different chunk sizes",             "roles": ["context"]},
-                    {"text": "Measure context efficiency: quality-per-token (output quality / input tokens used)",         "roles": ["context"]},
-                    {"text": "Build context ablation tests: systematically remove context components, measure impact",     "roles": ["context"]},
-                    {"text": "Document context failure modes: too much, wrong, stale, missing context",                    "roles": ["context"]},
+                "day_label": "Day 13",
+                "day_idx": 2,
+                "title": "Crop/Soil + Satellite Downloaders",
+                "hours": "10 hrs",
+                "agrisaathi_day": 3,
+                "all_tracks": [
+                    "Build CropSoilDownloader: ICAR crop database + FAO soil maps + state agriculture portal scrapers",
+                    "Data: crop calendar by region, soil type by district, recommended crops, fertilizer recommendations",
+                    "Build SatelliteDownloader: NASA MODIS NDVI + Sentinel-2 via ESA Copernicus + ISRO Bhuvan",
+                    "Process satellite data: NDVI calculation, soil moisture estimation, crop stress detection",
+                    "Handle raster data: rasterio for GeoTIFF processing, extract per-district statistics, WGS84 standardization",
+                    "Build first multi-source join: satellite NDVI + weather + soil type per district",
                 ],
+                "tracks": {
+                    "aipm": ["Prioritize features: which satellite signals most directly answer farmer questions? Build impact-effort matrix"],
+                    "evals": ["Design satellite data quality check: cloud cover filter (>30% reject), NDVI range validation, anomaly detection"],
+                    "context": ["Write NDVI interpreter: converts NDVI values to human-readable crop health assessment with recommended actions"],
+                },
+                "artifact": "CropSoilDownloader + SatelliteDownloader + Multi-source district join + NDVI interpreter",
             },
             {
-                "name": "Metrics, Logging & Experiments",
-                "roles": ["aipm"],
-                "tasks": [
-                    {"text": "Define North Star + 3 supporting metrics for Agri-Saathi",                                           "roles": ["aipm"]},
-                    {"text": "Add lightweight logging: question category, retrieval score, response rating, failure tag",           "roles": ["aipm"]},
-                    {"text": "Write A/B test plan: hypothesis, primary metric, guardrails, sample size, rollback",                 "roles": ["aipm"]},
-                    {"text": "Master AI-specific metrics: precision, recall, F1, latency, cost-per-session",                       "roles": ["aipm"]},
+                "day_label": "Day 14",
+                "day_idx": 3,
+                "title": "Additional Sources + Scheduler + Storage",
+                "hours": "10 hrs",
+                "agrisaathi_day": 4,
+                "all_tracks": [
+                    "Build remaining source downloader stubs: AgriNews, GovernmentAdvisory, FertilizerPrice, SeedDatabase, WaterLevel, CreditScheme, PestAlert, ExportPrice, InputCost",
+                    "For each stub: define source URL/API, schema, update frequency, storage target",
+                    "Set up APScheduler: cron jobs per source (weather=hourly, prices=daily 6am, satellite=weekly, advisories=daily)",
+                    "Build scheduler manager: start/stop/status per job, health endpoint with last run + next run",
+                    "Set up PostgreSQL schema: raw_downloads, processed_data, ingestion_log, source_health tables",
+                    "Set up Chroma vector store: collections per data type, embedding model, upsert logic",
+                    "Build unified store() interface: every downloader calls store(source, data, metadata) → routes to right destination",
                 ],
-            },
-        ],
-    },
-    {
-        "id": "ai2-agent",
-        "phase": "Phase 5",
-        "title": "AI² — Multi-Agent Learning System",
-        "weeks": "Weeks 9–11",
-        "icon": "🤖",
-        "description": "5-agent orchestration system for AI learners — build one agent at a time",
-        "artifact": "5-Agent Learning System + Orchestrator + Per-Agent Evals + Context Handoff Spec + PRD #2 + Demo",
-        "tracks": [
-            {
-                "name": "System Design & PRD",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Write PRD #2: AI Learning Multi-Agent System — target users, JTBD, architecture overview",            "roles": ["aipm"]},
-                    {"text": "Define orchestrator routing logic: how central orchestrator routes to 5 specialized agents",          "roles": ["aipm", "context"]},
-                    {"text": "Design inter-agent handoff protocol: how agents pass context to each other",                          "roles": ["context"]},
-                    {"text": "Design the eval framework: per-agent eval dimensions + end-to-end orchestration eval",               "roles": ["evals"]},
-                    {"text": "Map context flow diagram: what learner state/history each agent needs at inference time",             "roles": ["context"]},
-                    {"text": "Define modular agent interface contract: inputs, outputs, handoff schema for each agent",             "roles": ["aipm", "context"]},
-                ],
+                "tracks": {
+                    "aipm": ["Write the data pipeline PRD section: SLA targets per source, monitoring requirements, failure handling policy"],
+                    "evals": ["Build pipeline health eval: automated check — all sources within SLA, no failing jobs, storage within capacity"],
+                    "context": ["Design the multi-source context assembler: given a farmer query, which sources to pull, in what order, with what priority"],
+                },
+                "artifact": "Full scheduler + PostgreSQL schema + Chroma setup + Unified store() interface + Source stubs",
             },
             {
-                "name": "Step 1: AI Coding Agent",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Build AI Coding Agent: teaches AI-related coding, adapts to learner's current skill level",          "roles": ["aipm", "context"]},
-                    {"text": "Design adaptive context: learner profile injected into system prompt",                               "roles": ["context"]},
-                    {"text": "Implement skill-level detection: beginner/intermediate/advanced routing",                            "roles": ["context"]},
-                    {"text": "Create 20-question eval set: does it teach correctly at each level?",                                "roles": ["evals"]},
-                    {"text": "Test & confirm: agent works standalone before proceeding to Step 2",                                 "roles": ["evals"]},
+                "day_label": "Day 15",
+                "day_idx": 4,
+                "title": "RAG Backend + FastAPI Server",
+                "hours": "10 hrs",
+                "agrisaathi_day": 5,
+                "all_tracks": [
+                    "Build RAG retrieval engine: embed query → search Chroma → filter by source + district + date recency → re-rank",
+                    "Multi-source retrieval: combine weather + price + satellite + advisory into single context window",
+                    "Context assembly: order by relevance + recency, apply 4000-token budget, add source citations",
+                    "Build FastAPI server with 6 endpoints: GET /health, GET /data/{source}/{district}, POST /search, POST /chat, POST /refresh/{source}, POST /metrics",
+                    "Add 'I don't know' behavior: if retrieved context confidence < threshold, return graceful fallback",
+                    "Test end-to-end: farmer question → retrieval → Claude response → cited sources",
                 ],
-            },
-            {
-                "name": "Step 2: Learning Management Agent",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Build Learning Mgmt Agent: docs, progress tracking, to-do lists, topic selection",                  "roles": ["aipm", "context"]},
-                    {"text": "Implement learner state management: tracks what's learned, what's next, completion %",              "roles": ["context"]},
-                    {"text": "Add resource aggregation: pulls learning materials from multiple sources",                           "roles": ["context"]},
-                    {"text": "Build handoff to Research Agent: when learner wants to go deeper",                                   "roles": ["context"]},
-                    {"text": "Create 15-question eval set: does it track progress? Does handoff preserve context?",               "roles": ["evals"]},
-                    {"text": "Test & confirm: agent works standalone + handoff to Research works",                                 "roles": ["evals"]},
-                ],
-            },
-            {
-                "name": "Step 3: Research & Learning Agent",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Build Research Agent: explores topics via web search, Wikipedia, Claude, ChatGPT",                  "roles": ["aipm", "context"]},
-                    {"text": "Design multi-source context assembly: merge results into coherent context",                         "roles": ["context"]},
-                    {"text": "Implement handoff reception: receives topic + learner level from Learning Mgmt Agent",              "roles": ["context"]},
-                    {"text": "Add source citation and trust-level tagging for retrieved information",                              "roles": ["context"]},
-                    {"text": "Create 15-question eval set: accuracy, source quality, adaptation to learner level",               "roles": ["evals"]},
-                    {"text": "Test & confirm: standalone + receives handoffs correctly from Learning Mgmt",                       "roles": ["evals"]},
-                ],
-            },
-            {
-                "name": "Step 4: Practice Agent",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Build Practice Agent: quizzes, coding challenges, mock interview simulations",                      "roles": ["aipm", "context"]},
-                    {"text": "Design assessment context: pull learner history + completed topics for relevant challenges",        "roles": ["context"]},
-                    {"text": "Implement difficulty adaptation: adjust based on learner's performance history",                    "roles": ["context"]},
-                    {"text": "Add mock interview mode: AI PM product sense, execution, and technical deep-dive simulations",     "roles": ["aipm"]},
-                    {"text": "Create 20-question eval set: question quality, difficulty calibration, feedback accuracy",         "roles": ["evals"]},
-                    {"text": "Test & confirm: standalone practice flows work before proceeding",                                  "roles": ["evals"]},
-                ],
-            },
-            {
-                "name": "Step 5: Idea Generation Agent",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Build Idea Gen Agent: brainstorming, real-world project discovery, guided solution exploration",   "roles": ["aipm", "context"]},
-                    {"text": "Design creative context: inject learner's skills, interests, and completed projects",              "roles": ["context"]},
-                    {"text": "Add project feasibility assessment: scope, complexity, portfolio value for target roles",          "roles": ["aipm"]},
-                    {"text": "Create 10-question eval set: idea quality, relevance to learner's level, actionability",          "roles": ["evals"]},
-                    {"text": "Test & confirm: standalone brainstorming works before orchestration assembly",                     "roles": ["evals"]},
-                ],
-            },
-            {
-                "name": "Orchestration Layer Assembly",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Build central orchestrator: routes learner requests to the correct specialized agent",             "roles": ["aipm", "context"]},
-                    {"text": "Implement shared learner state: orchestrator maintains and passes profile across all agents",      "roles": ["context"]},
-                    {"text": "Design context handoff compression: summarize agent outputs before passing (token efficiency)",    "roles": ["context"]},
-                    {"text": "Add routing intelligence: classify intent → select agent → inject context → return response",     "roles": ["context"]},
-                    {"text": "Build end-to-end eval: 30-question set testing cross-agent workflows",                             "roles": ["evals"]},
-                    {"text": "Test orchestration failure modes: wrong routing, context loss, circular handoffs",                 "roles": ["evals"]},
-                    {"text": "Produce Eval Report v2: per-agent scores + orchestration scores",                                  "roles": ["evals"]},
-                    {"text": "Build demo UI showing agent switching, learner dashboard, progress tracking",                      "roles": ["aipm"]},
-                ],
+                "tracks": {
+                    "aipm": ["Write the API design doc: endpoint contracts, error codes, rate limits, auth strategy — shareable with eng team"],
+                    "evals": ["Build chat eval suite: 20 farmer questions with expected answers, run LLM-as-Judge scoring"],
+                    "context": ["Run context ablation test: remove each source one at a time, document quality impact per source"],
+                },
+                "artifact": "RAG engine + FastAPI server (6 endpoints) + Chat eval suite + Context ablation results",
             },
         ],
     },
     {
-        "id": "portfolio",
-        "phase": "Phase 6",
-        "title": "Portfolio Packaging & Interview Prep",
-        "weeks": "Weeks 12–13",
-        "icon": "🎯",
-        "description": "Make your work discoverable and role-specific for recruiters",
-        "artifact": "Complete Package: 2 Projects + Role-Specific Artifacts + Demo Videos + Case Studies",
-        "tracks": [
+        "num": 4,
+        "title": "Agri-Saathi Polish + Integration & Systems Thinking",
+        "subtitle": "Complete the project, then practice cross-functional thinking",
+        "color": "#2563EB",
+        "week_hours": "50 hrs — 10 hrs/day × 5 days",
+        "theme": "Days 16–17 complete Agri-Saathi. Days 18–20 zoom out to integration thinking, AI product teardowns, and mock interviews.",
+        "days": [
             {
-                "name": "Polish & Harden",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Add reliability features to Agri-Saathi: follow-up questions, escalation CTA",    "roles": ["aipm"]},
-                    {"text": "Final eval run → summarize deltas vs Week 8 baseline",                            "roles": ["aipm", "evals"]},
-                    {"text": "Final context quality audit → document improvements over iterations",              "roles": ["context"]},
-                    {"text": "Create 1-page Launch Checklist: privacy, limitations, monitoring, rollback",      "roles": ["aipm"]},
+                "day_label": "Day 16",
+                "day_idx": 0,
+                "title": "Agri-Saathi: E2E Testing + Architecture Diagram",
+                "hours": "8 hrs",
+                "agrisaathi_day": 6,
+                "all_tracks": [
+                    "Run full end-to-end test: trigger all downloaders → verify storage → run RAG queries → verify responses",
+                    "Test failure modes: source down, scheduler retry, API graceful degradation",
+                    "Draw complete architecture diagram (draw.io / Excalidraw): all data sources → ingestion → processing → storage → serving → user",
+                    "Annotate diagram: update frequencies, token budgets, retry logic, eval checkpoints",
+                    "Write README.md: project overview, architecture, local setup, how to add a new data source",
+                    "Write Context Pipeline Spec: formal document describing context assembly logic, source priorities, token budget",
                 ],
+                "tracks": {
+                    "aipm": ["Write PRD v1: complete product requirements — user personas, feature list, success metrics, launch criteria"],
+                    "evals": ["Run full eval suite, write Eval Report v1: per-source data quality, per-question chat quality, failure modes"],
+                    "context": ["Finalize Context Pipeline Spec with ablation findings: which sources matter most, optimal token allocation, compression strategy"],
+                },
+                "artifact": "Architecture diagram + README + PRD v1 + Eval Report v1 + Context Pipeline Spec",
             },
             {
-                "name": "Role-Specific Portfolio Artifacts",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "AIPM: Case study (problem→users→solution→architecture→evals→results→roadmap)",       "roles": ["aipm"]},
-                    {"text": "AIPM: 2 PRDs + metrics tree + experiment plan + RICE prioritization exercise",        "roles": ["aipm"]},
-                    {"text": "EVALS: Eval methodology white paper (human/LLM-judge/heuristic)",                    "roles": ["evals"]},
-                    {"text": "EVALS: Published eval framework with golden sets, rubrics, dashboards, regression",  "roles": ["evals"]},
-                    {"text": "EVALS: Adversarial testing report + safety audit findings",                          "roles": ["evals"]},
-                    {"text": "CONTEXT: Context architecture spec with diagrams showing info flow at inference",     "roles": ["context"]},
-                    {"text": "CONTEXT: Context ablation study showing quality-per-token optimization",             "roles": ["context"]},
-                    {"text": "CONTEXT: RAG optimization report: chunking experiments, retrieval benchmarks",       "roles": ["context"]},
+                "day_label": "Day 17",
+                "day_idx": 1,
+                "title": "Agri-Saathi: Portfolio Packaging + Demo Prep",
+                "hours": "6 hrs",
+                "agrisaathi_day": 7,
+                "all_tracks": [
+                    "Polish GitHub repo: clean code, docstrings, type hints throughout, clear commit history",
+                    "Write 3 resume bullets for Agri-Saathi (quantified: # sources, # endpoints, eval scores, data freshness SLA)",
+                    "Prepare demo script: 5 farmer questions showcasing different data sources working together",
+                    "Write the case study: problem → approach → architecture decisions → trade-offs → results → what you'd do next",
+                    "Create Notion portfolio page: project summary, architecture diagram, key artifacts, code links",
                 ],
+                "tracks": {
+                    "aipm": ["Prepare PM interview story: 'Tell me about an AI product you built' — context, decision, trade-off, outcome, metric"],
+                    "evals": ["Prepare Evals interview story: 'How do you evaluate an AI system?' — use Agri-Saathi eval framework as the concrete example"],
+                    "context": ["Prepare CE interview story: 'Design a context pipeline for a real-world AI application' — use Agri-Saathi architecture as reference"],
+                },
+                "artifact": "Polished GitHub repo + Case study + Demo script + 3 role-specific interview stories",
             },
             {
-                "name": "Demo Videos & Resume",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "Record Agri-Saathi demo (2-3 min): chat + citations + weekly plan + evals",              "roles": ["aipm", "evals", "context"]},
-                    {"text": "Record AI² demo (2-3 min): 5-agent system, orchestrator routing, learner dashboard",     "roles": ["aipm", "evals", "context"]},
-                    {"text": "Create portfolio page (Notion) with role-specific sections",                             "roles": ["aipm", "evals", "context"]},
-                    {"text": "Update resume with 3 role-specific bullets tied to quantified outcomes",                 "roles": ["aipm", "evals", "context"]},
-                    {"text": "Update LinkedIn with project entries",                                                    "roles": ["aipm", "evals", "context"]},
+                "day_label": "Day 18–19",
+                "day_idx": 2,
+                "title": "Multi-Agent System Design (Cross-Role Integration)",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "Design a multi-agent system from scratch — use AI² itself as the design exercise",
+                    "Architecture: Orchestrator (Sonnet — routing) → one of 3 specialists (Learning Coach, Practice Arena, Idea Generator)",
+                    "Draw full system diagram with data flows, eval checkpoints, context pipeline annotations",
+                    "Identify 5 failure modes and mitigation strategies from each role's perspective",
+                    "Study: how context moves between orchestrator and specialists, what compresses vs passes through",
+                    "Study: shared learner state design — what each agent needs vs what can be lazy-loaded",
+                    "Study: routing intelligence — how the orchestrator classifies intent and selects the right agent",
                 ],
+                "tracks": {
+                    "aipm": ["Own the PRD: user stories, success metrics, launch criteria, risk assessment for the multi-agent system"],
+                    "evals": ["Own the eval framework: per-agent evals, end-to-end evals, regression tests, adversarial scenarios"],
+                    "context": ["Own the context architecture: orchestrator context, agent-specific context, shared state, handoff compression"],
+                },
+                "artifact": "Multi-Agent System Design Doc (PRD + Eval Framework + Context Architecture + System Diagram)",
             },
             {
-                "name": "Interview Prep",
-                "roles": ["aipm", "evals", "context"],
-                "tasks": [
-                    {"text": "AIPM: 3 product sense + 2 execution/metrics + 1 technical deep dive mocks",                          "roles": ["aipm"]},
-                    {"text": "AIPM: Prep for 'How would you prioritize which agent to build next?'",                               "roles": ["aipm"]},
-                    {"text": "EVALS: Prep for 'How would you evaluate X?' questions across 5 product types",                       "roles": ["evals"]},
-                    {"text": "EVALS: Prep for 'This model is hallucinating — walk me through your debugging process'",             "roles": ["evals"]},
-                    {"text": "EVALS: Prep for 'How do you eval a multi-agent system vs a single agent?'",                         "roles": ["evals"]},
-                    {"text": "CONTEXT: Prep for 'Design the context pipeline for X agent' system design questions",                "roles": ["context"]},
-                    {"text": "CONTEXT: Prep for 'How would you optimize context to reduce cost by 40%?'",                         "roles": ["context"]},
-                    {"text": "CONTEXT: Prep for 'How do you handle context handoffs between agents without losing state?'",        "roles": ["context"]},
-                    {"text": "ALL: Prepare 'why this role' narrative with concrete project evidence from both projects",            "roles": ["aipm", "evals", "context"]},
+                "day_label": "Day 20",
+                "day_idx": 3,
+                "title": "AI Product Teardowns + Mock Interviews Round 1",
+                "hours": "10 hrs",
+                "all_tracks": [
+                    "Teardown ChatGPT: PM decisions, quality evals, 100K+ token context management",
+                    "Teardown Perplexity AI: product differentiation, search+RAG accuracy evals, real-time web context assembly",
+                    "Teardown GitHub Copilot: productivity measurement, bad code suggestion evals, repo-wide context pipeline",
+                    "Teardown Claude Artifacts: creative tools product decision, creative output evals, multi-modal context",
+                    "Teardown Notion AI: integration PM decisions, open-ended writing evals, workspace-wide context",
                 ],
+                "tracks": {
+                    "aipm": ["Practice 5 AIPM interview questions: product sense, execution, technical, metrics, behavioral. Record yourself."],
+                    "evals": ["Practice 5 Evals questions: eval design, debugging, adversarial testing, trade-offs. Mock scenario: quality dropped after a prompt change."],
+                    "context": ["Practice 5 CE questions: pipeline design, cost optimization, context debugging, architecture. Mock: RAG returns irrelevant results for 30% of queries."],
+                },
+                "artifact": "5 AI Product Teardowns + Self-recorded Mock Answers (5 per track) + Self-Assessment Notes",
             },
         ],
     },
+    {
+        "num": 5,
+        "title": "Portfolio, Interview Mastery & Career Launch",
+        "subtitle": "Package everything. Perform.",
+        "color": "#B45309",
+        "week_hours": "50 hrs — 10 hrs/day × 5 days",
+        "theme": "You've learned the concepts and built the artifacts. Package them into a portfolio that gets you hired, and drill interview performance until it's second nature.",
+        "days": [
+            {
+                "day_label": "Day 21–22",
+                "day_idx": 0,
+                "title": "Portfolio Assembly",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "Build Notion portfolio page showcasing all artifacts organized by role",
+                    "Update LinkedIn summary reflecting all three skill areas",
+                    "Update resume with AI-specific bullets for each track",
+                ],
+                "tracks": {
+                    "aipm": [
+                        "Polish AI Product Case Study into a publishable piece",
+                        "Compile PRD + metrics tree + model selection framework",
+                        "Write 3 resume bullets with quantified outcomes",
+                        "Create 'Product Thinking' doc: your framework for AI product decisions",
+                    ],
+                    "evals": [
+                        "Polish Eval Harness into a documented, runnable project",
+                        "Write short white paper: 'Evaluating LLM Quality: A Practical Framework'",
+                        "Compile eval taxonomy + adversarial testing methodology",
+                        "Create 'Quality Philosophy' doc: how you think about AI evaluation",
+                    ],
+                    "context": [
+                        "Polish Context Pipeline Spec into a technical architecture document",
+                        "Write technical blog post: 'Context Engineering: Beyond Prompt Engineering'",
+                        "Compile RAG optimization report + context ablation study",
+                        "Create 'System Thinking' doc: how you approach context architecture decisions",
+                    ],
+                },
+                "artifact": "Complete Portfolio: Notion Page + Resume + LinkedIn + Role-Specific Writing Samples",
+            },
+            {
+                "day_label": "Day 23–24",
+                "day_idx": 1,
+                "title": "Interview Deep Practice",
+                "hours": "16 hrs",
+                "all_tracks": [
+                    "Cross-functional scenario: quality dropped 8% after a context change — answer from each role",
+                    "STAR story: navigating ambiguity with probabilistic AI outputs",
+                    "STAR story: managing a failed model or evaluation that surprised everyone",
+                    "STAR story: making an ethical decision about AI deployment",
+                    "STAR story: cross-functional conflict between PM, ML engineer, and designer",
+                    "STAR story: data-driven decision that contradicted stakeholder intuition",
+                    "STAR story: shipping under uncertainty with incomplete eval data",
+                    "STAR story: stakeholder pushback on AI quality or limitations",
+                ],
+                "tracks": {
+                    "aipm": ["3 full mock rounds (product sense, execution, technical). Record + review for clarity, structure, AI-specific depth."],
+                    "evals": ["3 full mock rounds (eval design, debugging, methodology). Write your own scoring rubric for each answer."],
+                    "context": ["3 full mock rounds (system design, optimization, debugging). Whiteboard the pipeline on paper before explaining."],
+                },
+                "artifact": "Interview Ready Kit: 15+ practiced answers (recorded) + 7 STAR stories + Question Bank",
+            },
+            {
+                "day_label": "Day 25",
+                "day_idx": 2,
+                "title": "Final Review + Career Launch",
+                "hours": "10 hrs",
+                "all_tracks": [
+                    "Full knowledge audit: can you explain every topic from all 5 weeks in 2 minutes?",
+                    "Identify 3 weak spots and do targeted deep-dives on each",
+                    "Final portfolio review: does every artifact demonstrate real understanding?",
+                    "Prepare 'tell me about yourself' story tailored for each role (AIPM, Evals, CE)",
+                    "Application strategy: identify 20 target companies, customize resume for top 5",
+                    "Set up job alerts, update LinkedIn status, reach out to 5 people in target roles",
+                ],
+                "tracks": {
+                    "aipm": ["Finalize AIPM 'tell me about yourself' + research top 5 AIPM target companies + draft outreach messages"],
+                    "evals": ["Finalize Evals 'tell me about yourself' + research top 5 evals target companies + draft outreach messages"],
+                    "context": ["Finalize CE 'tell me about yourself' + research top 5 CE target companies + draft outreach messages"],
+                },
+                "artifact": "Target Company List (20) + Customized Resumes (5) + Final Knowledge Audit + Outreach Drafts",
+            },
+        ],
+    },
+]
+
+# ── All artifacts (flat list for portfolio view) ───────────────────────────────
+
+ALL_ARTIFACTS = [
+    {"week": 1, "day": "1–2",   "name": "AI Foundations Cheat Sheet (1-page visual reference per role)"},
+    {"week": 1, "day": "3–4",   "name": "LLM Decision Matrix + Hallucination Taxonomy + Token Budget Template"},
+    {"week": 1, "day": "5",     "name": "Mini-PRD + Eval Metrics Cheat Sheet + Context Engineering Landscape Map"},
+    {"week": 2, "day": "6–7",   "name": "20-Prompt Library + API Cost Memo + 10 Eval Test Cases + Context Assembly Spec"},
+    {"week": 2, "day": "8–9",   "name": "Agent Decision Framework + Eval Harness v0 + Agent Context Flow Diagram"},
+    {"week": 2, "day": "10",    "name": "RAG Build-vs-Buy Analysis + RAG Eval Suite + Context Pipeline Spec"},
+    {"week": 3, "day": "11",    "name": "Project skeleton + sources_registry.json + DataSource base class + Data Strategy 1-pager"},
+    {"week": 3, "day": "12",    "name": "WeatherDownloader + MarketPriceDownloader (tested, with retry) + Context formatters"},
+    {"week": 3, "day": "13",    "name": "CropSoilDownloader + SatelliteDownloader + Multi-source district join + NDVI interpreter"},
+    {"week": 3, "day": "14",    "name": "Full scheduler + PostgreSQL schema + Chroma setup + Unified store() + Source stubs"},
+    {"week": 3, "day": "15",    "name": "RAG engine + FastAPI server (6 endpoints) + Chat eval suite + Context ablation results"},
+    {"week": 4, "day": "16",    "name": "Architecture diagram + README + PRD v1 + Eval Report v1 + Context Pipeline Spec"},
+    {"week": 4, "day": "17",    "name": "Polished GitHub repo + Case study + Demo script + 3 role-specific interview stories"},
+    {"week": 4, "day": "18–19", "name": "Multi-Agent System Design Doc (PRD + Eval Framework + Context Architecture + System Diagram)"},
+    {"week": 4, "day": "20",    "name": "5 AI Product Teardowns + Self-recorded Mock Answers (5 per track) + Self-Assessment Notes"},
+    {"week": 5, "day": "21–22", "name": "Complete Portfolio: Notion Page + Resume + LinkedIn + Role-Specific Writing Samples"},
+    {"week": 5, "day": "23–24", "name": "Interview Ready Kit: 15+ practiced answers (recorded) + 7 STAR stories + Question Bank"},
+    {"week": 5, "day": "25",    "name": "Target Company List (20) + Customized Resumes (5) + Final Knowledge Audit + Outreach Drafts"},
 ]
 
 # ── Skill trees per role ───────────────────────────────────────────────────────
 
 ROLE_SKILLS = {
     "aipm": [
-        {"category": "PM Core", "skills": ["PRD writing & JTBD", "RICE/MoSCoW prioritization", "North Star & funnel metrics", "A/B test design", "Cohort analysis"]},
-        {"category": "AI Literacy", "skills": ["ML/DL fundamentals", "LLM architecture (conceptual)", "RAG + vector DBs", "Agents & tool use", "MCP & A2A protocols"]},
-        {"category": "AI Product Craft", "skills": ["Model lifecycle mgmt", "AI-specific metrics (P/R/F1)", "Risk mgmt (bias, drift, injection)", "Cost/latency optimization", "Responsible AI practices", "Multi-agent system design", "Modular agent interfaces"]},
-        {"category": "Tools", "skills": ["Lovable / v0 (rapid UI)", "Postman / API tools", "Notion for PRDs", "Loom for demos", "Basic Python / JSON"]},
+        {"category": "AI Literacy",       "skills": ["ML/DL fundamentals", "LLM architecture (conceptual)", "Tokenization & context windows", "Hallucination taxonomy", "Model landscape & selection"]},
+        {"category": "PM Core",           "skills": ["PRD writing for AI products", "RICE/MoSCoW prioritization", "North Star & funnel metrics", "A/B test design", "Stakeholder communication"]},
+        {"category": "AI Product Craft",  "skills": ["API cost analysis", "Agent vs pipeline decisions", "RAG build-vs-buy analysis", "Data strategy for AI products", "Multi-agent system PRDs", "Product teardown methodology"]},
+        {"category": "Portfolio",         "skills": ["Case study writing", "Demo scripting", "Interview story framing (STAR)", "Resume bullets with quantified outcomes", "Notion portfolio"]},
     ],
     "evals": [
-        {"category": "Eval Fundamentals", "skills": ["Precision, recall, F1, BLEU, ROUGE", "Train/val/test methodology", "Offline vs online evaluation", "Statistical significance basics", "Human eval design"]},
-        {"category": "LLM Evaluation", "skills": ["LLM-as-Judge pipelines", "Rubric design & calibration", "Judge bias detection & mitigation", "Adversarial testing", "Prompt injection detection"]},
-        {"category": "Eval Engineering", "skills": ["Golden set creation & maintenance", "Automated eval harnesses", "Regression testing for LLMs", "Multi-dimensional scoring (RAGAS)", "Synthetic data for eval scaling", "Multi-agent orchestration evals", "Routing correctness scoring"]},
-        {"category": "RAG Evaluation", "skills": ["Retrieval metrics (P@k, MRR)", "Faithfulness scoring", "Citation accuracy measurement", "Context relevance scoring", "End-to-end RAG benchmarking"]},
-        {"category": "Tools", "skills": ["RAGAS / DeepEval / Phoenix", "OpenAI Evals framework", "Label Studio / Prodigy", "Custom scoring scripts (Python)", "Eval dashboards & visualization"]},
+        {"category": "Eval Fundamentals", "skills": ["Accuracy, precision, recall, F1, BLEU, ROUGE", "Train/val/test methodology", "Offline vs online evaluation", "Human vs automated evaluation"]},
+        {"category": "LLM Evaluation",    "skills": ["LLM-as-Judge pipelines", "Rubric design & calibration", "Hallucination taxonomy & detection", "Adversarial testing", "Bias detection (position, verbosity)"]},
+        {"category": "Eval Engineering",  "skills": ["Eval harness v0 → production", "Golden set creation", "Regression testing for LLMs", "Multi-dimensional scoring (RAGAS)", "Data quality evaluation", "Pipeline health monitoring"]},
+        {"category": "RAG Evaluation",    "skills": ["Retrieval metrics (P@k, MRR)", "Freshness scoring", "Context ablation study design", "Chat quality evaluation (LLM-as-Judge)"]},
     ],
     "context": [
-        {"category": "Context Foundations", "skills": ["Context window mechanics", "Attention patterns & limits", "Token budget optimization", "System prompt architecture", "Few-shot example design"]},
-        {"category": "Retrieval & RAG", "skills": ["Chunking strategies (semantic, fixed, hybrid)", "Embedding model selection", "Vector DB ops (Chroma, Pinecone)", "Retrieval tuning (top-k, threshold)", "Hybrid search (vector + keyword)"]},
-        {"category": "Dynamic Context", "skills": ["Context assembly pipelines", "Context compression / summarization", "Dynamic tool selection at runtime", "User state & memory management", "Context routing per query type"]},
-        {"category": "Agent Context", "skills": ["MCP tool schema design", "Token-efficient tool returns", "Multi-turn state management", "Context ablation testing", "Quality-per-token optimization", "Inter-agent context handoffs", "Multi-agent shared state mgmt"]},
-        {"category": "Tools", "skills": ["LangChain / LlamaIndex", "Chroma / Pinecone / Weaviate", "Claude / OpenAI APIs", "Claude Code / Cursor (context rules)", "Custom context pipelines (Python)"]},
+        {"category": "Context Foundations", "skills": ["Context window mechanics", "Attention patterns & limits", "Token budget optimization", "System prompt architecture", "Context vs prompt distinction"]},
+        {"category": "Retrieval & RAG",     "skills": ["Chunking strategies (semantic, fixed, hybrid)", "Embedding model selection", "Vector DB ops (Chroma, pgvector)", "Retrieval tuning (top-k, re-ranking)", "Hybrid search (vector + keyword)"]},
+        {"category": "Data Pipeline",       "skills": ["Multi-source data ingestion", "Downloader architecture", "Scheduler design (APScheduler)", "Context formatters (tabular → narrative)", "Storage routing (PostgreSQL + Chroma)"]},
+        {"category": "Agent Context",       "skills": ["Context assembly pipelines", "Context compression / summarization", "Context handoff between agents", "Token-efficient tool returns", "Context ablation testing"]},
     ],
 }
 
-# ── Core helper functions ──────────────────────────────────────────────────────
+# ── Helper functions ───────────────────────────────────────────────────────────
 
-def get_task_key(phase_id: str, track_idx: int, task_idx: int) -> str:
+def get_task_key(week_num: int, day_idx: int, scope: str, task_idx: int) -> str:
     """Return the canonical key for a task in syllabus_progress."""
-    return f"{phase_id}-{track_idx}-{task_idx}"
+    return f"w{week_num}-d{day_idx}-{scope}-{task_idx}"
 
 
-def get_phase_by_id(phase_id: str) -> dict | None:
-    """Return a phase dict by its id, or None."""
-    return next((p for p in PHASES if p["id"] == phase_id), None)
+def get_week_by_num(week_num: int) -> dict | None:
+    """Return a week dict by its number, or None."""
+    return next((w for w in WEEKS if w["num"] == week_num), None)
 
 
 def get_progress(syllabus_progress: dict, selected_roles: list[str]) -> dict:
     """
-    Compute overall + per-phase completion counts for the selected roles.
+    Compute overall + per-week completion counts for the selected roles.
 
     Returns:
         {
             "total": int, "done": int, "in_progress": int, "pct": int,
-            "by_phase": {phase_id: {"total": int, "done": int, "pct": int}}
+            "by_week": {week_num: {"total": int, "done": int, "pct": int}}
         }
     """
     total = done = in_prog = 0
-    by_phase: dict[str, dict] = {}
+    by_week: dict[int, dict] = {}
 
-    for phase in PHASES:
-        ph_total = ph_done = 0
-        for ti, track in enumerate(phase["tracks"]):
-            if not any(r in selected_roles for r in track["roles"]):
-                continue
-            for taski, task in enumerate(track["tasks"]):
-                if not any(r in selected_roles for r in task["roles"]):
-                    continue
-                key = get_task_key(phase["id"], ti, taski)
+    for week in WEEKS:
+        wn = week["num"]
+        w_total = w_done = 0
+
+        for day in week["days"]:
+            for ti in range(len(day["all_tracks"])):
+                key = get_task_key(wn, day["day_idx"], "all", ti)
                 status = syllabus_progress.get(key, "todo")
-                ph_total += 1
+                w_total += 1
                 total += 1
                 if status == "done":
-                    ph_done += 1
+                    w_done += 1
                     done += 1
                 elif status == "in_progress":
                     in_prog += 1
-        by_phase[phase["id"]] = {
-            "total": ph_total,
-            "done":  ph_done,
-            "pct":   round(ph_done / ph_total * 100) if ph_total > 0 else 0,
+
+            for role in selected_roles:
+                tasks = day["tracks"].get(role, [])
+                task_list = tasks if isinstance(tasks, list) else [tasks]
+                for ti in range(len(task_list)):
+                    key = get_task_key(wn, day["day_idx"], role, ti)
+                    status = syllabus_progress.get(key, "todo")
+                    w_total += 1
+                    total += 1
+                    if status == "done":
+                        w_done += 1
+                        done += 1
+                    elif status == "in_progress":
+                        in_prog += 1
+
+        by_week[wn] = {
+            "total": w_total,
+            "done":  w_done,
+            "pct":   round(w_done / w_total * 100) if w_total > 0 else 0,
         }
 
     return {
@@ -479,22 +618,19 @@ def get_progress(syllabus_progress: dict, selected_roles: list[str]) -> dict:
         "done":        done,
         "in_progress": in_prog,
         "pct":         round(done / total * 100) if total > 0 else 0,
-        "by_phase":    by_phase,
+        "by_week":     by_week,
     }
 
 
-def get_current_phase_id(syllabus_progress: dict, selected_roles: list[str]) -> str:
-    """
-    Return the id of the phase the learner should be working on right now.
-    Logic: the first phase that isn't 100% complete.
-    Falls back to the last phase if all are done.
-    """
+def get_current_week(syllabus_progress: dict, selected_roles: list[str]) -> int:
+    """Return the week number the learner should be working on (first incomplete week)."""
     progress = get_progress(syllabus_progress, selected_roles)
-    for phase in PHASES:
-        ph = progress["by_phase"].get(phase["id"], {})
-        if ph.get("pct", 0) < 100 or ph.get("total", 0) == 0:
-            return phase["id"]
-    return PHASES[-1]["id"]
+    for week in WEEKS:
+        wn = week["num"]
+        w = progress["by_week"].get(wn, {})
+        if w.get("pct", 0) < 100 or w.get("total", 0) == 0:
+            return wn
+    return MAX_WEEKS
 
 
 def get_all_tasks_for_roles(
@@ -503,40 +639,49 @@ def get_all_tasks_for_roles(
 ) -> list[dict]:
     """
     Return every task relevant to the given roles, in syllabus order.
-    Optionally annotates each task with its completion status.
-
-    Each returned item has:
-        key, phase_num, phase_title, track_name, text, status, roles, label
-
-    The 'label' field is pre-formatted for st.selectbox:
-        "Phase 1 › AI Fundamentals › Write 1-page explainers: AI vs ML…"
-    Long task text is truncated to 72 characters.
+    Each item: key, week_num, week_title, day_label, day_title, scope, text, status, roles, label
     """
     if syllabus_progress is None:
         syllabus_progress = {}
     results = []
-    for phase in PHASES:
-        for ti, track in enumerate(phase["tracks"]):
-            if not any(r in selected_roles for r in track["roles"]):
-                continue
-            for taski, task in enumerate(track["tasks"]):
-                if not any(r in selected_roles for r in task["roles"]):
-                    continue
-                key = get_task_key(phase["id"], ti, taski)
-                status = syllabus_progress.get(key, "todo")
-                text = task["text"]
-                short_text = text if len(text) <= 72 else text[:69] + "…"
-                label = f"{phase['phase']} › {track['name']} › {short_text}"
+
+    for week in WEEKS:
+        for day in week["days"]:
+            for ti, task_text in enumerate(day["all_tracks"]):
+                key = get_task_key(week["num"], day["day_idx"], "all", ti)
+                short = task_text if len(task_text) <= 72 else task_text[:69] + "…"
                 results.append({
-                    "key":         key,
-                    "phase_num":   phase["phase"],
-                    "phase_title": phase["title"],
-                    "track_name":  track["name"],
-                    "text":        text,
-                    "status":      status,
-                    "roles":       task["roles"],
-                    "label":       label,
+                    "key":        key,
+                    "week_num":   week["num"],
+                    "week_title": week["title"],
+                    "day_label":  day["day_label"],
+                    "day_title":  day["title"],
+                    "scope":      "all",
+                    "text":       task_text,
+                    "status":     syllabus_progress.get(key, "todo"),
+                    "roles":      list(ROLE_TRACKS.keys()),
+                    "label":      f"Week {week['num']} › {day['title']} › {short}",
                 })
+
+            for role in selected_roles:
+                tasks = day["tracks"].get(role, [])
+                task_list = tasks if isinstance(tasks, list) else [tasks]
+                for ti, task_text in enumerate(task_list):
+                    key = get_task_key(week["num"], day["day_idx"], role, ti)
+                    short = task_text if len(task_text) <= 72 else task_text[:69] + "…"
+                    results.append({
+                        "key":        key,
+                        "week_num":   week["num"],
+                        "week_title": week["title"],
+                        "day_label":  day["day_label"],
+                        "day_title":  day["title"],
+                        "scope":      role,
+                        "text":       task_text,
+                        "status":     syllabus_progress.get(key, "todo"),
+                        "roles":      [role],
+                        "label":      f"Week {week['num']} › {day['title']} › {short}",
+                    })
+
     return results
 
 
@@ -545,61 +690,53 @@ def get_next_tasks(
     selected_roles: list[str],
     n: int = 5,
 ) -> list[dict]:
-    """
-    Return the next n incomplete tasks for the learner's selected roles,
-    in syllabus order, with phase/track context attached.
-
-    Each returned item:
-        {
-            "key": str,
-            "phase_id": str, "phase_title": str,
-            "track_name": str,
-            "text": str,
-            "status": "todo" | "in_progress",
-            "roles": [str],
-        }
-    """
+    """Return the next n incomplete tasks for the learner's selected roles."""
     results = []
-    for phase in PHASES:
+    for week in WEEKS:
         if len(results) >= n:
             break
-        for ti, track in enumerate(phase["tracks"]):
-            if not any(r in selected_roles for r in track["roles"]):
-                continue
-            for taski, task in enumerate(track["tasks"]):
-                if not any(r in selected_roles for r in task["roles"]):
-                    continue
-                key = get_task_key(phase["id"], ti, taski)
-                status = syllabus_progress.get(key, "todo")
-                if status != "done":
+        for day in week["days"]:
+            if len(results) >= n:
+                break
+            for ti, task_text in enumerate(day["all_tracks"]):
+                key = get_task_key(week["num"], day["day_idx"], "all", ti)
+                if syllabus_progress.get(key, "todo") != "done":
                     results.append({
-                        "key":         key,
-                        "phase_id":    phase["id"],
-                        "phase_title": phase["title"],
-                        "track_name":  track["name"],
-                        "text":        task["text"],
-                        "status":      status,
-                        "roles":       task["roles"],
+                        "key":        key,
+                        "week_num":   week["num"],
+                        "week_title": week["title"],
+                        "day_label":  day["day_label"],
+                        "day_title":  day["title"],
+                        "scope":      "all",
+                        "text":       task_text,
+                        "status":     syllabus_progress.get(key, "todo"),
+                        "roles":      list(ROLE_TRACKS.keys()),
                     })
                 if len(results) >= n:
                     break
+
+            for role in selected_roles:
+                if len(results) >= n:
+                    break
+                tasks = day["tracks"].get(role, [])
+                task_list = tasks if isinstance(tasks, list) else [tasks]
+                for ti, task_text in enumerate(task_list):
+                    key = get_task_key(week["num"], day["day_idx"], role, ti)
+                    if syllabus_progress.get(key, "todo") != "done":
+                        results.append({
+                            "key":        key,
+                            "week_num":   week["num"],
+                            "week_title": week["title"],
+                            "day_label":  day["day_label"],
+                            "day_title":  day["title"],
+                            "scope":      role,
+                            "text":       task_text,
+                            "status":     syllabus_progress.get(key, "todo"),
+                            "roles":      [role],
+                        })
+                    if len(results) >= n:
+                        break
     return results
-
-
-# ── Compatibility shims for sub-agent prompts ──────────────────────────────────
-# The Learning Coach, Practice Arena, and Idea Generator agents call these
-# functions to build their cached system prompts. They map the phase-based
-# structure above into the flat-text format those agents expect.
-
-# Week → phase mapping (weeks are approximate; phases are the real unit)
-_WEEK_TO_PHASE = {
-    1: "foundation",  2: "foundation",
-    3: "prompts-apis", 4: "prompts-apis",
-    5: "agrisaathi",  6: "agrisaathi",  7: "agrisaathi",
-    8: "evals-deep",
-    9: "ai2-agent",  10: "ai2-agent",  11: "ai2-agent",
-    12: "portfolio",  13: "portfolio",
-}
 
 
 def get_full_track_summary(role_key: str) -> str:
@@ -609,30 +746,26 @@ def get_full_track_summary(role_key: str) -> str:
     """
     role_info = ROLE_TRACKS.get(role_key, {"label": role_key})
     lines = [
-        f"CURRICULUM: {role_info['label']} — 13-Week AI Career Roadmap",
+        f"CURRICULUM: {role_info['label']} — 5-Week AI Career Roadmap (v2.0)",
         "=" * 60,
     ]
 
-    for phase in PHASES:
-        # Only include tracks/tasks relevant to this role
-        relevant_tracks = [
-            t for t in phase["tracks"]
-            if any(r == role_key for r in t["roles"])
-        ]
-        if not relevant_tracks:
-            continue
+    for week in WEEKS:
+        lines.append(f"\nWeek {week['num']}: {week['title']} ({week['week_hours']})")
+        lines.append(f"  {week['theme']}")
 
-        lines.append(f"\n{phase['phase']}: {phase['title']} ({phase['weeks']})")
-        lines.append(f"  {phase['description']}")
-        lines.append(f"  Artifact: {phase['artifact']}")
+        for day in week["days"]:
+            lines.append(f"\n  [{day['day_label']}] {day['title']} ({day['hours']})")
+            for task in day["all_tracks"]:
+                lines.append(f"    • {task}")
+            role_tasks = day["tracks"].get(role_key, [])
+            task_list = role_tasks if isinstance(role_tasks, list) else [role_tasks]
+            for task in task_list:
+                if task:
+                    lines.append(f"    → [{role_key.upper()}] {task}")
+            if day.get("artifact"):
+                lines.append(f"    Artifact: {day['artifact']}")
 
-        for track in relevant_tracks:
-            lines.append(f"\n  [{track['name']}]")
-            for task in track["tasks"]:
-                if role_key in task["roles"]:
-                    lines.append(f"    • {task['text']}")
-
-    # Append skill tree
     skills = ROLE_SKILLS.get(role_key, [])
     if skills:
         lines.append("\n" + "=" * 60)
@@ -648,49 +781,71 @@ def get_full_track_summary(role_key: str) -> str:
 def format_week_context(role_key: str, week: int) -> str:
     """
     Return a focused context block for the learner's current week.
-    Maps the week number to the appropriate phase and lists relevant tasks.
+    week is 1–5 in the new curriculum.
     """
-    phase_id = _WEEK_TO_PHASE.get(week, _WEEK_TO_PHASE[13])
-    phase = get_phase_by_id(phase_id)
-    if phase is None:
-        return f"Week {week} — no phase data found."
-
+    week_data = get_week_by_num(week) or WEEKS[-1]
     lines = [
-        f"Current: {phase['phase']} — {phase['title']} ({phase['weeks']})",
-        f"Focus: {phase['description']}",
-        f"Target artifact: {phase['artifact']}",
+        f"Current: Week {week_data['num']} — {week_data['title']}",
+        f"Focus: {week_data['theme']}",
+        f"Intensity: {week_data['week_hours']}",
         "",
-        "Relevant tasks for your role:",
+        "Day-by-day breakdown:",
     ]
 
-    for track in phase["tracks"]:
-        relevant = [t for t in track["tasks"] if role_key in t["roles"]]
-        if relevant:
-            lines.append(f"\n  {track['name']}")
-            for task in relevant:
-                lines.append(f"    • {task['text']}")
+    for day in week_data["days"]:
+        lines.append(f"\n  {day['day_label']}: {day['title']} ({day['hours']})")
+        for task in day["all_tracks"][:3]:
+            lines.append(f"    • {task}")
+        role_tasks = day["tracks"].get(role_key, [])
+        task_list = role_tasks if isinstance(role_tasks, list) else [role_tasks]
+        for task in task_list:
+            if task:
+                lines.append(f"    → [{role_key.upper()}] {task}")
+        if day.get("artifact"):
+            lines.append(f"    Artifact: {day['artifact']}")
 
     return "\n".join(lines)
 
 
 def get_week(role_key: str, week: int) -> dict:
     """
-    Return a dict describing the phase that corresponds to the given week.
-    Included for backwards compatibility with any code that expects a week dict.
+    Return a dict describing the week for the given role.
+    week is 1–5 in the new curriculum; values outside that range clamp to week 5.
+    Maintained for backward compatibility with agents and app.py.
     """
-    phase_id = _WEEK_TO_PHASE.get(week, _WEEK_TO_PHASE[13])
-    phase = get_phase_by_id(phase_id) or {}
+    week_data = get_week_by_num(week) or WEEKS[-1]
+    tasks = []
+    for day in week_data["days"]:
+        tasks.extend(day["all_tracks"])
+        role_tasks = day["tracks"].get(role_key, [])
+        task_list = role_tasks if isinstance(role_tasks, list) else [role_tasks]
+        tasks.extend(t for t in task_list if t)
+
     return {
-        "title":      phase.get("title", f"Week {week}"),
-        "phase_id":   phase_id,
-        "phase":      phase.get("phase", ""),
-        "weeks":      phase.get("weeks", ""),
-        "description": phase.get("description", ""),
-        "artifact":   phase.get("artifact", ""),
-        "tasks": [
-            task["text"]
-            for track in phase.get("tracks", [])
-            for task in track.get("tasks", [])
-            if role_key in task.get("roles", [])
-        ],
+        "title":      week_data["title"],
+        "week_num":   week_data["num"],
+        "week_hours": week_data["week_hours"],
+        "theme":      week_data["theme"],
+        "subtitle":   week_data["subtitle"],
+        "tasks":      tasks,
     }
+
+
+# ── Backward compatibility shims ──────────────────────────────────────────────
+
+def get_current_phase_id(syllabus_progress: dict, selected_roles: list[str]) -> str:
+    """Backward compat: returns 'week-{n}' for the current active week."""
+    return f"week-{get_current_week(syllabus_progress, selected_roles)}"
+
+
+def get_phase_by_id(phase_id: str) -> dict | None:
+    """Backward compat: accepts 'week-{n}' or bare int string, returns week dict."""
+    try:
+        num = int(str(phase_id).replace("week-", ""))
+        return get_week_by_num(num)
+    except (ValueError, TypeError):
+        return None
+
+
+_WEEK_TO_PHASE = {wn: f"week-{wn}" for wn in range(1, MAX_WEEKS + 1)}
+PHASES = WEEKS  # import alias — /syllabus route now iterates WEEKS directly

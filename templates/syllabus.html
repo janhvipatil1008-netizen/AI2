@@ -170,8 +170,9 @@
 
       // Update phase bar from server response
       const overall = data.overall;
-      if (overall && overall.by_phase) {
-        for (const [pid, info] of Object.entries(overall.by_phase)) {
+      if (overall && overall.by_week) {
+        for (const [wn, info] of Object.entries(overall.by_week)) {
+          const pid  = 'week-' + wn;
           const bar  = document.getElementById('bar-' + pid);
           const pct  = document.getElementById('pct-' + pid);
           const done = document.getElementById('done-' + pid);

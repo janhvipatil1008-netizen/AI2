@@ -139,7 +139,7 @@
     <!-- Continue Learning — most recent session only -->
     {% if recent_sessions %}
     {% set s = recent_sessions[0] %}
-    {% set pct = ((s.current_week / 13) * 100)|int %}
+    {% set pct = ((s.current_week / 5) * 100)|int %}
     <div style="margin-bottom: 2rem;">
       <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Continue Learning</div>
       <div class="resume-card">
@@ -156,11 +156,11 @@
               {% else %}Context Engineer{% endif %}
             </div>
             <div style="font-size: 0.8rem; color: var(--muted);">
-              Week {{ s.current_week }} / 13 ·
-              {% if s.current_week <= 3 %}Foundations
-              {% elif s.current_week <= 6 %}Core Skills
-              {% elif s.current_week <= 9 %}Advanced Topics
-              {% else %}Capstone{% endif %}
+              Week {{ s.current_week }} / 5 ·
+              {% if s.current_week <= 1 %}AI Foundations
+              {% elif s.current_week <= 2 %}Engineering Practice
+              {% elif s.current_week <= 4 %}Agri-Saathi Build
+              {% else %}Portfolio &amp; Launch{% endif %}
             </div>
           </div>
           <a href="/chat/{{ s.session_id }}" class="resume-btn">Resume →</a>

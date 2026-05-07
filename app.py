@@ -45,7 +45,7 @@ from context.learner_profile import (
 )
 from curriculum.syllabus import (
     format_week_context, _WEEK_TO_PHASE, get_phase_by_id,
-    PHASES, get_task_key, ROLE_TRACKS,
+    PHASES, get_task_key, ROLE_TRACKS, WEEKS,
     get_progress as syllabus_get_progress,
 )
 from orchestrator import Orchestrator
@@ -615,7 +615,7 @@ def _session_progress(session: SessionContext) -> dict:
         "total_weeks":    int(TOTAL_WEEKS),
         "phase_id":       str(phase_id),
         "phase_title":    str(phase.get("title", "")),
-        "phase_desc":     str(phase.get("description", "")),
+        "phase_desc":     str(phase.get("theme", "")),
         "exchanges":      int(len(session.history)),
         "exercises_done": int(session.exercises_done),
         "tasks_done":     int(session.tasks_done_count()),
@@ -995,37 +995,52 @@ async def syllabus_page(request: Request, session_id: str):
     session = data["session"]
     role    = session.track.value
 
-    # Build phase list — ALL tasks across all roles, with role metadata.
-    # Progress bar counts only the learner's own role (so it stays meaningful).
     phases_data = []
-    for phase in PHASES:
-        all_tasks  = []
-        role_done  = 0
-        role_total = 0
-        for ti, track in enumerate(phase["tracks"]):
-            for taski, task in enumerate(track["tasks"]):
-                key    = get_task_key(phase["id"], ti, taski)
+    for week in WEEKS:
+        wn        = week["num"]
+        all_tasks = []
+        role_done = role_total = 0
+        for day in week["days"]:
+            for ti, task_text in enumerate(day["all_tracks"]):
+                key    = get_task_key(wn, day["day_idx"], "all", ti)
                 status = session.syllabus_progress.get(key, "todo")
                 all_tasks.append({
                     "key":        key,
-                    "text":       task["text"],
-                    "track_name": track["name"],
+                    "text":       task_text,
+                    "track_name": "All Tracks",
                     "status":     status,
-                    "roles":      task["roles"],
-                    "is_my_role": role in task["roles"],
+                    "roles":      list(ROLE_TRACKS.keys()),
+                    "is_my_role": True,
                 })
-                if role in task["roles"]:
-                    role_total += 1
-                    if status == "done":
-                        role_done += 1
+                role_total += 1
+                if status == "done":
+                    role_done += 1
+            role_tasks = day["tracks"].get(role, [])
+            task_list  = role_tasks if isinstance(role_tasks, list) else [role_tasks]
+            for ti, task_text in enumerate(task_list):
+                if not task_text:
+                    continue
+                key    = get_task_key(wn, day["day_idx"], role, ti)
+                status = session.syllabus_progress.get(key, "todo")
+                all_tasks.append({
+                    "key":        key,
+                    "text":       task_text,
+                    "track_name": ROLE_TRACKS[role]["label"],
+                    "status":     status,
+                    "roles":      [role],
+                    "is_my_role": True,
+                })
+                role_total += 1
+                if status == "done":
+                    role_done += 1
         if all_tasks:
             phases_data.append({
-                "id":          phase["id"],
-                "phase":       phase["phase"],
-                "title":       phase["title"],
-                "weeks":       phase["weeks"],
-                "icon":        phase["icon"],
-                "description": phase["description"],
+                "id":          f"week-{wn}",
+                "icon":        "📅",
+                "phase":       f"Week {wn}",
+                "weeks":       week["week_hours"],
+                "title":       week["title"],
+                "description": week["theme"],
                 "tasks":       all_tasks,
                 "done":        role_done,
                 "total":       role_total,

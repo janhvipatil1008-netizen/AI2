@@ -24,19 +24,19 @@ def test_start_session_aipm(api):
     assert data["progress"]["track"] == "aipm"
     assert data["progress"]["track_label"] == "AI Product Manager"
     assert data["progress"]["current_week"] == 1
-    assert data["progress"]["total_weeks"] == 13
+    assert data["progress"]["total_weeks"] == 5
 
 
 def test_start_session_evals(api):
-    r = api.post("/session/start", json={"track": "evals", "week": 8})
+    r = api.post("/session/start", json={"track": "evals", "week": 3})
     assert r.status_code == 200
     data = r.json()
     assert data["progress"]["track"] == "evals"
-    assert data["progress"]["current_week"] == 8
+    assert data["progress"]["current_week"] == 3
 
 
 def test_start_session_context(api):
-    r = api.post("/session/start", json={"track": "context", "week": 6})
+    r = api.post("/session/start", json={"track": "context", "week": 2})
     assert r.status_code == 200
     data = r.json()
     assert data["progress"]["track"] == "context"
@@ -49,10 +49,10 @@ def test_start_session_invalid_track(api):
 
 
 def test_start_session_week_clamped(api):
-    """Weeks outside 1–13 are clamped, not errored."""
+    """Weeks outside 1–5 are clamped, not errored."""
     r = api.post("/session/start", json={"track": "aipm", "week": 99})
     assert r.status_code == 200
-    assert r.json()["progress"]["current_week"] == 13
+    assert r.json()["progress"]["current_week"] == 5
 
 
 # ── Routing: learning coach ───────────────────────────────────────────────────

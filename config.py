@@ -28,7 +28,7 @@ TRACK_TAGLINES = {
     CareerTrack.CONTEXT_ENGINEER: "Master the art of context and memory.",
 }
 
-TOTAL_WEEKS = 13
+TOTAL_WEEKS = 5
 
 # ── Agent Identities ──────────────────────────────────────────────────────────
 AGENT_DESCRIPTIONS = {
