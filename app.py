@@ -91,17 +91,20 @@ def _save_session(session_id: str, session: SessionContext) -> None:
         return
     data = json.dumps(session.to_dict())
     now  = datetime.now().isoformat()
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO sessions "
-                "(session_id, session_data, created_at, updated_at, user_id) "
-                "VALUES (%s, %s, %s, %s, %s) "
-                "ON CONFLICT (session_id) DO UPDATE "
-                "SET session_data=%s, updated_at=%s, user_id=%s",
-                (session_id, data, session.start_time, now, session.user_id or None,
-                 data, now, session.user_id or None),
-            )
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO sessions "
+                    "(session_id, session_data, created_at, updated_at, user_id) "
+                    "VALUES (%s, %s, %s, %s, %s) "
+                    "ON CONFLICT (session_id) DO UPDATE "
+                    "SET session_data=%s, updated_at=%s, user_id=%s",
+                    (session_id, data, session.start_time, now, session.user_id or None,
+                     data, now, session.user_id or None),
+                )
+    except Exception as exc:
+        logger.warning(f"_save_session failed (non-fatal): {exc}")
 
 
 def _save_exchange_to_history(
@@ -112,22 +115,28 @@ def _save_exchange_to_history(
     if TEST_MODE or not user_id:
         return
     now = datetime.now().isoformat()
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO conversation_history "
-                "(user_id, session_id, user_message, assistant_reply, agent_used, timestamp) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
-                (user_id, session_id, user_message, assistant_reply, agent_used, now),
-            )
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO conversation_history "
+                    "(user_id, session_id, user_message, assistant_reply, agent_used, timestamp) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    (user_id, session_id, user_message, assistant_reply, agent_used, now),
+                )
+    except Exception as exc:
+        logger.warning(f"_save_exchange_to_history failed (non-fatal): {exc}")
 
 
 def _save_profile_db(profile: LearnerProfile) -> None:
     """Persist a LearnerProfile to PostgreSQL."""
     if TEST_MODE:
         return
-    with get_conn() as conn:
-        save_profile(profile, conn)
+    try:
+        with get_conn() as conn:
+            save_profile(profile, conn)
+    except Exception as exc:
+        logger.warning(f"_save_profile_db failed (non-fatal): {exc}")
 
 
 def _load_profile_db(user_id: str) -> Optional[LearnerProfile]:
