@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI² — {{ job.title }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .detail-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2rem; background: #161b22; border-bottom: 1px solid #30363d;
+    }
+    .detail-header-left { display: flex; align-items: center; gap: 1rem; }
+    .ai2-chip {
+      background: #1c6ef5; color: #fff; font-weight: 700;
+      font-size: 0.9rem; padding: 0.25rem 0.6rem; border-radius: 6px;
+    }
+    .header-link { color: #8b949e; text-decoration: none; font-size: 0.875rem; }
+    .header-link:hover { color: #e6edf3; }
+
+    .detail-body { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    /* ── Job hero ──────────────────────────────────────────────────────────── */
+    .job-hero { margin-bottom: 1.5rem; }
+    .job-hero-title { font-size: 1.6rem; font-weight: 800; color: #e6edf3; margin: 0 0 0.3rem; }
+    .job-hero-sub { color: #8b949e; font-size: 0.9rem; }
+    .job-hero-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    .meta-pill {
+      background: #1c2128; border: 1px solid #30363d;
+      border-radius: 4px; padding: 0.15rem 0.5rem;
+      font-size: 0.75rem; color: #8b949e;
+    }
+    .match-large {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: #1c2128; border: 2px solid #238636;
+      border-radius: 50px; padding: 0.3rem 0.9rem;
+      font-size: 0.9rem; font-weight: 700; color: #3fb950;
+    }
+
+    /* ── Analyze button (shown when not yet enriched) ─────────────────────── */
+    .analyze-box {
+      background: #1c2128; border: 1px solid #30363d; border-radius: 12px;
+      padding: 2rem; text-align: center; margin-bottom: 1.5rem;
+    }
+    .analyze-box h3 { color: #e6edf3; margin: 0 0 0.5rem; }
+    .analyze-box p  { color: #8b949e; font-size: 0.87rem; margin: 0 0 1.25rem; }
+    .analyze-btn {
+      background: linear-gradient(135deg, #1c6ef5, #00b4d8);
+      color: #fff; border: none; border-radius: 50px;
+      padding: 0.6rem 1.5rem; font-weight: 700; font-size: 0.9rem; cursor: pointer;
+    }
+    .analyze-btn:hover { opacity: 0.9; }
+    .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #analyze-status { margin-top: 0.75rem; color: #8b949e; font-size: 0.82rem; }
+
+    /* ── Tabs ─────────────────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid #30363d; margin-bottom: 1.5rem; }
+    .tab-btn {
+      background: none; border: none; color: #8b949e; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; padding: 0.65rem 1rem;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .tab-btn.active { color: #00b4d8; border-bottom-color: #00b4d8; }
+    .tab-btn:hover:not(.active) { color: #e6edf3; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Content blocks ───────────────────────────────────────────────────── */
+    .section-card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+    }
+    .section-label {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #00b4d8; margin-bottom: 0.75rem;
+    }
+    .section-text { color: #e6edf3; font-size: 0.9rem; line-height: 1.6; }
+
+    .tag-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tag {
+      border-radius: 50px; padding: 0.2rem 0.65rem;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .tag-have  { background: #0f2b1b; border: 1px solid #238636; color: #3fb950; }
+    .tag-gap   { background: #2d1a1a; border: 1px solid #da3633; color: #f85149; }
+    .tag-must  { background: #1c2128; border: 1px solid #8b949e; color: #e6edf3; }
+    .tag-nice  { background: #1c2128; border: 1px solid #30363d; color: #8b949e; }
+
+    .flag-list { list-style: none; padding: 0; margin: 0; }
+    .flag-list li { padding: 0.3rem 0; font-size: 0.87rem; color: #e6edf3; }
+    .flag-list li::before { margin-right: 0.4rem; }
+    .flag-green li::before { content: "✅"; }
+    .flag-red   li::before { content: "⚠️"; }
+
+    .question-block {
+      background: #1c2128; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem;
+    }
+    .q-text  { font-weight: 600; color: #e6edf3; margin-bottom: 0.3rem; font-size: 0.9rem; }
+    .q-why   { color: #8b949e; font-size: 0.8rem; margin-bottom: 0.3rem; }
+    .q-strat { color: #00b4d8; font-size: 0.8rem; }
+
+    .quiz-item {
+      background: #1c2128; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem;
+    }
+    .quiz-q    { font-weight: 600; color: #e6edf3; margin-bottom: 0.6rem; font-size: 0.88rem; }
+    .quiz-opts { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+    .quiz-opts li {
+      padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer;
+      font-size: 0.83rem; color: #8b949e;
+    }
+    .quiz-opts li:hover { background: #30363d; color: #e6edf3; }
+    .quiz-opts li.correct   { background: #0f2b1b; color: #3fb950; }
+    .quiz-opts li.incorrect { background: #2d1a1a; color: #f85149; }
+    .quiz-explain { font-size: 0.8rem; color: #8b949e; display: none; margin-top: 0.4rem; }
+
+    /* ── JD raw section ───────────────────────────────────────────────────── */
+    .jd-raw {
+      background: #1c2128; border: 1px solid #30363d;
+      border-radius: 8px; padding: 1rem 1.25rem;
+      font-size: 0.8rem; color: #8b949e;
+      white-space: pre-wrap; max-height: 500px; overflow-y: auto;
+    }
+
+    /* ── Apply section ────────────────────────────────────────────────────── */
+    .apply-row { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+    .apply-link {
+      background: #238636; color: #fff; text-decoration: none;
+      border-radius: 50px; padding: 0.55rem 1.25rem;
+      font-weight: 700; font-size: 0.87rem;
+    }
+    .apply-link:hover { background: #2ea043; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="detail-header">
+  <div class="detail-header-left">
+    <span class="ai2-chip">AI²</span>
+    <span style="color:#30363d">|</span>
+    <span style="font-weight:700;color:#e6edf3;">Job Detail</span>
+  </div>
+  <a href="/jobs" class="header-link">← Back to Jobs</a>
+</header>
+
+<div class="detail-body">
+
+  <!-- ── Job hero ──────────────────────────────────────────────────────────── -->
+  <div class="job-hero">
+    <div class="job-hero-title">{{ job.title }}</div>
+    <div class="job-hero-sub">
+      {{ job.company or "Unknown company" }}
+      {% if job.location %} · {{ job.location }}{% endif %}
+    </div>
+    <div class="job-hero-meta">
+      {% if job.source %}<span class="meta-pill">{{ job.source }}</span>{% endif %}
+      {% if job.role_category %}<span class="meta-pill">{{ job.role_category | replace("_"," ") }}</span>{% endif %}
+      {% if job.date_posted %}<span class="meta-pill">Posted {{ job.date_posted[:10] }}</span>{% endif %}
+      {% if job.salary %}<span class="meta-pill">{{ job.salary }}</span>{% endif %}
+      {% if job.enrichment and job.enrichment.match_score %}
+        {% set score = job.enrichment.match_score %}
+        <span class="match-large">
+          {{ score }}% match
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── Analyze CTA (if not yet enriched) ─────────────────────────────────── -->
+  {% if not job.enrichment %}
+  <div class="analyze-box" id="analyze-box">
+    <h3>🤖 AI Analysis Not Yet Run</h3>
+    <p>Click below to analyze this JD with Claude — get a summary, skills breakdown,
+       interview questions, learning guide, and a 5-question quiz.</p>
+    <button class="analyze-btn" id="analyze-btn" onclick="analyzeJob('{{ job.id }}')">
+      Analyze with Claude
+    </button>
+    <div id="analyze-status"></div>
+  </div>
+  {% endif %}
+
+  <!-- ── Tabs (shown when enriched) ─────────────────────────────────────── -->
+  <div id="enriched-section" {% if not job.enrichment %}style="display:none"{% endif %}>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('summary', this)">Summary</button>
+      <button class="tab-btn" onclick="switchTab('skills', this)">Skills</button>
+      <button class="tab-btn" onclick="switchTab('questions', this)">Interview Prep</button>
+      <button class="tab-btn" onclick="switchTab('guide', this)">Learning Guide</button>
+      <button class="tab-btn" onclick="switchTab('quiz', this)">Quiz</button>
+      <button class="tab-btn" onclick="switchTab('jd', this)">Full JD</button>
+    </div>
+
+    <!-- Summary tab -->
+    <div class="tab-panel active" id="tab-summary">
+      {% if job.enrichment %}
+      {% set s = job.enrichment.summary %}
+      <div class="section-card">
+        <div class="section-label">Role in one line</div>
+        <div class="section-text">{{ s.role_in_one_line if s else "—" }}</div>
+      </div>
+      <div class="section-card">
+        <div class="section-label">What you'll do</div>
+        <ul class="flag-list" style="padding-left:1rem;">
+          {% for item in (s.what_you_will_do if s else []) %}
+          <li style="list-style:disc;color:#e6edf3;font-size:0.87rem;margin-bottom:0.2rem;">{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div class="section-card">
+          <div class="section-label">Green flags</div>
+          <ul class="flag-list flag-green">
+            {% for f in (s.green_flags if s else []) %}<li>{{ f }}</li>{% endfor %}
+          </ul>
+        </div>
+        <div class="section-card">
+          <div class="section-label">Red flags</div>
+          <ul class="flag-list flag-red">
+            {% for f in (s.red_flags if s else []) %}<li>{{ f }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-label">Company signal</div>
+        <div class="section-text">{{ s.company_signal if s else "—" }}</div>
+      </div>
+      {% if job.enrichment.match_reasoning %}
+      <div class="section-card">
+        <div class="section-label">Match reasoning</div>
+        <div class="section-text">{{ job.enrichment.match_reasoning }}</div>
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Skills tab -->
+    <div class="tab-panel" id="tab-skills">
+      {% if job.enrichment %}
+      {% set sk = job.enrichment.skills_needed %}
+      <div class="section-card">
+        <div class="section-label">Must have</div>
+        <div class="tag-grid">
+          {% for s in (sk.must_have if sk else []) %}<span class="tag tag-must">{{ s }}</span>{% endfor %}
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-label">Nice to have</div>
+        <div class="tag-grid">
+          {% for s in (sk.nice_to_have if sk else []) %}<span class="tag tag-nice">{{ s }}</span>{% endfor %}
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-label">You already have ✅</div>
+        <div class="tag-grid">
+          {% for s in (sk.you_already_have if sk else []) %}<span class="tag tag-have">{{ s }}</span>{% endfor %}
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-label">Gap to close 🎯</div>
+        <div class="tag-grid">
+          {% for s in (sk.gap_to_close if sk else []) %}<span class="tag tag-gap">{{ s }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Interview Prep tab -->
+    <div class="tab-panel" id="tab-questions">
+      {% if job.enrichment %}
+      {% for q in (job.enrichment.possible_questions or []) %}
+      <div class="question-block">
+        <div class="q-text">{{ loop.index }}. {{ q.question }}</div>
+        <div class="q-why">Why they ask: {{ q.why_they_ask }}</div>
+        <div class="q-strat">💡 {{ q.strong_answer_structure }}</div>
+        {% if q.type %}<span class="meta-pill" style="display:inline-block;margin-top:0.3rem;">{{ q.type }}</span>{% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Learning Guide tab -->
+    <div class="tab-panel" id="tab-guide">
+      {% if job.enrichment %}
+      {% set lg = job.enrichment.learning_guide %}
+      <div class="section-card">
+        <div class="section-label">Priority topics</div>
+        <ul class="flag-list" style="padding-left:1rem;">
+          {% for t in (lg.priority_topics if lg else []) %}
+          <li style="list-style:disc;color:#e6edf3;font-size:0.87rem;margin-bottom:0.2rem;">{{ t }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="section-card">
+        <div class="section-label">From your AI² syllabus</div>
+        <ul class="flag-list" style="padding-left:1rem;">
+          {% for t in (lg.from_your_syllabus if lg else []) %}
+          <li style="list-style:disc;color:#00b4d8;font-size:0.87rem;margin-bottom:0.2rem;">{{ t }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="section-card">
+        <div class="section-label">Portfolio / project talking points</div>
+        <ul class="flag-list" style="padding-left:1rem;">
+          {% for t in (lg.projects_to_reference if lg else []) %}
+          <li style="list-style:disc;color:#e6edf3;font-size:0.87rem;margin-bottom:0.2rem;">{{ t }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Quiz tab -->
+    <div class="tab-panel" id="tab-quiz">
+      {% if job.enrichment %}
+      {% for item in (job.enrichment.quiz or []) %}
+      <div class="quiz-item" id="quiz-{{ loop.index0 }}">
+        <div class="quiz-q">Q{{ loop.index }}. {{ item.question }}
+          <span class="meta-pill" style="margin-left:0.4rem;">{{ item.difficulty }}</span>
+        </div>
+        <ul class="quiz-opts">
+          {% for opt in item.options %}
+          <li onclick="answerQuiz({{ loop.index0 }}, '{{ opt[0] }}', '{{ item.correct }}', this)"
+              data-letter="{{ opt[0] }}">{{ opt }}</li>
+          {% endfor %}
+        </ul>
+        <div class="quiz-explain" id="explain-{{ loop.index0 }}">{{ item.explanation }}</div>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Full JD tab -->
+    <div class="tab-panel" id="tab-jd">
+      <div class="apply-row" style="margin-bottom:1rem;">
+        {% if job.job_url %}
+        <a href="{{ job.job_url }}" target="_blank" class="apply-link">Apply on {{ job.source or "portal" }} →</a>
+        {% endif %}
+      </div>
+      <div class="jd-raw">{{ job.description or "No description available." }}</div>
+    </div>
+
+  </div><!-- /enriched-section -->
+
+</div>
+
+<script>
+  const JOB_ID = "{{ job.id }}";
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  async function analyzeJob(jobId) {
+    const btn    = document.getElementById('analyze-btn');
+    const status = document.getElementById('analyze-status');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing with Claude…';
+    status.textContent = 'This takes 10–20 seconds. Please wait.';
+
+    try {
+      const resp = await fetch(`/api/jobs/enrich/${jobId}`, { method: 'POST' });
+      if (!resp.ok) throw new Error('Server error');
+      status.textContent = 'Done! Reloading page…';
+      setTimeout(() => location.reload(), 1000);
+    } catch (e) {
+      status.textContent = 'Error analyzing job. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Retry Analysis';
+    }
+  }
+
+  function answerQuiz(qIdx, chosen, correct, li) {
+    const opts = li.parentElement.querySelectorAll('li');
+    opts.forEach(o => {
+      o.style.pointerEvents = 'none';
+      if (o.dataset.letter === correct)   o.classList.add('correct');
+      if (o.dataset.letter === chosen && chosen !== correct) o.classList.add('incorrect');
+    });
+    document.getElementById('explain-' + qIdx).style.display = 'block';
+  }
+</script>
+</body>
+</html>

@@ -48,6 +48,15 @@ AGENT_DESCRIPTIONS = {
         "The Idea Generator brainstorms projects, creative applications, and career directions. "
         "Use for: project ideas, inspiration, 'what can I build', 'give me ideas', creative prompts."
     ),
+    "job_search_agent": (
+        "The Job Search Agent browses real AI job listings, analyzes job descriptions, "
+        "generates role-specific interview questions, creates outreach messages, and ranks "
+        "jobs by match with the learner's current skills. "
+        "Use for: 'show me jobs', 'find AI PM roles', 'analyze this job', 'prep me for [company]', "
+        "'quiz me on this role', 'write a cold message', 'which job fits me best', "
+        "'am I ready to apply', 'job search', 'hiring', 'openings', 'vacancies', "
+        "'what companies are hiring', 'career opportunities', 'apply'."
+    ),
 }
 
 # ── Generation Settings ───────────────────────────────────────────────────────
@@ -58,4 +67,4 @@ SYNTHESIS_MAX_TOKENS          = 256    # Orchestrator framing — concise
 
 # Sub-agents whose output is returned directly (no synthesis framing round-trip)
 # learning_coach and idea_generator responses are already complete and well-framed
-NO_SYNTHESIS_AGENTS = {"practice_arena", "learning_coach", "idea_generator"}
+NO_SYNTHESIS_AGENTS = {"practice_arena", "learning_coach", "idea_generator", "job_search_agent"}

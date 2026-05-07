@@ -266,6 +266,19 @@ def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
 # Initialise the DB at module load time (no-op in TEST_MODE)
 _init_db()
 
+# Initialise jobs.db (always — no TEST_MODE guard, jobs.db is read-only safe)
+try:
+    from jobs.database import (
+        init_db as _init_jobs_db,
+        get_jobs as _get_jobs,
+        get_job_with_enrichment as _get_job_detail,
+        get_stats as _get_jobs_stats,
+    )
+    _init_jobs_db()
+except Exception as _jobs_db_err:
+    import logging as _log
+    _log.getLogger(__name__).warning(f"jobs.db init skipped: {_jobs_db_err}")
+
 
 # ── Authentication middleware ─────────────────────────────────────────────────
 
@@ -1098,6 +1111,95 @@ async def chat_page(request: Request, session_id: str):
             "test_mode":  bool(TEST_MODE),
         },
     )
+
+
+# ── Job Search routes ─────────────────────────────────────────────────────────
+
+@app.get("/jobs", response_class=HTMLResponse)
+async def jobs_page(request: Request):
+    """Job list page — shows all fetched jobs with match scores."""
+    user_id = request.state.user_id or "test-user"
+    try:
+        jobs = _get_jobs(limit=50)
+    except Exception:
+        jobs = []
+    try:
+        stats = _get_jobs_stats()
+    except Exception:
+        stats = {"total": 0, "enriched": 0, "pending": 0, "last_fetch": None}
+    return templates.TemplateResponse(
+        request=request,
+        name="jobs.html",
+        context={
+            "jobs":      jobs,
+            "stats":     stats,
+            "test_mode": bool(TEST_MODE),
+        },
+    )
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+async def job_detail_page(request: Request, job_id: str):
+    """Job detail page — shows enriched JD analysis or triggers enrichment."""
+    try:
+        job = _get_job_detail(job_id)
+    except Exception:
+        job = None
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return templates.TemplateResponse(
+        request=request,
+        name="job_detail.html",
+        context={
+            "job":       job,
+            "test_mode": bool(TEST_MODE),
+        },
+    )
+
+
+@app.get("/api/jobs/health")
+async def jobs_health():
+    """Returns job DB stats — no auth required."""
+    try:
+        return {"status": "ok", **_get_jobs_stats()}
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
+
+
+@app.post("/api/jobs/enrich/{job_id}")
+async def enrich_job_endpoint(job_id: str, request: Request):
+    """Trigger on-demand enrichment for a single job. Returns enrichment data."""
+    # Resolve session for personalised context (optional)
+    session_id = request.query_params.get("session_id")
+    session = None
+    if session_id and not TEST_MODE:
+        try:
+            session = _get_session_data(session_id)["session"]
+        except Exception:
+            pass
+
+    from jobs.enricher import enrich_job
+    try:
+        data = await _run_blocking(enrich_job, job_id, session)
+        return {"status": "ok", "job_id": job_id, "match_score": data.get("match_score"), "data": data}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/jobs/refresh")
+async def refresh_jobs(category: str = "all"):
+    """Trigger a job fetch run in the background. Returns immediately."""
+    from jobs.fetcher import fetch_and_store
+
+    async def _bg():
+        try:
+            result = await _run_blocking(fetch_and_store, category)
+            logger.info(f"Background job fetch: {result}")
+        except Exception as exc:
+            logger.error(f"Background job fetch failed: {exc}")
+
+    asyncio.create_task(_bg())
+    return {"status": "queued", "message": f"Fetching '{category}' jobs in background"}
 
 
 # ── Async helper ──────────────────────────────────────────────────────────────

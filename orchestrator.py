@@ -39,9 +39,10 @@ from config import (
     TRACK_DISPLAY_NAMES,
     NO_SYNTHESIS_AGENTS,
 )
-import agents.learning_coach  as learning_coach
-import agents.practice_arena  as practice_arena
-import agents.idea_generator  as idea_generator
+import agents.learning_coach    as learning_coach
+import agents.practice_arena    as practice_arena
+import agents.idea_generator    as idea_generator
+import agents.job_search_agent  as job_search_agent
 
 
 # ── Orchestrator Tools ────────────────────────────────────────────────────────
@@ -149,6 +150,32 @@ ORCHESTRATOR_TOOLS = [
             "required": ["theme"],
         },
     },
+    {
+        "name": "consult_job_search_agent",
+        "description": AGENT_DESCRIPTIONS["job_search_agent"],
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The learner's job search request, verbatim or paraphrased",
+                },
+                "intent": {
+                    "type": "string",
+                    "enum": ["browse", "analyze", "prep", "quiz", "apply", "match"],
+                    "description": (
+                        "'browse' — list top matching jobs. "
+                        "'analyze' — deep breakdown of a specific job. "
+                        "'prep' — interview questions for a specific role. "
+                        "'quiz' — quiz the learner on a role's tech stack. "
+                        "'apply' — draft cold outreach to recruiter. "
+                        "'match' — rank all jobs by fit vs learner profile."
+                    ),
+                },
+            },
+            "required": ["query"],
+        },
+    },
 ]
 
 
@@ -196,6 +223,11 @@ ROUTING DECISION RULES
 • ANY request for "ideas", "what can I build", "inspire me", "project",
   "what should I work on"
   → consult_idea_generator
+
+• ANY mention of jobs, openings, hiring, vacancies, apply, career opportunities,
+  "show me jobs", "find roles", "which company", "am I ready to apply",
+  "prep me for [company]", "cold message", "outreach", "job search", "match me"
+  → consult_job_search_agent
 
 • When ambiguous → default to consult_learning_coach
 
@@ -350,6 +382,15 @@ class Orchestrator:
                 theme   = tool_input["theme"],
                 session = self.session,
                 context = tool_input.get("context", ""),
+                profile = self.profile,
+            )
+
+        if tool_name == "consult_job_search_agent":
+            return job_search_agent.respond(
+                client  = self.client,
+                query   = tool_input["query"],
+                session = self.session,
+                intent  = tool_input.get("intent", ""),
                 profile = self.profile,
             )
 

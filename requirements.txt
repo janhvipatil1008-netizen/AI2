@@ -14,6 +14,9 @@ slowapi>=0.1.9
 bcrypt>=4.0.0
 itsdangerous>=2.1.2
 
+# Job search
+python-jobspy>=0.2.0
+
 # Testing
 pytest>=8.2.0
 pytest-playwright>=0.5.0

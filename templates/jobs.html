@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI² — Job Search</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    /* ── Page layout ──────────────────────────────────────────────────────── */
+    .jobs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+    }
+    .jobs-header-left { display: flex; align-items: center; gap: 1rem; }
+    .ai2-chip {
+      background: #1c6ef5; color: #fff; font-weight: 700;
+      font-size: 0.9rem; padding: 0.25rem 0.6rem; border-radius: 6px;
+    }
+    .header-title { font-weight: 700; font-size: 1.05rem; color: #e6edf3; }
+    .header-actions { display: flex; align-items: center; gap: 1rem; }
+    .header-link { color: #8b949e; text-decoration: none; font-size: 0.875rem; }
+    .header-link:hover { color: #e6edf3; }
+
+    .jobs-body { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+    /* ── Hero ─────────────────────────────────────────────────────────────── */
+    .jobs-hero { margin-bottom: 2rem; }
+    .jobs-eyebrow {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #00b4d8; margin-bottom: 0.4rem;
+    }
+    .jobs-h1 { font-size: 1.75rem; font-weight: 800; color: #e6edf3; margin: 0 0 0.4rem; }
+    .jobs-sub { color: #8b949e; font-size: 0.9rem; }
+
+    /* ── Stats bar ────────────────────────────────────────────────────────── */
+    .stats-bar {
+      display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: #1c2128; border: 1px solid #30363d;
+      border-radius: 8px; padding: 0.5rem 1rem;
+      font-size: 0.8rem; color: #8b949e;
+    }
+    .stat-chip strong { color: #e6edf3; font-size: 1rem; }
+
+    /* ── Controls ─────────────────────────────────────────────────────────── */
+    .controls-row {
+      display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;
+    }
+    .filter-select, .search-input {
+      background: #1c2128; border: 1px solid #30363d;
+      color: #e6edf3; border-radius: 8px; padding: 0.5rem 0.75rem;
+      font-size: 0.85rem; outline: none;
+    }
+    .search-input { flex: 1; min-width: 200px; }
+    .filter-select:focus, .search-input:focus { border-color: #00b4d8; }
+    .refresh-btn {
+      background: #00b4d8; color: #0d1117; border: none;
+      border-radius: 50px; padding: 0.5rem 1.25rem;
+      font-weight: 700; font-size: 0.85rem; cursor: pointer;
+    }
+    .refresh-btn:hover { background: #0096b7; }
+    .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Job cards ────────────────────────────────────────────────────────── */
+    .jobs-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .job-card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 12px; padding: 1.25rem 1.5rem;
+      cursor: pointer; transition: border-color 0.15s, transform 0.1s;
+      text-decoration: none; display: block; color: inherit;
+    }
+    .job-card:hover { border-color: #00b4d8; transform: translateY(-1px); }
+
+    .job-card-top {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 1rem; margin-bottom: 0.5rem;
+    }
+    .job-title { font-weight: 700; font-size: 1rem; color: #e6edf3; }
+    .job-company { color: #8b949e; font-size: 0.85rem; margin-top: 0.15rem; }
+    .match-badge {
+      background: #1c2128; border: 1px solid #30363d;
+      border-radius: 50px; padding: 0.2rem 0.6rem;
+      font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+      color: #e6edf3; flex-shrink: 0;
+    }
+    .match-badge.high  { border-color: #238636; color: #3fb950; }
+    .match-badge.mid   { border-color: #9e6a03; color: #d29922; }
+    .match-badge.low   { border-color: #30363d; color: #8b949e; }
+
+    .job-meta {
+      display: flex; gap: 0.75rem; flex-wrap: wrap;
+      font-size: 0.78rem; color: #8b949e; margin-bottom: 0.5rem;
+    }
+    .meta-pill {
+      background: #0d1117; border: 1px solid #30363d;
+      border-radius: 4px; padding: 0.1rem 0.4rem;
+    }
+    .job-oneliner { font-size: 0.82rem; color: #8b949e; font-style: italic; }
+
+    .no-jobs {
+      text-align: center; padding: 4rem 2rem; color: #8b949e;
+    }
+    .no-jobs h3 { color: #e6edf3; margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="jobs-header">
+  <div class="jobs-header-left">
+    <span class="ai2-chip">AI²</span>
+    <span style="color:#30363d">|</span>
+    <span class="header-title">Job Search</span>
+  </div>
+  <div class="header-actions">
+    <a href="/dashboard" class="header-link">← Dashboard</a>
+  </div>
+</header>
+
+<!-- ── Body ───────────────────────────────────────────────────────────────── -->
+<div class="jobs-body">
+
+  <div class="jobs-hero">
+    <div class="jobs-eyebrow">AI FIRST JOB SEARCH</div>
+    <h1 class="jobs-h1">Find Your Next AI Role</h1>
+    <p class="jobs-sub">Real jobs from Indeed &amp; Google Jobs — analyzed by Claude for your track and skill level.</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-chip"><strong id="stat-total">{{ stats.total }}</strong> jobs indexed</div>
+    <div class="stat-chip"><strong id="stat-enriched">{{ stats.enriched }}</strong> analyzed by AI</div>
+    <div class="stat-chip"><strong>{{ stats.pending }}</strong> pending analysis</div>
+    {% if stats.last_fetch %}
+    <div class="stat-chip">Last fetched: {{ stats.last_fetch[:10] }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-row">
+    <input type="text" class="search-input" id="search-input"
+           placeholder="Search jobs by title or company…" oninput="filterJobs()">
+    <select class="filter-select" id="category-filter" onchange="filterJobs()">
+      <option value="">All roles</option>
+      <option value="ai_engineer">AI Engineer</option>
+      <option value="ai_pm">AI Product Manager</option>
+      <option value="ai_researcher">AI Researcher / NLP</option>
+      <option value="ai_infra">RAG / Prompt / Context Eng</option>
+      <option value="ai_evals">AI Evals / Quality</option>
+      <option value="data_ai">AI Data Scientist</option>
+      <option value="ai_solutions">AI Solutions Architect</option>
+    </select>
+    <select class="filter-select" id="score-filter" onchange="filterJobs()">
+      <option value="0">Any match</option>
+      <option value="70">70%+ match</option>
+      <option value="80">80%+ match</option>
+    </select>
+    <button class="refresh-btn" id="refresh-btn" onclick="refreshJobs()">Refresh Jobs</button>
+  </div>
+
+  <!-- Job list -->
+  <div class="jobs-grid" id="jobs-grid">
+    {% if jobs %}
+      {% for job in jobs %}
+      <a class="job-card"
+         href="/jobs/{{ job.id }}"
+         data-title="{{ job.title | lower }}"
+         data-company="{{ (job.company or '') | lower }}"
+         data-category="{{ job.role_category or '' }}"
+         data-score="{{ job.match_score or 0 }}">
+        <div class="job-card-top">
+          <div>
+            <div class="job-title">{{ job.title }}</div>
+            <div class="job-company">
+              {{ job.company or "Unknown company" }}
+              {% if job.location %} · {{ job.location }}{% endif %}
+            </div>
+          </div>
+          {% if job.match_score %}
+            {% set score = job.match_score %}
+            <span class="match-badge {% if score >= 75 %}high{% elif score >= 50 %}mid{% else %}low{% endif %}">
+              {{ score }}% match
+            </span>
+          {% else %}
+            <span class="match-badge">Not scored</span>
+          {% endif %}
+        </div>
+
+        <div class="job-meta">
+          {% if job.source %}<span class="meta-pill">{{ job.source }}</span>{% endif %}
+          {% if job.role_category %}<span class="meta-pill">{{ job.role_category | replace("_", " ") }}</span>{% endif %}
+          {% if job.date_posted %}<span class="meta-pill">{{ job.date_posted[:10] }}</span>{% endif %}
+          {% if job.salary %}<span class="meta-pill">{{ job.salary }}</span>{% endif %}
+        </div>
+
+        {% if job.summary and job.summary.role_in_one_line %}
+        <div class="job-oneliner">{{ job.summary.role_in_one_line }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    {% else %}
+      <div class="no-jobs">
+        <h3>No jobs yet</h3>
+        <p>Click <strong>Refresh Jobs</strong> to fetch the latest AI roles from Indeed &amp; Google Jobs.</p>
+        <p style="margin-top: 0.5rem; font-size: 0.8rem;">First fetch takes 1–3 minutes.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  function filterJobs() {
+    const q     = document.getElementById('search-input').value.toLowerCase();
+    const cat   = document.getElementById('category-filter').value;
+    const score = parseInt(document.getElementById('score-filter').value) || 0;
+
+    document.querySelectorAll('.job-card').forEach(card => {
+      const matchQ     = !q || card.dataset.title.includes(q) || card.dataset.company.includes(q);
+      const matchCat   = !cat || card.dataset.category === cat;
+      const matchScore = parseInt(card.dataset.score) >= score;
+      card.style.display = (matchQ && matchCat && matchScore) ? 'block' : 'none';
+    });
+  }
+
+  async function refreshJobs() {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    btn.textContent = 'Fetching…';
+    try {
+      const resp = await fetch('/api/jobs/refresh', { method: 'POST' });
+      const data = await resp.json();
+      btn.textContent = 'Queued ✓';
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Refresh Jobs'; }, 3000);
+      // Reload after a delay to show new jobs
+      setTimeout(() => location.reload(), 15000);
+    } catch (e) {
+      btn.textContent = 'Error — retry';
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
