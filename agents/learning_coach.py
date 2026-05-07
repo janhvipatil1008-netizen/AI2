@@ -475,7 +475,7 @@ def _build_learner_context(session: SessionContext, depth: str, profile=None) ->
     )
 
     phase_title = phase["title"] if phase else f"Week {session.current_week}"
-    phase_desc = phase["description"] if phase else ""
+    phase_desc = phase.get("theme", phase.get("description", "")) if phase else ""
 
     return f"""
 ════════════════════════════════════════
