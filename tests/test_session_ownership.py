@@ -3,14 +3,16 @@ Session ownership tests.
 
 These require a real (non-TEST_MODE) server backed by PostgreSQL so that
 auth middleware and the SQL-level ownership check in _get_session_data are
-exercised. Skipped automatically when SUPABASE_DATABASE_URL is not set.
-A second server is started on port 8766; the existing port-8765 suite is unaffected.
+exercised. Skipped automatically when SUPABASE_DATABASE_URL is not set or
+the database is not reachable. A second server is started on port 8766;
+the existing port-8765 suite is unaffected.
 """
 
 import os
 import sys
 import time
 import subprocess
+import uuid
 
 import requests
 import pytest
@@ -26,9 +28,26 @@ _AUTH_SECRET = "a" * 64
 
 _DB_URL = os.getenv("SUPABASE_DATABASE_URL", "")
 
+
+def _db_reachable() -> bool:
+    """Return True only if a real psycopg2 connection can be opened."""
+    if not _DB_URL:
+        return False
+    try:
+        sys.path.insert(0, ROOT)
+        from database.pool import _connect
+        conn = _connect()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+_DB_OK = _db_reachable()
+
 pytestmark = pytest.mark.skipif(
-    not _DB_URL,
-    reason="SUPABASE_DATABASE_URL not set — skipping ownership integration tests",
+    not _DB_OK,
+    reason="SUPABASE_DATABASE_URL not set or DB unreachable — skipping ownership integration tests",
 )
 
 
@@ -65,7 +84,7 @@ def auth_server():
         try:
             if requests.get(f"{_AUTH_BASE}/health", timeout=3).status_code == 200:
                 break
-        except requests.exceptions.ConnectionError:
+        except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout):
             pass
         time.sleep(0.5)
     else:
@@ -92,6 +111,7 @@ def _signup_and_get_cookie(base_url: str, email: str, password: str) -> str:
             "confirm_password": password,
         },
         allow_redirects=False,
+        timeout=30,
     )
     assert r.status_code == 302, f"Signup failed: {r.status_code} — {r.text[:200]}"
     val = r.cookies.get("ai2_user_token")
@@ -105,6 +125,7 @@ def _start_session(base_url: str, cookie: str) -> str:
         f"{base_url}/session/start",
         json={"track": "aipm", "week": 1},
         cookies={"ai2_user_token": cookie},
+        timeout=30,
     )
     assert r.status_code == 200, f"session/start failed: {r.status_code} — {r.text[:200]}"
     return r.json()["session_id"]
@@ -114,14 +135,16 @@ def _start_session(base_url: str, cookie: str) -> str:
 
 def test_session_ownership_enforced(auth_server):
     """User B must get HTTP 403 when accessing a session owned by user A."""
-    cookie_a   = _signup_and_get_cookie(auth_server, "usera@ownership.test", "password123")
-    cookie_b   = _signup_and_get_cookie(auth_server, "userb@ownership.test", "password123")
+    run = uuid.uuid4().hex[:8]
+    cookie_a   = _signup_and_get_cookie(auth_server, f"usera-{run}@ownership.test", "password123")
+    cookie_b   = _signup_and_get_cookie(auth_server, f"userb-{run}@ownership.test", "password123")
     session_id = _start_session(auth_server, cookie_a)
 
     r = requests.get(
         f"{auth_server}/chat/{session_id}",
         cookies={"ai2_user_token": cookie_b},
         allow_redirects=False,
+        timeout=30,
     )
     assert r.status_code == 403, (
         f"Expected 403 (access denied), got {r.status_code}. "
@@ -131,13 +154,15 @@ def test_session_ownership_enforced(auth_server):
 
 def test_own_session_accessible(auth_server):
     """User A must get HTTP 200 when accessing their own session."""
-    cookie_a   = _signup_and_get_cookie(auth_server, "usera2@ownership.test", "password123")
+    run = uuid.uuid4().hex[:8]
+    cookie_a   = _signup_and_get_cookie(auth_server, f"usera2-{run}@ownership.test", "password123")
     session_id = _start_session(auth_server, cookie_a)
 
     r = requests.get(
         f"{auth_server}/chat/{session_id}",
         cookies={"ai2_user_token": cookie_a},
         allow_redirects=False,
+        timeout=30,
     )
     assert r.status_code == 200, (
         f"Expected 200 (owner access), got {r.status_code}. "
