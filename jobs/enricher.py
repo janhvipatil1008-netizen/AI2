@@ -82,7 +82,7 @@ match_score is 0-100 vs learner's current mastery (be realistic, not inflated).\
 """
 
 
-def enrich_job(job_id: str, session=None) -> dict:
+def enrich_job(job_id: str, learner_context: dict = None) -> dict:
     """
     Enrich a single job synchronously. Saves result to jobs.db.
     Returns the enrichment data dict.
@@ -101,13 +101,22 @@ def enrich_job(job_id: str, session=None) -> dict:
     row = dict(row)
 
     # ── Build learner context ─────────────────────────────────────────────────
-    if session is not None:
-        from config import TRACK_DISPLAY_NAMES
-        track        = TRACK_DISPLAY_NAMES.get(session.track, session.track.value)
-        current_week = session.current_week
-        goals        = ", ".join(session.goals[:3]) if session.goals else "land an AI role"
-        mastered     = ", ".join(sorted(session.topics_explored)[:6]) if session.topics_explored else "AI fundamentals"
-        struggling   = "advanced topics — still building"
+    if learner_context is not None:
+        from config import TRACK_DISPLAY_NAMES, CareerTrack
+        raw_track = learner_context.get("track", "")
+        try:
+            track = TRACK_DISPLAY_NAMES.get(CareerTrack(raw_track), raw_track)
+        except ValueError:
+            track = raw_track or row.get("role_category", "AI role")
+        current_week = learner_context.get("current_week", 1)
+        goals_list   = learner_context.get("goals", [])
+        background   = learner_context.get("background", "")
+        goals        = background or (", ".join(goals_list[:3]) if goals_list else "land an AI role")
+        explored     = learner_context.get("topics_explored", [])
+        mastered     = ", ".join(explored[:6]) if explored else "AI fundamentals"
+        low_scores   = [q["topic"] for q in learner_context.get("quiz_scores", [])
+                        if q.get("pct", 100) < 60]
+        struggling   = ", ".join(low_scores[:4]) if low_scores else "advanced topics — still building"
     else:
         track        = row.get("role_category", "AI role")
         current_week = 1

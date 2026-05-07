@@ -7,7 +7,8 @@ import os
 import sqlite3
 from pathlib import Path
 
-JOBS_DB_PATH = os.getenv("AI2_JOBS_DB", str(Path(__file__).parent.parent / "jobs.db"))
+_DB_DIR      = "." if os.getenv("AI2_TEST_MODE") == "1" else os.getenv("DB_DIR", "/data")
+JOBS_DB_PATH = os.getenv("AI2_JOBS_DB", os.path.join(_DB_DIR, "jobs.db"))
 
 
 def get_conn() -> sqlite3.Connection:

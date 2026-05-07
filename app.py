@@ -17,6 +17,7 @@ import functools
 import json
 import os
 import sqlite3
+import logging
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -56,7 +57,9 @@ load_dotenv()
 # ── Config ────────────────────────────────────────────────────────────────────
 
 TEST_MODE       = os.getenv("AI2_TEST_MODE") == "1"
-SESSION_DB_PATH = os.getenv("AI2_SESSION_DB", "sessions.db")
+_DB_DIR         = "." if TEST_MODE else os.getenv("DB_DIR", "/data")
+SESSION_DB_PATH = os.getenv("AI2_SESSION_DB", os.path.join(_DB_DIR, "sessions.db"))
+logger          = logging.getLogger(__name__)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -264,7 +267,19 @@ def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
 
 
 # Initialise the DB at module load time (no-op in TEST_MODE)
-_init_db()
+def _startup_db() -> None:
+    """Ensure data dir exists; create schema on first deploy; log if fresh."""
+    if TEST_MODE:
+        return
+    data_dir = os.path.dirname(SESSION_DB_PATH)
+    if data_dir and data_dir != ".":
+        os.makedirs(data_dir, exist_ok=True)
+    fresh = not os.path.exists(SESSION_DB_PATH)
+    _init_db()
+    if fresh:
+        logger.info(f"First-deploy: created fresh schema at {SESSION_DB_PATH}")
+
+_startup_db()
 
 # Initialise jobs.db (always — no TEST_MODE guard, jobs.db is read-only safe)
 try:
@@ -1204,18 +1219,25 @@ async def jobs_health():
 @app.post("/api/jobs/enrich/{job_id}")
 async def enrich_job_endpoint(job_id: str, request: Request):
     """Trigger on-demand enrichment for a single job. Returns enrichment data."""
-    # Resolve session for personalised context (optional)
     session_id = request.query_params.get("session_id")
-    session = None
-    if session_id and not TEST_MODE:
+    learner_context = None
+    if session_id:
         try:
-            session = _get_session_data(session_id)["session"]
+            s = _get_session_data(session_id, request.state.user_id or "")["session"]
+            learner_context = {
+                "track":           s.track.value,
+                "current_week":    s.current_week,
+                "background":      "; ".join(s.goals[:3]) if s.goals else "",
+                "goals":           s.goals,
+                "quiz_scores":     s.quiz_scores,
+                "topics_explored": sorted(s.topics_explored)[:10],
+            }
         except Exception:
             pass
 
     from jobs.enricher import enrich_job
     try:
-        data = await _run_blocking(enrich_job, job_id, session)
+        data = await _run_blocking(enrich_job, job_id, learner_context=learner_context)
         return {"status": "ok", "job_id": job_id, "match_score": data.get("match_score"), "data": data}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

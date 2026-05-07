@@ -63,6 +63,14 @@ def fetch_and_store(category: str = "all") -> dict:
 
     init_db()
 
+    # ── Prune stale rows before fetching new ones ─────────────────────────────
+    with get_conn() as conn:
+        cur     = conn.execute("DELETE FROM jobs WHERE created_at < datetime('now', '-7 days')")
+        deleted = cur.rowcount
+        conn.execute("DELETE FROM job_enrichments WHERE job_id NOT IN (SELECT id FROM jobs)")
+    if deleted:
+        logger.info(f"Pruned {deleted} stale job(s) older than 7 days")
+
     cats = list(SEARCH_TERMS.keys()) if category == "all" else [category]
     fetched = new = skipped = 0
 

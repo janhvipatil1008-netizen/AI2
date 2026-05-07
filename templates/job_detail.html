@@ -345,6 +345,7 @@
 
 <script>
   const JOB_ID = "{{ job.id }}";
+  const SESSION_ID = new URLSearchParams(window.location.search).get('session_id') || '';
 
   function switchTab(name, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -361,7 +362,8 @@
     status.textContent = 'This takes 10–20 seconds. Please wait.';
 
     try {
-      const resp = await fetch(`/api/jobs/enrich/${jobId}`, { method: 'POST' });
+      const qs = SESSION_ID ? `?session_id=${encodeURIComponent(SESSION_ID)}` : '';
+      const resp = await fetch(`/api/jobs/enrich/${jobId}${qs}`, { method: 'POST' });
       if (!resp.ok) throw new Error('Server error');
       status.textContent = 'Done! Reloading page…';
       setTimeout(() => location.reload(), 1000);
