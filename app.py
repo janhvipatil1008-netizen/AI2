@@ -591,19 +591,54 @@ def _make_client() -> anthropic.Anthropic:
     return anthropic.Anthropic(api_key=api_key)
 
 
-def _get_session_data(session_id: str) -> dict:
+def _get_session_data(session_id: str, user_id: str = "") -> dict:
+    # ── In-memory cache hit ───────────────────────────────────────────────────
     if session_id in _sessions:
-        return _sessions[session_id]
+        data = _sessions[session_id]
+        if not TEST_MODE and user_id:
+            owner = data["session"].user_id
+            if owner and owner != user_id:
+                raise HTTPException(status_code=403, detail="Access denied.")
+        return data
 
-    # Cache miss: try restoring from SQLite (handles restarts + multi-worker)
+    # ── DB restore (cache miss after restart / multi-worker) ─────────────────
     if not TEST_MODE:
-        session = _load_session_from_db(session_id)
-        if session is not None:
+        try:
+            with sqlite3.connect(SESSION_DB_PATH) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                if user_id:
+                    # Fetch only if session belongs to this user
+                    row = conn.execute(
+                        "SELECT session_data FROM sessions WHERE session_id = ? AND user_id = ?",
+                        (session_id, user_id),
+                    ).fetchone()
+                    if row is None:
+                        # Distinguish 404 (doesn't exist) from 403 (exists, wrong user)
+                        exists = conn.execute(
+                            "SELECT user_id FROM sessions WHERE session_id = ?",
+                            (session_id,),
+                        ).fetchone()
+                        if exists is None:
+                            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+                        raise HTTPException(status_code=403, detail="Access denied.")
+                else:
+                    row = conn.execute(
+                        "SELECT session_data FROM sessions WHERE session_id = ?",
+                        (session_id,),
+                    ).fetchone()
+                    if row is None:
+                        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+            session = SessionContext.from_dict(json.loads(row[0]))
             client  = _make_client()
             profile = _load_profile_db(session.user_id) if session.user_id else None
             orch    = Orchestrator(client=client, session=session, profile=profile)
             _sessions[session_id] = {"session": session, "orch": orch, "client": client, "profile": profile}
             return _sessions[session_id]
+        except HTTPException:
+            raise
+        except Exception:
+            pass
 
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
@@ -852,7 +887,7 @@ async def start_session(request: Request, body: StartSessionRequest):
 @app.post("/chat")
 @limiter.limit(_CHAT_RATE_LIMIT)
 async def chat(request: Request, body: ChatRequest):
-    data    = _get_session_data(body.session_id)
+    data    = _get_session_data(body.session_id, request.state.user_id or "")
     session: SessionContext = data["session"]
 
     if not body.message.strip():
@@ -913,8 +948,8 @@ async def chat(request: Request, body: ChatRequest):
 
 
 @app.get("/progress/{session_id}")
-async def get_progress(session_id: str):
-    data    = _get_session_data(session_id)
+async def get_progress(request: Request, session_id: str):
+    data    = _get_session_data(session_id, request.state.user_id or "")
     session = data["session"]
     return _session_progress(session)
 
@@ -922,7 +957,7 @@ async def get_progress(session_id: str):
 @app.post("/quiz")
 @limiter.limit(_PRACTICE_RATE_LIMIT)
 async def quiz(request: Request, body: QuizRequest):
-    data    = _get_session_data(body.session_id)
+    data    = _get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
     if TEST_MODE:
@@ -943,7 +978,7 @@ async def quiz(request: Request, body: QuizRequest):
 @app.post("/interview")
 @limiter.limit(_PRACTICE_RATE_LIMIT)
 async def interview(request: Request, body: InterviewRequest):
-    data    = _get_session_data(body.session_id)
+    data    = _get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
     if TEST_MODE:
@@ -964,7 +999,7 @@ async def interview(request: Request, body: InterviewRequest):
 @app.post("/evaluate")
 @limiter.limit(_PRACTICE_RATE_LIMIT)
 async def evaluate(request: Request, body: EvaluateRequest):
-    data    = _get_session_data(body.session_id)
+    data    = _get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
     if TEST_MODE:
@@ -1004,7 +1039,7 @@ async def evaluate(request: Request, body: EvaluateRequest):
 
 @app.get("/syllabus/{session_id}", response_class=HTMLResponse)
 async def syllabus_page(request: Request, session_id: str):
-    data    = _get_session_data(session_id)
+    data    = _get_session_data(session_id, request.state.user_id or "")
     session = data["session"]
     role    = session.track.value
 
@@ -1078,12 +1113,12 @@ async def syllabus_page(request: Request, session_id: str):
 
 
 @app.post("/task/toggle")
-async def task_toggle(body: TaskToggleRequest):
+async def task_toggle(request: Request, body: TaskToggleRequest):
     valid_statuses = {"done", "in_progress", "todo"}
     if body.status not in valid_statuses:
         raise HTTPException(status_code=422, detail=f"status must be one of {valid_statuses}")
 
-    data    = _get_session_data(body.session_id)
+    data    = _get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
     session.mark_task(body.task_key, body.status)
     _save_session(body.session_id, session)
@@ -1100,7 +1135,7 @@ async def task_toggle(body: TaskToggleRequest):
 
 @app.get("/chat/{session_id}", response_class=HTMLResponse)
 async def chat_page(request: Request, session_id: str):
-    data    = _get_session_data(session_id)
+    data    = _get_session_data(session_id, request.state.user_id or "")
     session = data["session"]
     return templates.TemplateResponse(
         request=request,
