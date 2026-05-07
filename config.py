@@ -8,7 +8,7 @@ from enum import Enum
 # ── Models ────────────────────────────────────────────────────────────────────
 # Sonnet for routing (fast, cheap classification) — Opus for sub-agents (quality generation)
 ORCHESTRATOR_MODEL = "claude-sonnet-4-6"
-AGENT_MODEL        = "claude-opus-4-6"
+AGENT_MODEL        = "claude-sonnet-4-6"
 
 # ── Career Tracks ─────────────────────────────────────────────────────────────
 class CareerTrack(str, Enum):
