@@ -9,10 +9,15 @@ Task keys: "w{week_num}-d{day_idx}-{scope}-{task_idx}"
   scope = "all" | "aipm" | "evals" | "context"
 """
 
+# compatibility-only: fixed week bounds for old sessions/static fallback.
+# New modular curriculum features should use course/module/topic sequence_order
+# plus learner enrollment/progress state.
 MAX_WEEKS = 5
 
 # ── Role definitions ───────────────────────────────────────────────────────────
 
+# compatibility-only: static track metadata for fallback/seed export.
+# New modular curriculum features should use modular course/enrollment state.
 ROLE_TRACKS = {
     "aipm":    {"label": "AI Product Manager",  "icon": "📦", "color": "#4FC3F7"},
     "evals":   {"label": "AI Evals Specialist", "icon": "🔬", "color": "#FF8A65"},
@@ -21,6 +26,9 @@ ROLE_TRACKS = {
 
 # ── 5-Week Roadmap ─────────────────────────────────────────────────────────────
 
+# compatibility-only: static roadmap for old sessions/static fallback and seed
+# export. Do not use WEEKS for new modular curriculum features; use
+# course/module/topic sequence_order plus learner enrollment/progress state.
 WEEKS = [
     {
         "num": 1,

@@ -26,7 +26,7 @@ import psycopg2
 
 import anthropic
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -39,25 +39,41 @@ from auth import (
     AUTH_COOKIE, hash_password, verify_password,
     create_auth_token, get_current_user_id,
 )
-from database.pool import get_conn
+from core.security_config import assert_test_mode_off, get_cookie_secure, is_debug_access_allowed
+from database.pool import _connect as _open_db_connection, get_conn
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES, TOTAL_WEEKS
 from context.session import SessionContext
 from context.learner_profile import (
     LearnerProfile, load_profile, save_profile,
 )
 from curriculum.syllabus import (
-    format_week_context, _WEEK_TO_PHASE, get_phase_by_id,
-    PHASES, get_task_key, ROLE_TRACKS, WEEKS,
+    _WEEK_TO_PHASE, get_phase_by_id,
+    get_task_key, ROLE_TRACKS, WEEKS,
     get_progress as syllabus_get_progress,
 )
+from curriculum.topics import get_topics_for_week
 from orchestrator import Orchestrator
 import agents.practice_arena as practice_arena
+from services.learner_course_enrollment_service import (
+    ensure_course_enrollment,
+    get_active_course_enrollment_with_fallback,
+    normalize_course_key,
+    summarize_enrollment_progress,
+)
+from services.dashboard_modular_progress_service import (
+    build_dashboard_modular_progress_summary,
+)
+from services.modular_position_service import (
+    build_position_summary,
+    build_legacy_position_fallback,
+)
 
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
 TEST_MODE = os.getenv("AI2_TEST_MODE") == "1"
+assert_test_mode_off()
 logger    = logging.getLogger(__name__)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -223,6 +239,56 @@ def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
         return []
 
 
+def build_dashboard_learning_summary(session) -> dict:
+    """Compute a quick learner stats dict for the dashboard. Pure — no Claude calls."""
+    track        = session.track.value
+    current_week = session.current_week
+    topics       = get_topics_for_week(track, current_week)
+    total_topics = len(topics)
+
+    pcts    = [session.topic_completion_percent(t.topic_id) for t in topics]
+    tp_maps = [session.get_topic_progress(t.topic_id)       for t in topics]
+
+    completed   = sum(1 for p in pcts if p == 100)
+    in_progress = sum(
+        1 for p, tp in zip(pcts, tp_maps)
+        if p < 100 and (p > 0 or "in_progress" in tp.values())
+    )
+    not_started = total_topics - completed - in_progress
+    avg_pct     = round(sum(pcts) / total_topics) if total_topics else 0
+
+    counts       = session.todo_counts()
+    daily_count  = len(session.get_todos("daily"))
+    weekly_count = len(session.get_todos("weekly"))
+
+    quiz_done      = sum(1 for v in session.quiz_submissions.values()      if v.get("evaluation"))
+    portfolio_done = sum(1 for v in session.portfolio_submissions.values() if v.get("feedback"))
+    interview_done = sum(1 for v in session.interview_submissions.values() if v.get("feedback"))
+    reflections    = sum(
+        1 for v in session.topic_notes.values()
+        if v.get("reflection") or v.get("confusions") or v.get("application_idea")
+    )
+
+    return {
+        "current_week":               current_week,
+        "total_topics":               total_topics,
+        "completed_topics":           completed,
+        "in_progress_topics":         in_progress,
+        "not_started_topics":         not_started,
+        "average_completion_percent": avg_pct,
+        "total_todos":                counts["total"],
+        "daily_todos":                daily_count,
+        "weekly_todos":               weekly_count,
+        "done_todos":                 counts.get("done", 0),
+        "in_progress_todos":          counts.get("in_progress", 0),
+        "quiz_evaluations_done":      quiz_done,
+        "portfolio_reviews_done":     portfolio_done,
+        "interview_feedback_done":    interview_done,
+        "reflections_saved":          reflections,
+        "usage_summary":              session.usage_summary(),
+    }
+
+
 def _startup_db() -> None:
     """Run schema.sql against PostgreSQL if tables don't yet exist. No-op in TEST_MODE."""
     if TEST_MODE:
@@ -262,7 +328,7 @@ except Exception as _jobs_db_err:
 
 # ── Authentication middleware ─────────────────────────────────────────────────
 
-_PUBLIC_PATHS = {"/login", "/signup", "/health"}
+_PUBLIC_PATHS = {"/login", "/signup", "/health", "/privacy", "/terms"}
 
 
 @app.middleware("http")
@@ -561,7 +627,6 @@ class TaskToggleRequest(BaseModel):
     task_key:   str
     status:     str = "done"   # "done" | "in_progress" | "todo"
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_client() -> anthropic.Anthropic:
@@ -663,6 +728,1186 @@ async def health():
     return {"status": "ok", "test_mode": TEST_MODE}
 
 
+def _debug_access(request: Request) -> None:
+    """FastAPI dependency: blocks debug endpoints in production without a valid token."""
+    if not is_debug_access_allowed(request):
+        raise HTTPException(status_code=404, detail="Not found.")
+
+
+@app.get("/debug/storage-status")
+async def debug_storage_status(_: None = Depends(_debug_access)):
+    """Safe read-only status of the storage/write-through configuration.
+
+    Returns only boolean flags and human-readable notes.
+    Never returns env var values, secrets, DB URLs, or user data.
+    Never opens a DB connection.
+    """
+    from services.storage_flags import (
+        is_curriculum_db_reads_enabled,
+        is_db_write_through_enabled,
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    wt_enabled = is_db_write_through_enabled()
+    curriculum_reads_enabled = is_curriculum_db_reads_enabled()
+    progress_reads_enabled = is_progress_db_reads_enabled()
+    todos_reads_enabled = is_todos_db_reads_enabled()
+    db_reads_enabled = any((
+        curriculum_reads_enabled,
+        progress_reads_enabled,
+        todos_reads_enabled,
+    ))
+    if db_reads_enabled:
+        storage_mode = "session_context_with_db_read_flags_enabled"
+    elif wt_enabled:
+        storage_mode = "session_context_with_db_write_through"
+    else:
+        storage_mode = "session_context_only"
+    notes = [
+        "SessionContext remains the runtime source of truth.",
+        "New learning tables are not read by runtime routes yet.",
+        "DB write-through is enabled for progress/todos mirrors." if wt_enabled
+        else "DB write-through is disabled.",
+    ]
+    if db_reads_enabled:
+        notes.append(
+            "DB read flags may be enabled, but runtime routes have not been migrated to DB-primary reads yet."
+        )
+    return {
+        "session_context_source_of_truth": True,
+        "db_write_through_enabled":        wt_enabled,
+        "db_reads_enabled":                db_reads_enabled,
+        "curriculum_db_reads_enabled":     curriculum_reads_enabled,
+        "progress_db_reads_enabled":       progress_reads_enabled,
+        "todos_db_reads_enabled":          todos_reads_enabled,
+        "storage_mode":                    storage_mode,
+        "notes":                           notes,
+    }
+
+
+@app.get("/debug/storage-health")
+async def debug_storage_health(
+    request: Request,
+    session_id: Optional[str] = None,
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Unified debug-only storage/mirror health summary.
+
+    Reports storage flags and safe SessionContext counts only. Does not open a
+    DB connection, call debug HTTP endpoints, or return private generated
+    content, submissions, notes, usage metadata, or full session data.
+    """
+    return _build_storage_health_payload(request, session_id, legacy_topic_id)
+
+
+@app.get("/debug/storage-health-view", response_class=HTMLResponse)
+async def debug_storage_health_view(
+    request: Request,
+    session_id: Optional[str] = None,
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Minimal internal view for the safe storage health summary."""
+    health = _build_storage_health_payload(request, session_id, legacy_topic_id)
+    return templates.TemplateResponse(
+        request=request,
+        name="storage_health.html",
+        context={
+            "health": health,
+            "session_id": session_id or "",
+            "legacy_topic_id": legacy_topic_id or "",
+            "test_mode": bool(TEST_MODE),
+        },
+    )
+
+
+@app.get("/admin/beta-metrics", response_class=HTMLResponse)
+async def admin_beta_metrics(
+    request: Request,
+    _: None = Depends(_debug_access),
+):
+    """Simple protected internal view for private beta aggregate metrics."""
+    from services.beta_metrics_service import build_beta_metrics_payload
+
+    db_available = False
+    db_metrics = None
+    try:
+        from repositories.beta_metrics_repository import collect_beta_metrics
+
+        with get_conn() as conn:
+            db_metrics = collect_beta_metrics(conn)
+        db_available = True
+    except Exception as exc:
+        logger.warning("beta metrics unavailable: %s", _safe_debug_error_message(exc))
+
+    metrics = build_beta_metrics_payload(
+        db_available=db_available,
+        db_metrics=db_metrics,
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="beta_metrics.html",
+        context={
+            "metrics": metrics,
+            "test_mode": bool(TEST_MODE),
+        },
+    )
+
+
+def _build_storage_health_payload(
+    request: Request,
+    session_id: Optional[str] = None,
+    legacy_topic_id: Optional[str] = None,
+) -> dict:
+    from services.storage_flags import (
+        is_curriculum_db_reads_enabled,
+        is_db_write_through_enabled,
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+
+    try:
+        wt_enabled = is_db_write_through_enabled()
+        curriculum_reads_enabled = is_curriculum_db_reads_enabled()
+        progress_reads_enabled = is_progress_db_reads_enabled()
+        todos_reads_enabled = is_todos_db_reads_enabled()
+        db_reads_enabled = any((
+            curriculum_reads_enabled,
+            progress_reads_enabled,
+            todos_reads_enabled,
+        ))
+
+        session = None
+        session_status = None
+        topic_status = None
+        notes = [
+            "SessionContext remains the runtime source of truth.",
+            "This endpoint reports flags and safe counts only; it does not read DB mirrors.",
+        ]
+
+        if session_id:
+            data = _get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+            session = data["session"]
+            session_status = _storage_health_session_status(session)
+            notes.append("SessionContext loaded read-only for safe count summary.")
+
+            if legacy_topic_id:
+                topic_status = _storage_health_topic_status(session, legacy_topic_id)
+                notes.append("Topic-level status is presence-only; no generated/user text is returned.")
+        else:
+            notes.append("No session_id provided; returning config-only health without DB access.")
+
+        overall_status = _storage_health_overall_status(
+            wt_enabled=wt_enabled,
+            curriculum_reads_enabled=curriculum_reads_enabled,
+            progress_reads_enabled=progress_reads_enabled,
+            todos_reads_enabled=todos_reads_enabled,
+        )
+
+        return {
+            "source_of_truth": {
+                "session_context": True,
+                "db_primary_reads": False,
+            },
+            "flags": {
+                "db_write_through_enabled": wt_enabled,
+                "curriculum_db_reads_enabled": curriculum_reads_enabled,
+                "progress_db_reads_enabled": progress_reads_enabled,
+                "todos_db_reads_enabled": todos_reads_enabled,
+                "db_reads_enabled": db_reads_enabled,
+            },
+            "mirrors": {
+                "curriculum": {
+                    "schema_available": True,
+                    "read_flag_enabled": curriculum_reads_enabled,
+                    "debug_checks_available": True,
+                },
+                "learner_state": {
+                    "schema_available": True,
+                    "write_through_available": True,
+                    "progress_read_flag_enabled": progress_reads_enabled,
+                    "todos_read_flag_enabled": todos_reads_enabled,
+                    "debug_checks_available": True,
+                    "session_comparison_available": True,
+                    **({"session_status": session_status} if session_status is not None else {}),
+                    **({"topic_status": topic_status} if topic_status is not None else {}),
+                },
+                "generated_learning": {
+                    "schema_available": True,
+                    "write_through_available": True,
+                    "debug_checks_available": True,
+                    "session_comparison_available": True,
+                    **({"topic_status": topic_status} if topic_status is not None else {}),
+                },
+                "usage_events": {
+                    "schema_available": True,
+                    "write_through_available": True,
+                    "debug_checks_available": True,
+                    "session_comparison_available": True,
+                    **(
+                        {"session_status": {
+                            "session_loaded": True,
+                            "usage_events_count": session_status["usage_events_count"],
+                        }}
+                        if session_status is not None else {}
+                    ),
+                },
+            },
+            "overall_status": overall_status,
+            "notes": notes,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return {
+            "source_of_truth": {
+                "session_context": True,
+                "db_primary_reads": False,
+            },
+            "flags": {
+                "db_write_through_enabled": False,
+                "curriculum_db_reads_enabled": False,
+                "progress_db_reads_enabled": False,
+                "todos_db_reads_enabled": False,
+                "db_reads_enabled": False,
+            },
+            "mirrors": {
+                "curriculum": {},
+                "learner_state": {},
+                "generated_learning": {},
+                "usage_events": {},
+            },
+            "overall_status": "error",
+            "notes": [
+                "Storage health summary failed.",
+                _safe_debug_error_message(exc),
+            ],
+        }
+
+
+def _storage_health_overall_status(
+    *,
+    wt_enabled: bool,
+    curriculum_reads_enabled: bool,
+    progress_reads_enabled: bool,
+    todos_reads_enabled: bool,
+) -> str:
+    if not any((wt_enabled, curriculum_reads_enabled, progress_reads_enabled, todos_reads_enabled)):
+        return "not_configured"
+    if wt_enabled and all((curriculum_reads_enabled, progress_reads_enabled, todos_reads_enabled)):
+        return "healthy"
+    return "partial"
+
+
+def _storage_health_session_status(session: SessionContext) -> dict:
+    topic_progress = getattr(session, "topic_progress", {}) or {}
+    return {
+        "session_loaded": True,
+        "usage_events_count": len(getattr(session, "usage_events", []) or []),
+        "todos_count": len(getattr(session, "todos", []) or []),
+        "completed_topics_count": _storage_health_completed_topics_count(session, topic_progress),
+    }
+
+
+def _storage_health_completed_topics_count(session: SessionContext, topic_progress: dict) -> int:
+    completed = 0
+    for topic_id in topic_progress:
+        try:
+            if session.topic_completion_percent(topic_id) == 100:
+                completed += 1
+        except Exception:
+            steps = topic_progress.get(topic_id) or {}
+            if steps and all(status == "done" for status in steps.values()):
+                completed += 1
+    return completed
+
+
+def _storage_health_topic_status(session: SessionContext, legacy_topic_id: str) -> dict:
+    practice = (getattr(session, "generated_topic_practice", {}) or {}).get(legacy_topic_id) or {}
+    return {
+        "topic_progress_present": legacy_topic_id in (getattr(session, "topic_progress", {}) or {}),
+        "generated_content_present": legacy_topic_id in (getattr(session, "generated_topic_content", {}) or {}),
+        "practice_present": any(
+            practice.get(kind) is not None
+            for kind in ("quiz", "portfolio_task", "interview_practice")
+        ),
+        "quiz_submission_present": legacy_topic_id in (getattr(session, "quiz_submissions", {}) or {}),
+        "portfolio_submission_present": legacy_topic_id in (getattr(session, "portfolio_submissions", {}) or {}),
+        "interview_submission_present": legacy_topic_id in (getattr(session, "interview_submissions", {}) or {}),
+        "notes_present": legacy_topic_id in (getattr(session, "topic_notes", {}) or {}),
+    }
+
+
+@app.get("/debug/curriculum-db-check")
+async def debug_curriculum_db_check(
+    track_key: str = "aipm",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: attempt curriculum DB reads and report readiness.
+
+    Returns only boolean flags, normalised row dicts, and human-readable notes.
+    Never returns env var values, secrets, DB URLs, stack traces, or user data.
+    Safe to call when AI2_CURRICULUM_DB_READS_ENABLED is off — no DB connection
+    is opened in that case.
+    """
+    from services.storage_flags import is_curriculum_db_reads_enabled
+    from services.curriculum_read_service import (
+        get_track_by_key_from_db,
+        get_topic_by_legacy_id_from_db,
+    )
+    from core.logging import safe_error_metadata
+
+    reads_enabled = is_curriculum_db_reads_enabled()
+    topic_id = legacy_topic_id or ""
+
+    if not reads_enabled:
+        return {
+            "curriculum_db_reads_enabled": False,
+            "attempted_db_connection": False,
+            "track_key": track_key,
+            "legacy_topic_id": topic_id,
+            "track_found": False,
+            "topic_found": False,
+            "track": None,
+            "topic": None,
+            "source": "disabled",
+            "error": None,
+            "notes": [
+                "Curriculum DB reads are disabled.",
+                "Set AI2_CURRICULUM_DB_READS_ENABLED=1 to enable.",
+            ],
+        }
+
+    track_row = None
+    topic_row = None
+    error_msg = None
+    source = "db"
+
+    try:
+        with get_conn() as conn:
+            track_row = get_track_by_key_from_db(conn, track_key)
+            if topic_id:
+                topic_row = get_topic_by_legacy_id_from_db(conn, topic_id)
+    except Exception as exc:
+        meta = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        source = "error"
+        track_row = None
+        topic_row = None
+
+    notes: list[str] = []
+    if source == "db":
+        notes.append("Curriculum DB reads are enabled.")
+        if not topic_id:
+            notes.append("No legacy_topic_id provided; topic lookup skipped.")
+        elif topic_row is None:
+            notes.append(f"No topic found for legacy_topic_id={topic_id!r}.")
+        if track_row is None:
+            notes.append(f"No track found for track_key={track_key!r}.")
+    else:
+        notes.append("DB read failed. Check DB connectivity and schema.")
+
+    return {
+        "curriculum_db_reads_enabled": True,
+        "attempted_db_connection": True,
+        "track_key": track_key,
+        "legacy_topic_id": topic_id,
+        "track_found": track_row is not None,
+        "topic_found": topic_row is not None,
+        "track": track_row,
+        "topic": topic_row,
+        "source": source,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@app.get("/debug/curriculum-fallback-check")
+async def debug_curriculum_fallback_check(
+    track_key: str = "aipm",
+    legacy_topic_id: Optional[str] = None,
+    include_topics: bool = False,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: inspect curriculum fallback reader behavior.
+
+    Shows whether track, topic, and topics-list data come from DB or the
+    existing syllabus helpers.  Safe to call when
+    AI2_CURRICULUM_DB_READS_ENABLED is off — no DB connection is opened.
+    Never returns secrets, env var values, DB URLs, stack traces, or user
+    session data.
+    """
+    from services.storage_flags import is_curriculum_db_reads_enabled
+    from services.curriculum_fallback_service import (
+        get_track_with_fallback,
+        get_topic_with_fallback,
+        get_topics_for_track_with_fallback,
+    )
+    from core.logging import safe_error_metadata
+
+    reads_enabled = is_curriculum_db_reads_enabled()
+    topic_id      = legacy_topic_id or ""
+
+    track_result:  dict | None = None
+    topic_result:  dict | None = None
+    topics_result: dict | None = None
+    error_msg:     str  | None = None
+    notes: list[str] = []
+
+    if not reads_enabled:
+        track_result = get_track_with_fallback(conn=None, track_key=track_key)
+        if topic_id:
+            topic_result = get_topic_with_fallback(conn=None, legacy_topic_id=topic_id)
+        if include_topics:
+            topics_result = get_topics_for_track_with_fallback(conn=None, track_key=track_key)
+        notes.append(
+            "AI2_CURRICULUM_DB_READS_ENABLED is off; all results from fallback."
+        )
+        return {
+            "track_key":                   track_key,
+            "legacy_topic_id":             topic_id,
+            "include_topics":              include_topics,
+            "curriculum_db_reads_enabled": False,
+            "attempted_db_connection":     False,
+            "track_result":                track_result,
+            "topic_result":                topic_result,
+            "topics_result":               topics_result,
+            "source_summary": {
+                "track_source":  track_result.get("source") if track_result else None,
+                "topic_source":  topic_result.get("source") if topic_result else None,
+                "topics_source": topics_result.get("source") if topics_result else None,
+            },
+            "error": None,
+            "notes": notes,
+        }
+
+    # Flag on — open one DB connection and run all reads through the fallback service.
+    try:
+        with get_conn() as conn:
+            track_result = get_track_with_fallback(conn=conn, track_key=track_key)
+            if topic_id:
+                topic_result = get_topic_with_fallback(conn=conn, legacy_topic_id=topic_id)
+            if include_topics:
+                topics_result = get_topics_for_track_with_fallback(conn=conn, track_key=track_key)
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        notes.append("DB connection failed; results unavailable.")
+
+    return {
+        "track_key":                   track_key,
+        "legacy_topic_id":             topic_id,
+        "include_topics":              include_topics,
+        "curriculum_db_reads_enabled": True,
+        "attempted_db_connection":     True,
+        "track_result":                track_result,
+        "topic_result":                topic_result,
+        "topics_result":               topics_result,
+        "source_summary": {
+            "track_source":  track_result.get("source") if track_result else None,
+            "topic_source":  topic_result.get("source") if topic_result else None,
+            "topics_source": topics_result.get("source") if topics_result else None,
+        },
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@app.get("/debug/learner-state-db-check")
+async def debug_learner_state_db_check(
+    session_id: str = "",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: attempt learner-state DB reads and report readiness.
+
+    Reads from topic_progress and todos mirrors via flag-gated service functions.
+    Never returns raw env values, secrets, DB URLs, stack traces, or private session data.
+    Safe to call when both read flags are off — no DB connection is opened in that case.
+    """
+    from services.storage_flags import (
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    from services.learner_state_read_service import (
+        get_topic_progress_from_db,
+        list_todos_from_db,
+    )
+    from core.logging import safe_error_metadata
+
+    progress_enabled = is_progress_db_reads_enabled()
+    todos_enabled    = is_todos_db_reads_enabled()
+    topic_id         = legacy_topic_id or ""
+
+    if not progress_enabled and not todos_enabled:
+        return {
+            "progress_db_reads_enabled": False,
+            "todos_db_reads_enabled":    False,
+            "attempted_db_connection":   False,
+            "session_id":                session_id,
+            "legacy_topic_id":           topic_id,
+            "progress_found":            False,
+            "todos_found":               False,
+            "topic_progress":            None,
+            "todos":                     None,
+            "source":                    "disabled",
+            "error":                     None,
+            "notes": [
+                "Learner-state DB reads are disabled.",
+                "Set AI2_PROGRESS_DB_READS_ENABLED=1 or AI2_TODOS_DB_READS_ENABLED=1 to enable.",
+            ],
+        }
+
+    topic_progress = None
+    todos          = None
+    error_msg      = None
+    source         = "db"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            if progress_enabled:
+                if topic_id:
+                    topic_progress = get_topic_progress_from_db(
+                        conn,
+                        session_id=session_id,
+                        legacy_topic_id=topic_id,
+                    )
+                else:
+                    notes.append(
+                        "legacy_topic_id is required for topic progress DB check; "
+                        "progress lookup skipped."
+                    )
+            if todos_enabled:
+                todos = list_todos_from_db(conn, session_id=session_id)
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        source         = "error"
+        topic_progress = None
+        todos          = None
+
+    if source == "db":
+        active = []
+        if progress_enabled:
+            active.append("progress")
+        if todos_enabled:
+            active.append("todos")
+        notes.insert(0, f"Learner-state DB reads enabled for: {', '.join(active)}.")
+        if progress_enabled and topic_id and topic_progress is None:
+            notes.append(f"No progress found for legacy_topic_id={topic_id!r}.")
+        if todos_enabled and todos is not None and len(todos) == 0:
+            notes.append("No todos found for this session.")
+    else:
+        notes.append("DB read failed. Check DB connectivity and schema.")
+
+    return {
+        "progress_db_reads_enabled": progress_enabled,
+        "todos_db_reads_enabled":    todos_enabled,
+        "attempted_db_connection":   True,
+        "session_id":                session_id,
+        "legacy_topic_id":           topic_id,
+        "progress_found":            topic_progress is not None,
+        "todos_found":               bool(todos),
+        "topic_progress":            topic_progress,
+        "todos":                     todos,
+        "source":                    source,
+        "error":                     error_msg,
+        "notes":                     notes,
+    }
+
+
+def _empty_generated_learning_state_found() -> dict:
+    return {
+        "generated_topic_content": False,
+        "generated_topic_practice": {
+            "quiz": False,
+            "portfolio_task": False,
+            "interview_practice": False,
+        },
+        "quiz_submission": False,
+        "portfolio_submission": False,
+        "interview_submission": False,
+        "topic_notes": False,
+    }
+
+
+def _generated_learning_state_found(state: dict | None) -> dict:
+    found = _empty_generated_learning_state_found()
+    if not state:
+        return found
+
+    found["generated_topic_content"] = state.get("generated_topic_content") is not None
+    practice = state.get("generated_topic_practice") or {}
+    found["generated_topic_practice"] = {
+        "quiz": practice.get("quiz") is not None,
+        "portfolio_task": practice.get("portfolio_task") is not None,
+        "interview_practice": practice.get("interview_practice") is not None,
+    }
+    found["quiz_submission"] = state.get("quiz_submission") is not None
+    found["portfolio_submission"] = state.get("portfolio_submission") is not None
+    found["interview_submission"] = state.get("interview_submission") is not None
+    found["topic_notes"] = state.get("topic_notes") is not None
+    return found
+
+
+def _safe_debug_error_message(exc: Exception) -> str:
+    """Return a short debug-safe exception summary without secrets or URLs."""
+    import re
+
+    from core.logging import safe_error_metadata
+
+    meta = safe_error_metadata(exc)
+    message = str(meta["error_message"])
+    for env_name in (
+        "SUPABASE_DATABASE_URL",
+        "DATABASE_URL",
+        "ANTHROPIC_API_KEY",
+    ):
+        raw_value = os.getenv(env_name, "")
+        if raw_value:
+            message = message.replace(raw_value, "[redacted]")
+    message = re.sub(
+        r"\b(SUPABASE_DATABASE_URL|DATABASE_URL|ANTHROPIC_API_KEY|AI2_TEST_MODE)\s*=\s*\S+",
+        "[redacted]",
+        message,
+    )
+    message = re.sub(r"postgres(?:ql)?://\S+", "[redacted-db-url]", message, flags=re.IGNORECASE)
+    message = re.sub(r"\b\w+://\S+", "[redacted-url]", message)
+    message = re.sub(r"\btraceback\b", "[redacted]", message, flags=re.IGNORECASE)
+    for token in (
+        "SUPABASE_DATABASE_URL",
+        "DATABASE_URL",
+        "ANTHROPIC_API_KEY",
+        "AI2_TEST_MODE",
+    ):
+        message = message.replace(token, "[redacted]")
+    return f"{meta['error_type']}: {message[:300]}"
+
+
+def _safe_debug_limit(value, *, default: int = 50, minimum: int = 1, maximum: int = 200) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(parsed, maximum))
+
+
+@app.get("/debug/generated-learning-db-check")
+async def debug_generated_learning_db_check(
+    session_id: str,
+    legacy_topic_id: str,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: inspect generated-learning DB mirror state.
+
+    Opens one DB connection only when this endpoint is called. Returns only
+    generated-learning mirror state from generated_learning_read_service.
+    Never returns env var values, DB URLs, stack traces, or full session data.
+    """
+    from services.generated_learning_read_service import get_generated_learning_state_from_db
+
+    state = None
+    error_msg = None
+    source = "db"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            state = get_generated_learning_state_from_db(
+                conn,
+                session_id=session_id,
+                legacy_topic_id=legacy_topic_id,
+            )
+    except Exception as exc:
+        source = "error"
+        state = None
+        error_msg = _safe_debug_error_message(exc)
+        notes.append("Generated-learning DB mirror read failed. Check DB connectivity and schema.")
+
+    if source == "db":
+        notes.append("Generated-learning DB mirror read completed.")
+        if not any(_flatten_generated_learning_found(_generated_learning_state_found(state))):
+            notes.append("No generated-learning mirror state found for this session/topic.")
+
+    return {
+        "session_id": session_id,
+        "legacy_topic_id": legacy_topic_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "state_found": _generated_learning_state_found(state),
+        "state": state,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@app.get("/debug/usage-events-db-check")
+async def debug_usage_events_db_check(
+    session_id: str,
+    limit: str = "50",
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: inspect usage_events DB mirror state for a session.
+
+    Opens one DB connection only when this endpoint is called. Returns only
+    usage_events mirror rows and aggregate counts from the usage-events
+    repository. Never returns env var values, DB URLs, stack traces, or full
+    session data.
+    """
+    from repositories.usage_events_repository import (
+        list_usage_events_for_session,
+        usage_event_summary_for_session,
+    )
+
+    safe_limit = _safe_debug_limit(limit)
+    events = []
+    summary = None
+    error_msg = None
+    source = "db"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            events = list_usage_events_for_session(
+                conn,
+                session_id=session_id,
+                limit=safe_limit,
+            )
+            summary = usage_event_summary_for_session(
+                conn,
+                session_id=session_id,
+            )
+    except Exception as exc:
+        source = "error"
+        events = []
+        summary = None
+        error_msg = _safe_debug_error_message(exc)
+        notes.append("Usage-events DB mirror read failed. Check DB connectivity and schema.")
+
+    if source == "db":
+        notes.append("Usage-events DB mirror read completed.")
+        if not events:
+            notes.append("No usage_events mirror rows found for this session.")
+
+    return {
+        "session_id": session_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "events_count": len(events),
+        "summary": summary,
+        "events": events,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@app.get("/debug/usage-events-mismatch-check")
+async def debug_usage_events_mismatch_check(
+    request: Request,
+    session_id: str,
+    limit: str = "200",
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: compare usage_events DB mirror state against SessionContext.
+
+    Loads SessionContext read-only, then reads usage_events DB mirror state
+    and returns only the sanitized comparison output. Never calls save_session.
+    """
+    from repositories.usage_events_repository import (
+        list_usage_events_for_session,
+        usage_event_summary_for_session,
+    )
+    from services.usage_events_mismatch_service import compare_usage_events_state
+
+    data = _get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+    safe_limit = _safe_debug_limit(limit, default=200, minimum=1, maximum=500)
+
+    comparison = None
+    error_msg = None
+    source = "db_compare"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            db_events = list_usage_events_for_session(
+                conn,
+                session_id=session_id,
+                limit=safe_limit,
+            )
+            db_summary = usage_event_summary_for_session(
+                conn,
+                session_id=session_id,
+            )
+            comparison = compare_usage_events_state(
+                session=session,
+                db_summary=db_summary,
+                db_events=db_events,
+            )
+    except Exception as exc:
+        source = "error"
+        comparison = None
+        error_msg = _safe_debug_error_message(exc)
+        notes.append("Usage-events DB mirror comparison failed. Check DB connectivity and schema.")
+
+    if source == "db_compare":
+        notes.append("Usage-events DB mirror comparison completed.")
+
+    return {
+        "session_id": session_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "matches": comparison.get("matches") if comparison is not None else None,
+        "comparison": comparison,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@app.get("/debug/generated-learning-mismatch-check")
+async def debug_generated_learning_mismatch_check(
+    request: Request,
+    session_id: str,
+    legacy_topic_id: str,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: compare generated-learning DB mirror state against SessionContext.
+
+    Loads SessionContext read-only, then reads generated-learning DB mirror state
+    and returns only the sanitized comparison output. Never calls save_session.
+    """
+    from services.generated_learning_read_service import get_generated_learning_state_from_db
+    from services.generated_learning_mismatch_service import compare_generated_learning_state
+
+    data = _get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+
+    comparison = None
+    error_msg = None
+    source = "db_compare"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            db_state = get_generated_learning_state_from_db(
+                conn,
+                session_id=session_id,
+                legacy_topic_id=legacy_topic_id,
+            )
+            comparison = compare_generated_learning_state(
+                session=session,
+                legacy_topic_id=legacy_topic_id,
+                db_state=db_state,
+            )
+    except Exception as exc:
+        source = "error"
+        comparison = None
+        error_msg = _safe_debug_error_message(exc)
+        notes.append("Generated-learning DB mirror comparison failed. Check DB connectivity and schema.")
+
+    if source == "db_compare":
+        notes.append("Generated-learning DB mirror comparison completed.")
+
+    return {
+        "session_id": session_id,
+        "legacy_topic_id": legacy_topic_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "matches": comparison.get("matches") if comparison is not None else None,
+        "comparison": comparison,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+def _flatten_generated_learning_found(found: dict) -> list[bool]:
+    practice = found.get("generated_topic_practice") or {}
+    return [
+        bool(found.get("generated_topic_content")),
+        bool(practice.get("quiz")),
+        bool(practice.get("portfolio_task")),
+        bool(practice.get("interview_practice")),
+        bool(found.get("quiz_submission")),
+        bool(found.get("portfolio_submission")),
+        bool(found.get("interview_submission")),
+        bool(found.get("topic_notes")),
+    ]
+
+
+@app.get("/debug/learner-state-mismatch-check")
+async def debug_learner_state_mismatch_check(
+    request: Request,
+    session_id: str = "",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: compare DB mirror state against a loaded SessionContext.
+
+    Loads the session via the standard helper (read-only — never calls save_session).
+    Reads DB mirrors only when the relevant feature flags are on.
+    Returns only mismatch comparison output; never returns full session_data, generated
+    content, quiz answers, portfolio submissions, or raw env values.
+    """
+    from services.storage_flags import (
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    from services.learner_state_read_service import (
+        get_topic_progress_from_db,
+        list_todos_from_db,
+    )
+    from services.state_mismatch_service import compare_learner_state
+    from core.logging import safe_error_metadata
+
+    # Step A — load session (read-only; HTTPException propagates for 404/403)
+    data    = _get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+
+    progress_enabled = is_progress_db_reads_enabled()
+    todos_enabled    = is_todos_db_reads_enabled()
+    topic_id         = legacy_topic_id or ""
+
+    # Step B — both flags off: skip DB entirely
+    if not progress_enabled and not todos_enabled:
+        return {
+            "session_id":                session_id,
+            "legacy_topic_id":           topic_id,
+            "progress_db_reads_enabled": False,
+            "todos_db_reads_enabled":    False,
+            "attempted_db_connection":   False,
+            "source":                    "session_only",
+            "matches":                   None,
+            "comparison":                None,
+            "error":                     None,
+            "notes": [
+                "DB mirror comparison requires AI2_PROGRESS_DB_READS_ENABLED=1 "
+                "or AI2_TODOS_DB_READS_ENABLED=1.",
+            ],
+        }
+
+    # Step C — at least one flag on: read DB and compare
+    db_progress  = None
+    db_todos     = None
+    error_msg    = None
+    source       = "db_compare"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            if progress_enabled:
+                if topic_id:
+                    db_progress = get_topic_progress_from_db(
+                        conn,
+                        session_id=session_id,
+                        legacy_topic_id=topic_id,
+                    )
+                else:
+                    notes.append(
+                        "legacy_topic_id is required for progress comparison; "
+                        "progress DB read skipped."
+                    )
+            if todos_enabled:
+                db_todos = list_todos_from_db(conn, session_id=session_id)
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        source    = "error"
+
+    # Step C (cont.) — run comparison on success
+    comparison = None
+    matches    = None
+    if source == "db_compare":
+        comparison = compare_learner_state(
+            session=session,
+            legacy_topic_id=topic_id if (progress_enabled and topic_id) else None,
+            db_progress=db_progress,
+            db_todos=db_todos,
+        )
+        matches = comparison["matches"]
+
+    return {
+        "session_id":                session_id,
+        "legacy_topic_id":           topic_id,
+        "progress_db_reads_enabled": progress_enabled,
+        "todos_db_reads_enabled":    todos_enabled,
+        "attempted_db_connection":   True,
+        "source":                    source,
+        "matches":                   matches,
+        "comparison":                comparison,
+        "error":                     error_msg,
+        "notes":                     notes,
+    }
+
+
+@app.get("/debug/learner-state-fallback-check")
+async def debug_learner_state_fallback_check(
+    request: Request,
+    session_id: str = "",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: inspect learner-state fallback reader behavior.
+
+    Shows whether topic progress and todos come from DB or SessionContext
+    fallback.  Loads session read-only (never calls save_session).
+    Safe to call when both DB read flags are off — no DB connection is opened.
+    Never returns secrets, env var values, DB URLs, stack traces, or private
+    session data.
+    """
+    from services.storage_flags import (
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    from services.learner_state_fallback_service import get_learner_state_with_fallback
+    from core.logging import safe_error_metadata
+
+    # Step A — load session (read-only; HTTPException propagates for 404/403)
+    data    = _get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+
+    progress_enabled = is_progress_db_reads_enabled()
+    todos_enabled    = is_todos_db_reads_enabled()
+    topic_id         = legacy_topic_id or ""
+
+    result:    dict | None = None
+    error_msg: str  | None = None
+    notes: list[str] = []
+
+    # Step B — both flags off: skip DB entirely, use session fallback
+    if not progress_enabled and not todos_enabled:
+        result = get_learner_state_with_fallback(
+            conn=None,
+            session=session,
+            session_id=session_id,
+            legacy_topic_id=topic_id or None,
+        )
+        notes.append(
+            "Both DB read flags are off; SessionContext fallback was used."
+        )
+        return {
+            "session_id":                session_id,
+            "legacy_topic_id":           topic_id,
+            "progress_db_reads_enabled": False,
+            "todos_db_reads_enabled":    False,
+            "attempted_db_connection":   False,
+            "result":                    result,
+            "source_summary":            result["source_summary"],
+            "error":                     None,
+            "notes":                     notes + result.get("notes", []),
+        }
+
+    # Step C — at least one flag on: open one DB connection
+    try:
+        with get_conn() as conn:
+            result = get_learner_state_with_fallback(
+                conn=conn,
+                session=session,
+                session_id=session_id,
+                legacy_topic_id=topic_id or None,
+            )
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        notes.append("DB connection failed.")
+
+    source_summary = (
+        result["source_summary"] if result else
+        {"topic_progress_source": None, "todos_source": None}
+    )
+
+    return {
+        "session_id":                session_id,
+        "legacy_topic_id":           topic_id,
+        "progress_db_reads_enabled": progress_enabled,
+        "todos_db_reads_enabled":    todos_enabled,
+        "attempted_db_connection":   True,
+        "result":                    result,
+        "source_summary":            source_summary,
+        "error":                     error_msg,
+        "notes":                     notes + (result.get("notes", []) if result else []),
+    }
+
+
+@app.get("/debug/modular-curriculum")
+async def debug_modular_curriculum(
+    course_key: str = "aipm-foundations",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(_debug_access),
+):
+    """Debug-only: inspect the modular curriculum structure.
+
+    Tries modular DB reads via the fallback service; falls back to the static
+    WEEKS / ROLE_TRACKS curriculum when the DB is unavailable or not yet seeded.
+
+    Never returns secrets, DB URLs, stack traces, learner submissions, notes,
+    feedback, usage metadata, or session data.  Uses at most one DB connection.
+    Does not modify runtime curriculum reads.
+    """
+    from services.modular_curriculum_fallback_service import (
+        get_course_structure_with_fallback,
+        get_topic_structure_by_legacy_id_with_fallback,
+    )
+
+    notes: list[str] = [
+        "Modular curriculum debug endpoint.",
+        "Runtime reads still use the static curriculum path.",
+        "This endpoint is for inspection only and does not modify any data.",
+    ]
+
+    conn_error: str | None = None
+    result: dict = {}
+
+    try:
+        with get_conn() as conn:
+            if legacy_topic_id:
+                result = get_topic_structure_by_legacy_id_with_fallback(
+                    conn,
+                    legacy_topic_id=legacy_topic_id,
+                )
+            else:
+                result = get_course_structure_with_fallback(
+                    conn,
+                    course_key=course_key,
+                )
+    except Exception as exc:
+        conn_error = _safe_debug_error_message(exc)
+        notes.append("DB connection failed; using static curriculum fallback.")
+        if legacy_topic_id:
+            result = get_topic_structure_by_legacy_id_with_fallback(
+                None,
+                legacy_topic_id=legacy_topic_id,
+            )
+        else:
+            result = get_course_structure_with_fallback(
+                None,
+                course_key=course_key,
+            )
+
+    if result.get("source") != "db":
+        notes.append("Data served from static curriculum (DB not seeded or unavailable).")
+
+    if legacy_topic_id:
+        return {
+            "mode":            "topic",
+            "legacy_topic_id": legacy_topic_id,
+            "source":          result.get("source", "fallback"),
+            "topic":           result.get("topic"),
+            "error":           conn_error or result.get("error"),
+            "notes":           notes,
+        }
+    return {
+        "mode":             "course",
+        "course_key":       course_key,
+        "source":           result.get("source", "fallback"),
+        "course_structure": result.get("course_structure"),
+        "error":            conn_error or result.get("error"),
+        "notes":            notes,
+    }
+
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if request.state.user_id:
@@ -701,7 +1946,7 @@ async def login_submit(request: Request):
 
     token = create_auth_token(user_id)
     resp  = RedirectResponse(url="/dashboard", status_code=302)
-    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600)
+    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600, secure=get_cookie_secure())
     return resp
 
 
@@ -762,7 +2007,7 @@ async def signup_submit(request: Request):
 
     token = create_auth_token(user_id)
     resp  = RedirectResponse(url="/dashboard", status_code=302)
-    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600)
+    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600, secure=get_cookie_secure())
     return resp
 
 
@@ -771,6 +2016,24 @@ async def logout():
     resp = RedirectResponse(url="/login", status_code=302)
     resp.delete_cookie(AUTH_COOKIE)
     return resp
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={"test_mode": bool(TEST_MODE)},
+    )
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="terms.html",
+        context={"test_mode": bool(TEST_MODE)},
+    )
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -794,6 +2057,57 @@ async def dashboard(request: Request):
     recent_sessions = _get_user_sessions(user_id, limit=5)
     profile         = _load_profile_db(user_id)
 
+    # Build learning summary from the most recent session
+    recent_session    = None
+    recent_session_id = None
+    if recent_sessions:
+        recent_session_id = recent_sessions[0]["session_id"]
+        try:
+            recent_session = _get_session_data(recent_session_id, user_id)["session"]
+        except Exception:
+            recent_session = None
+    elif TEST_MODE and _sessions:
+        recent_session_id = list(_sessions.keys())[-1]
+        recent_session    = _sessions[recent_session_id]["session"]
+        recent_sessions   = [{
+            "session_id":   recent_session_id,
+            "track":        recent_session.track.value,
+            "current_week": recent_session.current_week,
+            "updated_at":   "",
+        }]
+
+    learning_summary = build_dashboard_learning_summary(recent_session) if recent_session else None
+    enrollment_user_id = ""
+    if recent_session is not None:
+        enrollment_user_id = recent_session.user_id or ("" if TEST_MODE else user_id)
+    enrollment_summary, modular_progress_summary = _dashboard_db_summaries(
+        user_id=enrollment_user_id,
+        session_id=recent_session_id,
+        session=recent_session,
+    )
+
+    if modular_progress_summary.get("available"):
+        _cp = {
+            **modular_progress_summary,
+            "unassigned_topics": modular_progress_summary.get("topics", []),
+        }
+        _raw = build_position_summary(_cp)
+        position_summary = {
+            "available": True,
+            "current_topic_key": _raw["current"].get("topic_key"),
+            "current_module_key": _raw["current"].get("module_key"),
+            "next_topic_key": _raw["next"].get("topic_key") if _raw.get("has_next") else None,
+            "progress_percent": _raw.get("course_progress_percent", 0),
+            "source": "modular",
+        }
+    else:
+        _fb = build_legacy_position_fallback(recent_session)
+        position_summary = {
+            "available": False,
+            "current_module_label": _fb.get("current_module_label"),
+            "source": _fb.get("source", "disabled"),
+        }
+
     tracks = [
         {
             "value":   str(t.value),
@@ -814,13 +2128,241 @@ async def dashboard(request: Request):
         request=request,
         name="dashboard.html",
         context={
-            "display_name":    display_name,
-            "recent_sessions": recent_sessions,
-            "tracks":          tracks,
-            "stats":           stats,
-            "test_mode":       bool(TEST_MODE),
+            "display_name":      display_name,
+            "recent_sessions":   recent_sessions,
+            "tracks":            tracks,
+            "stats":             stats,
+            "learning_summary":  learning_summary,
+            "enrollment_summary": enrollment_summary,
+            "modular_progress_summary": modular_progress_summary,
+            "position_summary":  position_summary,
+            "recent_session_id": recent_session_id,
+            "test_mode":         bool(TEST_MODE),
         },
     )
+
+
+def _onboarding_template_context(
+    *,
+    session_id: str,
+    onboarding: dict | None = None,
+    error: str = "",
+) -> dict:
+    return {
+        "session_id": session_id,
+        "onboarding": onboarding or {},
+        "error": error,
+        "goals": [
+            ("aipm", "AI Product Manager"),
+            ("ai_builder", "AI Builder"),
+            ("interview_prep", "Interview Prep"),
+        ],
+        "levels": [
+            ("beginner", "Beginner"),
+            ("some_experience", "Some experience"),
+            ("building_projects", "Building projects"),
+            ("job_ready", "Job ready"),
+        ],
+        "weekly_times": [
+            ("two_hours", "2 hours available"),
+            ("five_hours", "5 hours available"),
+            ("ten_hours", "10 hours available"),
+        ],
+        "test_mode": bool(TEST_MODE),
+    }
+
+
+def _dashboard_enrollment_summary(
+    *,
+    user_id: str | None,
+    session_id: str | None,
+    session: SessionContext | None,
+    conn=None,
+) -> dict:
+    disabled = _disabled_dashboard_enrollment_summary(session)
+    if not user_id or not session_id or session is None:
+        return disabled
+
+    track_key = session.track.value if getattr(session, "track", None) else None
+    course_key = normalize_course_key(track_key)
+    owns_conn = conn is None
+    try:
+        if conn is None:
+            conn = _open_db_connection()
+        result = get_active_course_enrollment_with_fallback(
+            conn,
+            user_id=user_id,
+            session_id=session_id,
+            track_key=track_key,
+        )
+        summary = summarize_enrollment_progress(enrollment=result.get("enrollment"))
+        return {
+            "source": result.get("source") or "fallback",
+            "course_key": summary.get("course_key") or course_key,
+            "status": summary.get("status") or "active",
+            "progress_percent": int(summary.get("progress_percent") or 0),
+            "current_module_key": summary.get("current_module_key"),
+            "current_topic_key": summary.get("current_topic_key"),
+            "current_legacy_topic_id": summary.get("current_legacy_topic_id"),
+            "error": None,
+        }
+    except Exception:
+        return {
+            **disabled,
+            "source": "error_fallback",
+        }
+    finally:
+        if owns_conn and conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def _disabled_dashboard_enrollment_summary(session: SessionContext | None) -> dict:
+    track_key = session.track.value if session and getattr(session, "track", None) else None
+    course_key = normalize_course_key(track_key)
+    return {
+        "source": "disabled",
+        "course_key": course_key,
+        "status": "active",
+        "progress_percent": 0,
+        "current_module_key": None,
+        "current_topic_key": None,
+        "current_legacy_topic_id": None,
+        "error": None,
+    }
+
+
+def _disabled_dashboard_modular_progress_summary() -> dict:
+    return {
+        "source": "disabled",
+        "available": False,
+        "progress_percent": 0,
+        "modules": [],
+        "topics": [],
+        "error": None,
+    }
+
+
+def _dashboard_db_summaries(
+    *,
+    user_id: str | None,
+    session_id: str | None,
+    session: SessionContext | None,
+) -> tuple[dict, dict]:
+    enrollment_summary = _disabled_dashboard_enrollment_summary(session)
+    modular_summary = _disabled_dashboard_modular_progress_summary()
+    if not user_id or not session_id or session is None:
+        return enrollment_summary, modular_summary
+
+    conn = None
+    try:
+        conn = _open_db_connection()
+        enrollment_summary = _dashboard_enrollment_summary(
+            user_id=user_id,
+            session_id=session_id,
+            session=session,
+            conn=conn,
+        )
+        track_key = session.track.value if getattr(session, "track", None) else None
+        modular_summary = build_dashboard_modular_progress_summary(
+            conn,
+            user_id=user_id,
+            session_id=session_id,
+            track_key=track_key,
+        )
+    except Exception:
+        modular_summary = {
+            **_disabled_dashboard_modular_progress_summary(),
+            "source": "error_fallback",
+        }
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    return enrollment_summary, modular_summary
+
+
+def _ensure_onboarding_course_enrollment(
+    *,
+    session: SessionContext,
+    session_id: str,
+    track_key: str | None,
+) -> None:
+    """Best-effort DB enrollment after onboarding; never blocks onboarding."""
+    user_id = session.user_id or ""
+    if not user_id or not session_id:
+        return
+
+    try:
+        with get_conn() as conn:
+            result = ensure_course_enrollment(
+                conn,
+                user_id=user_id,
+                session_id=session_id,
+                track_key=track_key,
+                source="onboarding",
+            )
+            if result.get("source") == "error" or result.get("error"):
+                raise RuntimeError("course enrollment failed")
+    except Exception:
+        logger.warning("onboarding course enrollment failed; continuing without DB enrollment")
+
+
+@app.get("/onboarding/{session_id}", response_class=HTMLResponse)
+async def onboarding_page(request: Request, session_id: str):
+    data = _get_session_data(session_id, request.state.user_id or "")
+    session: SessionContext = data["session"]
+    return templates.TemplateResponse(
+        request=request,
+        name="onboarding.html",
+        context=_onboarding_template_context(
+            session_id=session_id,
+            onboarding=session.get_onboarding_profile(),
+        ),
+    )
+
+
+@app.post("/onboarding/save")
+async def onboarding_save(request: Request):
+    form = await request.form()
+    session_id = str(form.get("session_id", "")).strip()
+    goal = str(form.get("goal", "")).strip()
+    level = str(form.get("level", "")).strip()
+    weekly_time = str(form.get("weekly_time", "")).strip()
+
+    data = _get_session_data(session_id, request.state.user_id or "")
+    session: SessionContext = data["session"]
+
+    try:
+        onboarding_profile = session.save_onboarding_profile(goal, level, weekly_time)
+    except ValueError as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="onboarding.html",
+            context=_onboarding_template_context(
+                session_id=session_id,
+                onboarding={
+                    "goal": goal,
+                    "level": level,
+                    "weekly_time": weekly_time,
+                },
+                error=str(exc),
+            ),
+            status_code=422,
+        )
+
+    _save_session(session_id, session)
+    _ensure_onboarding_course_enrollment(
+        session=session,
+        session_id=session_id,
+        track_key=onboarding_profile.get("recommended_track"),
+    )
+    return RedirectResponse(url=f"/topics/{session_id}", status_code=302)
 
 
 @app.get("/history", response_class=HTMLResponse)
@@ -1070,7 +2612,7 @@ async def syllabus_page(request: Request, session_id: str):
             phases_data.append({
                 "id":          f"week-{wn}",
                 "icon":        "📅",
-                "phase":       f"Week {wn}",
+                "phase":       f"Module {wn}",
                 "weeks":       week["week_hours"],
                 "title":       week["title"],
                 "description": week["theme"],
@@ -1235,3 +2777,24 @@ async def _run_blocking(fn, *args, **kwargs):
     """Run a synchronous function in a thread pool to avoid blocking the event loop."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(_executor, functools.partial(fn, *args, **kwargs))
+
+
+# ── Route dependency injection ────────────────────────────────────────────────
+
+import routes.deps as _rdeps  # noqa: E402
+_rdeps.templates        = templates
+_rdeps.get_session_data = _get_session_data
+_rdeps.save_session     = _save_session
+_rdeps.session_progress = _session_progress
+_rdeps.make_client      = _make_client
+_rdeps.run_blocking     = _run_blocking
+_rdeps.TEST_MODE        = TEST_MODE
+
+from routes.topics import router as topics_router, get_next_topic_step  # noqa: E402,F401
+app.include_router(topics_router)
+
+from routes.todos import router as todos_router  # noqa: E402
+app.include_router(todos_router)
+
+from routes.submissions import router as submissions_router  # noqa: E402
+app.include_router(submissions_router)

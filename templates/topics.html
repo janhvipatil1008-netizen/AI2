@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}AI² - Module {{ current_week }} Topics{% endblock %}
+
+{% block content %}
+<section class="topics-page">
+  <div class="topics-topbar">
+    <div>
+      <a href="/chat/{{ session_id }}" class="back-btn">← Back to Chat</a>
+      <div class="topics-eyebrow">{{ progress.track_label }} · Module {{ current_week }}</div>
+      <h1>Module {{ current_week }} Topics</h1>
+      <p>{{ progress.phase_title }} · {{ progress.phase_desc }}</p>
+    </div>
+    <a href="/dashboard"                 class="topics-secondary-link">Back to Dashboard</a>
+    <a href="/syllabus/{{ session_id }}" class="topics-secondary-link">View Syllabus</a>
+    <a href="/todos/{{ session_id }}"    class="topics-secondary-link">My Planner</a>
+  </div>
+
+  {% if topics %}
+  <div class="week-progress-summary">
+    <div class="week-progress-header">
+      <h2 class="week-progress-title">Module {{ current_week }} Progress</h2>
+      <span class="week-progress-avg">{{ week_progress_summary.average_completion_percent }}%</span>
+    </div>
+    <div class="week-progress-bar">
+      <div class="week-progress-fill" style="width: {{ week_progress_summary.average_completion_percent }}%"></div>
+    </div>
+    <div class="week-progress-stats">
+      <span class="week-stat-chip week-stat-completed">
+        Completed: {{ week_progress_summary.completed_topics }} / {{ week_progress_summary.total_topics }}
+      </span>
+      <span class="week-stat-chip week-stat-in-progress">
+        In progress: {{ week_progress_summary.in_progress_topics }}
+      </span>
+      <span class="week-stat-chip week-stat-not-started">
+        Not started: {{ week_progress_summary.not_started_topics }}
+      </span>
+    </div>
+  </div>
+
+  <div class="topic-card-grid">
+    {% for topic in topics %}
+    {% set tp = progress_by_topic[topic.topic_id] %}
+    {% set pct = tp.completion_percent %}
+    {% set steps = tp.topic_progress %}
+    {% if pct == 100 %}
+      {% set status_label = "Completed" %}
+      {% set status_cls   = "topic-card-status-completed" %}
+    {% elif pct > 0 or "in_progress" in steps.values() %}
+      {% set status_label = "In Progress" %}
+      {% set status_cls   = "topic-card-status-in-progress" %}
+    {% else %}
+      {% set status_label = "Not Started" %}
+      {% set status_cls   = "topic-card-status-not-started" %}
+    {% endif %}
+    <article class="topic-card">
+      <div class="topic-card-meta">Module {{ topic.week_num }} · {{ topic.module_title }}</div>
+      <h2>
+        <a href="/topic/{{ session_id }}/{{ topic.topic_id }}">{{ topic.topic_title }}</a>
+      </h2>
+      <p class="topic-description">{{ topic.description }}</p>
+
+      <div class="topic-card-progress-row">
+        <span class="topic-card-status-label {{ status_cls }}">{{ status_label }}</span>
+        <span class="topic-card-pct">{{ pct | int }}%</span>
+      </div>
+      <div class="topic-card-progress">
+        <div class="topic-card-progress-fill" style="width: {{ pct | int }}%"></div>
+      </div>
+
+      <div class="topic-step-chips">
+        {% set step_map = [
+          ("learn",              "Learn"),
+          ("quiz",               "Quiz"),
+          ("portfolio_task",     "Portfolio"),
+          ("interview_practice", "Interview"),
+          ("reflection",         "Reflection"),
+        ] %}
+        {% for step_key, step_label in step_map %}
+          {% set s = steps.get(step_key, "not_started") %}
+          {% if s == "done" %}
+            {% set chip_cls = "topic-step-chip-done" %}
+          {% elif s == "in_progress" %}
+            {% set chip_cls = "topic-step-chip-in-progress" %}
+          {% else %}
+            {% set chip_cls = "" %}
+          {% endif %}
+          <span class="topic-step-chip {{ chip_cls }}" title="{{ step_label }}: {{ s | replace('_', ' ') }}">{{ step_label }}</span>
+        {% endfor %}
+      </div>
+
+      <a class="topic-continue-btn"
+         href="/topic/{{ session_id }}/{{ topic.topic_id }}{% if tp.next_step.anchor %}#{{ tp.next_step.anchor }}{% endif %}">
+        {{ tp.next_step.label }}
+      </a>
+
+      <div class="topic-actions-label">Recommended actions</div>
+      <div class="topic-action-pills">
+        {% for action in topic.recommended_actions %}
+        <span class="topic-action-pill">{{ action | replace("_", " ") }}</span>
+        {% endfor %}
+      </div>
+
+      <div class="topic-button-row">
+        <a class="topic-action-btn topic-open-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}">Open Topic</a>
+        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}">Learn</a>
+        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}">Quiz</a>
+        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.portfolio_prompt | urlencode }}">Portfolio Task</a>
+        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.interview_prompt | urlencode }}">Interview Practice</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="topics-empty">
+    No topics were found for this learning path module.
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

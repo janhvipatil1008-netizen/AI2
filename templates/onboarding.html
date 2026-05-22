@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}AI2 Onboarding{% endblock %}
+
+{% block head %}
+<style>
+  .onboarding-wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem;
+  }
+  .onboarding-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.4rem;
+  }
+  .onboarding-title {
+    margin: 0 0 0.4rem;
+    font-size: 1.45rem;
+    color: var(--text);
+  }
+  .onboarding-sub {
+    margin: 0 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+  .onboarding-field {
+    display: grid;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+  }
+  .onboarding-field label {
+    color: var(--text);
+    font-weight: 650;
+    font-size: 0.9rem;
+  }
+  .onboarding-field select {
+    background: #0f141b;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.55rem 0.65rem;
+  }
+  .onboarding-error {
+    border: 1px solid #f97373;
+    color: #ffd1d1;
+    background: rgba(249, 115, 115, 0.08);
+    border-radius: 6px;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .onboarding-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+  .onboarding-submit {
+    border: 0;
+    border-radius: 6px;
+    background: #1c6ef5;
+    color: white;
+    font-weight: 700;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+  }
+  .onboarding-link {
+    color: var(--muted);
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="onboarding-wrap">
+  <section class="onboarding-panel">
+    <h1 class="onboarding-title">Set up your learning path</h1>
+    <p class="onboarding-sub">This helps AI2 recommend where to start.</p>
+
+    {% if error %}
+    <div class="onboarding-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/onboarding/save">
+      <input type="hidden" name="session_id" value="{{ session_id }}" />
+
+      <div class="onboarding-field">
+        <label for="goal">Learning goal</label>
+        <select id="goal" name="goal" required>
+          {% for value, label in goals %}
+          <option value="{{ value }}" {% if onboarding.goal == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="onboarding-field">
+        <label for="level">Current level</label>
+        <select id="level" name="level" required>
+          {% for value, label in levels %}
+          <option value="{{ value }}" {% if onboarding.level == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="onboarding-field">
+        <label for="weekly_time">Time available</label>
+        <select id="weekly_time" name="weekly_time" required>
+          {% for value, label in weekly_times %}
+          <option value="{{ value }}" {% if onboarding.weekly_time == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="onboarding-actions">
+        <button class="onboarding-submit" type="submit">Save and start learning</button>
+        <a class="onboarding-link" href="/topics/{{ session_id }}">Skip for now</a>
+      </div>
+    </form>
+  </section>
+</main>
+{% endblock %}

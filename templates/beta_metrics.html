@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}AI² Beta Metrics{% endblock %}
+
+{% block head %}
+<style>
+  .metrics-wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem;
+  }
+  .metrics-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  .metrics-title {
+    margin: 0 0 0.35rem;
+    font-size: 1.55rem;
+  }
+  .metrics-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .metrics-pill {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.9rem;
+    margin: 1rem 0;
+  }
+  .metrics-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 1rem;
+  }
+  .metrics-card h2 {
+    margin: 0 0 0.8rem;
+    font-size: 1rem;
+  }
+  .metrics-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 0.38rem 0;
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .metrics-row:first-of-type {
+    border-top: 0;
+  }
+  .metrics-value {
+    color: var(--text);
+    text-align: right;
+  }
+  .metrics-notes {
+    margin: 0.5rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="metrics-wrap">
+  <div class="metrics-top">
+    <div>
+      <h1 class="metrics-title">AI² Beta Metrics</h1>
+      <p class="metrics-sub">Safe internal aggregate counts for private beta tracking.</p>
+    </div>
+    <div class="metrics-pill">DB metrics: {{ "available" if metrics.db_available else "unavailable" }}</div>
+  </div>
+
+  <div class="metrics-grid">
+    <article class="metrics-card">
+      <h2>Storage / Config Health</h2>
+      {% for key, value in metrics.storage_config.items() %}
+      <div class="metrics-row">
+        <span>{{ key }}</span>
+        <span class="metrics-value">{{ value|string|lower }}</span>
+      </div>
+      {% endfor %}
+    </article>
+
+    <article class="metrics-card">
+      <h2>Sessions / Users</h2>
+      {% for key, value in metrics.session_user_summary.items() %}
+      <div class="metrics-row">
+        <span>{{ key }}</span>
+        <span class="metrics-value">{{ value }}</span>
+      </div>
+      {% endfor %}
+    </article>
+
+    <article class="metrics-card">
+      <h2>Usage</h2>
+      {% for key, value in metrics.usage_summary.items() %}
+      <div class="metrics-row">
+        <span>{{ key }}</span>
+        <span class="metrics-value">{{ value }}</span>
+      </div>
+      {% endfor %}
+    </article>
+
+    <article class="metrics-card">
+      <h2>Learning Outcomes</h2>
+      {% for key, value in metrics.learning_outcomes_summary.items() %}
+      <div class="metrics-row">
+        <span>{{ key }}</span>
+        <span class="metrics-value">{{ value }}</span>
+      </div>
+      {% endfor %}
+    </article>
+
+    <article class="metrics-card">
+      <h2>Beta Feedback</h2>
+      {% for key, value in metrics.beta_feedback_summary.items() %}
+        {% if key != "willingness_to_pay_counts" %}
+        <div class="metrics-row">
+          <span>{{ key }}</span>
+          <span class="metrics-value">{{ value }}</span>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% for key, value in metrics.beta_feedback_summary.willingness_to_pay_counts.items() %}
+      <div class="metrics-row">
+        <span>willingness_to_pay_{{ key }}</span>
+        <span class="metrics-value">{{ value }}</span>
+      </div>
+      {% endfor %}
+    </article>
+
+    <article class="metrics-card">
+      <h2>Cache</h2>
+      {% for key, value in metrics.cache_summary.items() %}
+      <div class="metrics-row">
+        <span>{{ key }}</span>
+        <span class="metrics-value">{{ value }}</span>
+      </div>
+      {% endfor %}
+    </article>
+  </div>
+
+  <article class="metrics-card">
+    <h2>Notes</h2>
+    <ul class="metrics-notes">
+      {% for note in metrics.notes %}
+      <li>{{ note }}</li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% endblock %}

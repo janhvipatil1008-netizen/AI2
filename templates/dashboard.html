@@ -97,6 +97,79 @@
     }
     .track-card:hover { border-color: #7c6af7; }
     .track-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .session-action-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.25rem;
+    }
+    .session-action-link {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.2rem 0.65rem;
+    }
+    .session-action-link:hover { color: var(--text); border-color: #7c6af7; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      border-bottom: 2px solid #7c6af7;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .summary-card-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .summary-stat-big {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .summary-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+    .summary-chip {
+      font-size: 0.7rem;
+      background: #1e2433;
+      border-radius: 4px;
+      padding: 0.15rem 0.5rem;
+      color: var(--muted);
+    }
+    .summary-chip-done    { color: #4ade80; }
+    .summary-chip-inprog  { color: #facc15; }
+    .summary-rows { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+    .summary-row span:last-child { font-weight: 600; }
+    .summary-link {
+      font-size: 0.82rem;
+      color: #7c6af7;
+      text-decoration: none;
+      margin-top: auto;
+      padding-top: 0.25rem;
+    }
+    .summary-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -156,7 +229,7 @@
               {% else %}Context Engineer{% endif %}
             </div>
             <div style="font-size: 0.8rem; color: var(--muted);">
-              Week {{ s.current_week }} / 5 ·
+              Module {{ s.current_week }} ·
               {% if s.current_week <= 1 %}AI Foundations
               {% elif s.current_week <= 2 %}Engineering Practice
               {% elif s.current_week <= 4 %}Agri-Saathi Build
@@ -168,6 +241,131 @@
         <div class="progress-track">
           <div class="progress-fill" style="width: {{ pct }}%;"></div>
         </div>
+        <div class="session-action-links">
+          <a href="/chat/{{ s.session_id }}"     class="session-action-link">Continue Chat</a>
+          <a href="/topics/{{ s.session_id }}"   class="session-action-link">Browse Module Topics</a>
+          <a href="/todos/{{ s.session_id }}"    class="session-action-link">My Planner</a>
+          <a href="/syllabus/{{ s.session_id }}" class="session-action-link">View Syllabus</a>
+          <a href="/onboarding/{{ s.session_id }}" class="session-action-link">Set up learning path</a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Current Focus — position derived from modular progress or session fallback -->
+    {% if position_summary and (position_summary.available or position_summary.current_module_label) %}
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Current Focus</div>
+      <div class="summary-card">
+        <div class="summary-rows">
+          {% if position_summary.available %}
+            {% if position_summary.current_topic_key %}
+            <div class="summary-row"><span>Topic</span><span>{{ position_summary.current_topic_key }}</span></div>
+            {% endif %}
+            {% if position_summary.current_module_key %}
+            <div class="summary-row"><span>Module</span><span>{{ position_summary.current_module_key }}</span></div>
+            {% endif %}
+            {% if not position_summary.current_topic_key and not position_summary.current_module_key %}
+            <div class="summary-row"><span>Getting started</span><span>—</span></div>
+            {% endif %}
+            {% if position_summary.next_topic_key %}
+            <div class="summary-row"><span>Up next</span><span>{{ position_summary.next_topic_key }}</span></div>
+            {% endif %}
+            {% if position_summary.progress_percent %}
+            <div class="progress-track" style="margin-top: 0.35rem;">
+              <div class="progress-fill" style="width: {{ position_summary.progress_percent }}%;"></div>
+            </div>
+            {% endif %}
+          {% else %}
+            <div class="summary-row"><span>Current module</span><span>{{ position_summary.current_module_label }}</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if enrollment_summary and enrollment_summary.source == "db" %}
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Learning path</div>
+      <div class="summary-card">
+        <div class="summary-rows">
+          <div class="summary-row"><span>Course</span><span>{{ enrollment_summary.course_key }}</span></div>
+          <div class="summary-row"><span>Progress</span><span>{{ enrollment_summary.progress_percent }}%</span></div>
+          {% if enrollment_summary.current_module_key %}
+          <div class="summary-row"><span>Current module</span><span>{{ enrollment_summary.current_module_key }}</span></div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if modular_progress_summary and modular_progress_summary.available %}
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Learning progress</div>
+      <div class="summary-card">
+        <div class="summary-rows">
+          {% if modular_progress_summary.course_key %}
+          <div class="summary-row"><span>Course</span><span>{{ modular_progress_summary.course_key }}</span></div>
+          {% endif %}
+          <div class="summary-row"><span>Progress</span><span>{{ modular_progress_summary.progress_percent }}%</span></div>
+          {% if modular_progress_summary.current_module_key %}
+          <div class="summary-row"><span>Current module</span><span>{{ modular_progress_summary.current_module_key }}</span></div>
+          {% endif %}
+          {% if modular_progress_summary.current_topic_key %}
+          <div class="summary-row"><span>Current topic</span><span>{{ modular_progress_summary.current_topic_key }}</span></div>
+          {% endif %}
+          {% for module in modular_progress_summary.modules %}
+            {% if loop.index <= 3 %}
+            <div class="summary-row"><span>{{ module.module_key }}</span><span>{{ module.progress_percent }}%</span></div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Your Learning Summary -->
+    {% if learning_summary %}
+    <div style="margin-bottom: 2rem;">
+      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Your Learning Summary</div>
+      <div class="summary-grid">
+
+        <!-- Card 1: Module Progress -->
+        <div class="summary-card">
+          <div class="summary-card-title">Module {{ learning_summary.current_week }} Progress</div>
+          <div class="summary-stat-big">{{ learning_summary.average_completion_percent }}%</div>
+          <div class="summary-chips">
+            <span class="summary-chip summary-chip-done">Completed: {{ learning_summary.completed_topics }} / {{ learning_summary.total_topics }}</span>
+            <span class="summary-chip summary-chip-inprog">In progress: {{ learning_summary.in_progress_topics }}</span>
+            <span class="summary-chip">Not started: {{ learning_summary.not_started_topics }}</span>
+          </div>
+          <a href="/topics/{{ recent_session_id }}" class="summary-link">Browse Module Topics →</a>
+        </div>
+
+        <!-- Card 2: Planner -->
+        <div class="summary-card">
+          <div class="summary-card-title">Planner</div>
+          <div class="summary-rows">
+            <div class="summary-row"><span>Daily todos</span><span>{{ learning_summary.daily_todos }}</span></div>
+            <div class="summary-row"><span>Module-plan todos</span><span>{{ learning_summary.weekly_todos }}</span></div>
+            <div class="summary-row"><span>Done</span><span>{{ learning_summary.done_todos }}</span></div>
+            <div class="summary-row"><span>In progress</span><span>{{ learning_summary.in_progress_todos }}</span></div>
+          </div>
+          <a href="/todos/{{ recent_session_id }}" class="summary-link">Open Planner →</a>
+        </div>
+
+        <!-- Card 3: Practice & Reflection -->
+        <div class="summary-card">
+          <div class="summary-card-title">Practice &amp; Reflection</div>
+          <div class="summary-rows">
+            <div class="summary-row"><span>Quiz evaluations</span><span>{{ learning_summary.quiz_evaluations_done }}</span></div>
+            <div class="summary-row"><span>Portfolio reviews</span><span>{{ learning_summary.portfolio_reviews_done }}</span></div>
+            <div class="summary-row"><span>Interview feedback</span><span>{{ learning_summary.interview_feedback_done }}</span></div>
+            <div class="summary-row"><span>Reflections saved</span><span>{{ learning_summary.reflections_saved }}</span></div>
+          </div>
+          <a href="/topics/{{ recent_session_id }}" class="summary-link">Continue Learning →</a>
+        </div>
+
       </div>
     </div>
     {% endif %}

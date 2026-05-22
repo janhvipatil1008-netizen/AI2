@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}AI² - Privacy{% endblock %}
+
+{% block content %}
+<section class="topic-detail-page">
+  <nav class="topic-breadcrumb" aria-label="Breadcrumb">
+    <a href="/dashboard">Dashboard</a>
+    <span>-></span>
+    <span>Privacy</span>
+  </nav>
+
+  <header class="topic-detail-header">
+    <div class="topics-eyebrow">Private Beta</div>
+    <h1>Privacy</h1>
+    <p>AI² is a learning platform in private beta. This page explains the current data handling approach in clear language; it is not a final legal policy for public launch.</p>
+  </header>
+
+  <section class="topic-ai-content-section">
+    <h2>What AI² May Store</h2>
+    <p>AI² may collect account information such as your email address and display name if authentication is enabled.</p>
+    <p>The platform stores learning progress, todos, topic notes, quiz submissions, portfolio submissions, interview submissions, AI feedback, usage events, learning outcome scores, and beta feedback.</p>
+  </section>
+
+  <section class="topic-ai-content-section">
+    <h2>AI Provider Use</h2>
+    <p>AI² uses Claude/Anthropic integration to generate and evaluate learning content. When you request AI feedback, your submissions may be sent to the AI provider so the platform can generate that feedback.</p>
+  </section>
+
+  <section class="topic-ai-content-section">
+    <h2>Debug And Health Views</h2>
+    <p>Debug and health views are protected in production and should not expose full private content. AI² avoids exposing secrets, database URLs, API keys, raw environment values, or full private learner content in debug surfaces.</p>
+  </section>
+
+  <section class="topic-ai-content-section">
+    <h2>Beta Requests</h2>
+    <p>During private beta, users can request deletion or export manually through the project owner or support contact. Data handling may evolve before public launch as the product and storage model mature.</p>
+  </section>
+</section>
+{% endblock %}

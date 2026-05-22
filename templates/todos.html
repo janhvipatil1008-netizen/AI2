@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}AI² - My Learning Planner{% endblock %}
+
+{% block content %}
+<section class="todos-page" data-session-id="{{ session_id }}">
+  <nav class="topic-breadcrumb" aria-label="Breadcrumb">
+    <a href="/dashboard">Dashboard</a>
+    <span>→</span>
+    <a href="/topics/{{ session_id }}">Module Topics</a>
+    <span>→</span>
+    <span>My Learning Planner</span>
+  </nav>
+
+  <header class="todos-header">
+    <div class="topics-eyebrow">
+      {{ progress.track_label }} ·
+      {% if todo_learning_context and todo_learning_context.current_module_key %}
+        {{ todo_learning_context.current_module_key }}
+      {% else %}
+        Module {{ progress.current_week }}
+      {% endif %}
+      {% if todo_learning_context and todo_learning_context.current_topic_key %}
+        · {{ todo_learning_context.current_topic_key }}
+      {% endif %}
+    </div>
+    <h1>My Learning Planner</h1>
+    <p>Track daily tasks and learning path tasks alongside your topic journey.</p>
+  </header>
+
+  <div class="todos-counts-bar">
+    <span class="todo-count-chip todo-count-total">{{ todo_counts.total }} total</span>
+    <span class="todo-count-chip todo-count-inprogress">{{ todo_counts.in_progress }} in progress</span>
+    <span class="todo-count-chip todo-count-done">{{ todo_counts.done }} done</span>
+  </div>
+
+  <!-- ── Create form ───────────────────────────────────────────────────── -->
+  <section class="todo-create-section">
+    <h2>Add a Task</h2>
+    <form id="todo-create-form" class="todo-create-form">
+      <input
+        id="todo-title"
+        class="todo-title-input"
+        type="text"
+        placeholder="What do you want to learn or do?"
+        required
+        maxlength="200"
+      >
+      <select id="todo-type" class="todo-type-select">
+        <option value="daily">Today (Daily)</option>
+        <option value="weekly">Learning Path Task</option>
+      </select>
+      <input
+        id="todo-due"
+        class="todo-due-input"
+        type="text"
+        placeholder="Due label (optional, e.g. Friday)"
+        maxlength="50"
+      >
+      <button type="submit" class="todo-create-btn">Add Task</button>
+    </form>
+    <div id="todo-create-error" class="todo-create-error" style="display:none"></div>
+  </section>
+
+  <!-- ── Daily todos ───────────────────────────────────────────────────── -->
+  <section class="todo-list-section">
+    <h2>Today / Daily Tasks</h2>
+    {% if daily_todos %}
+    <ul class="todo-list" id="daily-todo-list">
+      {% for todo in daily_todos %}
+      <li class="todo-item todo-status-{{ todo.status | replace('_', '-') }}" id="todo-{{ todo.todo_id }}">
+        <div class="todo-item-main">
+          <span class="todo-item-title">{{ todo.title }}</span>
+          {% if todo.due_label %}
+          <span class="todo-due-label">Due: {{ todo.due_label }}</span>
+          {% endif %}
+          <span class="todo-status-badge todo-badge-{{ todo.status | replace('_', '-') }}">
+            {{ todo.status | replace('_', ' ') | title }}
+          </span>
+        </div>
+        <div class="todo-item-actions">
+          <button class="todo-status-btn" onclick="setTodoStatus('{{ todo.todo_id }}', 'todo')">To Do</button>
+          <button class="todo-status-btn todo-btn-progress" onclick="setTodoStatus('{{ todo.todo_id }}', 'in_progress')">In Progress</button>
+          <button class="todo-status-btn todo-btn-done" onclick="setTodoStatus('{{ todo.todo_id }}', 'done')">Done</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="todo-empty">No daily tasks yet. Add one above.</p>
+    {% endif %}
+  </section>
+
+  <!-- ── Module-plan todos ─────────────────────────────────────────────── -->
+  <section class="todo-list-section">
+    <h2>Learning Path Tasks</h2>
+    {% if weekly_todos %}
+    <ul class="todo-list" id="module-plan-todo-list">
+      {% for todo in weekly_todos %}
+      <li class="todo-item todo-status-{{ todo.status | replace('_', '-') }}" id="todo-{{ todo.todo_id }}">
+        <div class="todo-item-main">
+          <span class="todo-item-title">{{ todo.title }}</span>
+          {% if todo.due_label %}
+          <span class="todo-due-label">Due: {{ todo.due_label }}</span>
+          {% endif %}
+          <span class="todo-status-badge todo-badge-{{ todo.status | replace('_', '-') }}">
+            {{ todo.status | replace('_', ' ') | title }}
+          </span>
+        </div>
+        <div class="todo-item-actions">
+          <button class="todo-status-btn" onclick="setTodoStatus('{{ todo.todo_id }}', 'todo')">To Do</button>
+          <button class="todo-status-btn todo-btn-progress" onclick="setTodoStatus('{{ todo.todo_id }}', 'in_progress')">In Progress</button>
+          <button class="todo-status-btn todo-btn-done" onclick="setTodoStatus('{{ todo.todo_id }}', 'done')">Done</button>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="todo-empty">No learning path tasks yet. Add one above.</p>
+    {% endif %}
+  </section>
+</section>
+
+<script>
+  const _sessionId = document.querySelector('[data-session-id]').dataset.sessionId;
+
+  // ── Status update ─────────────────────────────────────────────────────
+  async function setTodoStatus(todoId, status) {
+    try {
+      const res = await fetch('/todos/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: _sessionId, todo_id: todoId, status}),
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        console.warn('Status update failed:', res.status);
+      }
+    } catch (e) {
+      console.warn('Status update error:', e);
+    }
+  }
+
+  // ── Create form ───────────────────────────────────────────────────────
+  document.getElementById('todo-create-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const title = document.getElementById('todo-title').value.trim();
+    const type  = document.getElementById('todo-type').value;
+    const due   = document.getElementById('todo-due').value.trim() || null;
+    const errEl = document.getElementById('todo-create-error');
+    errEl.style.display = 'none';
+
+    if (!title) return;
+
+    try {
+      const res = await fetch('/todos/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: _sessionId, title, todo_type: type, due_label: due}),
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        errEl.textContent = data.detail || 'Failed to create task.';
+        errEl.style.display = 'block';
+      }
+    } catch (e) {
+      errEl.textContent = 'Network error — please try again.';
+      errEl.style.display = 'block';
+    }
+  });
+</script>
+{% endblock %}

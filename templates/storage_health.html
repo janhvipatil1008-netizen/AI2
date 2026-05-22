@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}AI2 Storage Health{% endblock %}
+
+{% block head %}
+<style>
+  .health-wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem;
+  }
+  .health-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .health-title {
+    margin: 0 0 0.35rem;
+    font-size: 1.55rem;
+    color: var(--text);
+  }
+  .health-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .status-pill {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.65rem;
+    color: var(--text);
+    background: var(--surface);
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .health-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 1rem;
+  }
+  .health-card h2 {
+    margin: 0 0 0.75rem;
+    color: var(--text);
+    font-size: 1rem;
+  }
+  .health-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.35rem 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .health-row:first-of-type {
+    border-top: 0;
+  }
+  .health-value {
+    color: var(--text);
+    text-align: right;
+  }
+  .health-notes {
+    margin: 0.75rem 0 0;
+    padding-left: 1.1rem;
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .health-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: end;
+    margin-bottom: 1rem;
+  }
+  .health-form label {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .health-form input {
+    min-width: 210px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 0.45rem 0.55rem;
+  }
+  .health-form button {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #1c6ef5;
+    color: #fff;
+    padding: 0.47rem 0.8rem;
+    cursor: pointer;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="health-wrap">
+  <div class="health-top">
+    <div>
+      <h1 class="health-title">Storage Health</h1>
+      <p class="health-sub">Safe internal summary of storage flags and mirror readiness.</p>
+    </div>
+    <div class="status-pill">Overall status: {{ health.overall_status }}</div>
+  </div>
+
+  <form class="health-form" method="get" action="/debug/storage-health-view">
+    <label>
+      Session ID
+      <input name="session_id" value="{{ session_id }}" autocomplete="off" />
+    </label>
+    <label>
+      Legacy topic ID
+      <input name="legacy_topic_id" value="{{ legacy_topic_id }}" autocomplete="off" />
+    </label>
+    <button type="submit">Refresh</button>
+  </form>
+
+  <div class="health-grid">
+    <article class="health-card">
+      <h2>Source Of Truth</h2>
+      <div class="health-row">
+        <span>SessionContext</span>
+        <span class="health-value">{{ health.source_of_truth.session_context|string|lower }}</span>
+      </div>
+      <div class="health-row">
+        <span>DB primary reads</span>
+        <span class="health-value">{{ health.source_of_truth.db_primary_reads|string|lower }}</span>
+      </div>
+    </article>
+
+    <article class="health-card">
+      <h2>Flags</h2>
+      <div class="health-row">
+        <span>DB write-through enabled</span>
+        <span class="health-value">{{ health.flags.db_write_through_enabled|string|lower }}</span>
+      </div>
+      <div class="health-row">
+        <span>Curriculum DB reads enabled</span>
+        <span class="health-value">{{ health.flags.curriculum_db_reads_enabled|string|lower }}</span>
+      </div>
+      <div class="health-row">
+        <span>Progress DB reads enabled</span>
+        <span class="health-value">{{ health.flags.progress_db_reads_enabled|string|lower }}</span>
+      </div>
+      <div class="health-row">
+        <span>Todos DB reads enabled</span>
+        <span class="health-value">{{ health.flags.todos_db_reads_enabled|string|lower }}</span>
+      </div>
+    </article>
+  </div>
+
+  <div class="health-grid">
+    {% for mirror_name, mirror in health.mirrors.items() %}
+    <article class="health-card">
+      <h2>{{ mirror_name }}</h2>
+      {% for key, value in mirror.items() %}
+        {% if key not in ["session_status", "topic_status"] %}
+        <div class="health-row">
+          <span>{{ key }}</span>
+          <span class="health-value">{{ value|string|lower }}</span>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </article>
+    {% endfor %}
+  </div>
+
+  {% if health.mirrors.learner_state.session_status %}
+  <div class="health-grid">
+    <article class="health-card">
+      <h2>Session Counts</h2>
+      {% for key, value in health.mirrors.learner_state.session_status.items() %}
+      <div class="health-row">
+        <span>{{ key }}</span>
+        <span class="health-value">{{ value|string|lower }}</span>
+      </div>
+      {% endfor %}
+    </article>
+  </div>
+  {% endif %}
+
+  {% if health.mirrors.learner_state.topic_status %}
+  <div class="health-grid">
+    <article class="health-card">
+      <h2>Topic Presence</h2>
+      {% for key, value in health.mirrors.learner_state.topic_status.items() %}
+      <div class="health-row">
+        <span>{{ key }}</span>
+        <span class="health-value">{{ value|string|lower }}</span>
+      </div>
+      {% endfor %}
+    </article>
+  </div>
+  {% endif %}
+
+  <article class="health-card">
+    <h2>Notes</h2>
+    <ul class="health-notes">
+      {% for note in health.notes %}
+      <li>{{ note }}</li>
+      {% endfor %}
+    </ul>
+  </article>
+</section>
+{% endblock %}

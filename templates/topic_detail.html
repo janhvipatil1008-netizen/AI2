@@ -1,0 +1,634 @@
+{% extends "base.html" %}
+{% block title %}AI² - {{ topic.topic_title }}{% endblock %}
+
+{% block content %}
+<section class="topic-detail-page" data-session-id="{{ session_id }}" data-topic-id="{{ topic.topic_id }}">
+  <nav class="topic-breadcrumb" aria-label="Breadcrumb">
+    <a href="/dashboard">Dashboard</a>
+    <span>→</span>
+    <a href="/topics/{{ session_id }}">Module Topics</a>
+    <span>→</span>
+    <span>{{ topic.topic_title }}</span>
+  </nav>
+
+  <header class="topic-detail-header">
+    <div class="topics-eyebrow">{{ progress.track_label }} · Module {{ topic.week_num }}</div>
+    <h1>{{ topic.topic_title }}</h1>
+    <div class="topic-detail-meta">{{ topic.module_title }}</div>
+    <p>{{ topic.description }}</p>
+    <div class="topic-freshness-info">
+      <span class="topic-freshness-chip">Freshness: {{ topic_freshness_label }}</span>
+      <span class="topic-freshness-guidance">{{ topic_freshness_guidance }}</span>
+    </div>
+    {% if modular_topic_context and (modular_topic_context.skills or modular_topic_context.activities) %}
+    <div class="topic-freshness-info">
+      {% for skill in modular_topic_context.skills %}
+      <span class="topic-freshness-chip">{{ skill.label }}</span>
+      {% endfor %}
+      {% for activity in modular_topic_context.activities %}
+      <span class="topic-freshness-chip">{{ activity.title }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </header>
+
+  <div class="topic-completion-bar">
+    <div class="topic-completion-label">
+      Topic Progress: <strong id="completion-percent">{{ completion_percent }}%</strong>
+    </div>
+    <div class="topic-progress-track">
+      <div class="topic-progress-fill" id="completion-fill" style="width: {{ completion_percent }}%"></div>
+    </div>
+  </div>
+
+  <section class="topic-ai-content-section" id="learning-outcome">
+    <div class="topic-ai-content-heading">
+      <h2>Check your learning improvement</h2>
+    </div>
+
+    {% set outcome = learning_outcome_summary %}
+    <div class="topic-ai-content-empty">
+      <p>Use a quick self-score before and after this topic to track whether your understanding improved.</p>
+      {% if learning_outcome_unavailable %}
+      <p>Learning outcome summary is temporarily unavailable.</p>
+      {% endif %}
+      <div class="topic-ai-content-meta">
+        <span>Baseline saved: {{ "Yes" if outcome.has_baseline else "No" }}</span>
+        <span class="ai-meta-sep">Â·</span>
+        <span>Post-topic saved: {{ "Yes" if outcome.has_post else "No" }}</span>
+        <span class="ai-meta-sep">Â·</span>
+        <span>Baseline score: {{ outcome.baseline_score if outcome.baseline_score is not none else "Not set" }}</span>
+        <span class="ai-meta-sep">Â·</span>
+        <span>Post score: {{ outcome.post_score if outcome.post_score is not none else "Not set" }}</span>
+        <span class="ai-meta-sep">Â·</span>
+        <span>Improvement delta: {{ outcome.improvement_delta if outcome.improvement_delta is not none else "Not set" }}</span>
+        <span class="ai-meta-sep">Â·</span>
+        <span>Status: {{ outcome.status if outcome.status else "Not started" }}</span>
+      </div>
+    </div>
+
+    <div class="journey-grid">
+      <form class="journey-step-card" method="post" action="/topic/outcome/baseline">
+        <h3>Baseline</h3>
+        <input type="hidden" name="session_id" value="{{ session_id }}">
+        <input type="hidden" name="topic_id" value="{{ topic.topic_id }}">
+        <input type="hidden" name="return_to" value="topic_detail">
+        <label class="reflection-label">What do you know right now?
+          <textarea name="baseline_answer" class="reflection-textarea" rows="3"
+                    placeholder="Write a short baseline answer before learning."></textarea>
+        </label>
+        <label class="reflection-label">Self-score
+          <select name="baseline_score" class="reflection-textarea">
+            <option value="">No score</option>
+            {% for score in range(0, 11) %}
+            <option value="{{ score }}">{{ score }}/10</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="reflection-save-btn" type="submit">Save Baseline</button>
+      </form>
+
+      <form class="journey-step-card" method="post" action="/topic/outcome/post">
+        <h3>Post-topic</h3>
+        <input type="hidden" name="session_id" value="{{ session_id }}">
+        <input type="hidden" name="topic_id" value="{{ topic.topic_id }}">
+        <input type="hidden" name="return_to" value="topic_detail">
+        <label class="reflection-label">What can you explain after learning?
+          <textarea name="post_answer" class="reflection-textarea" rows="3"
+                    placeholder="Write a short post-topic answer after learning."></textarea>
+        </label>
+        <label class="reflection-label">Self-score
+          <select name="post_score" class="reflection-textarea">
+            <option value="">No score</option>
+            {% for score in range(0, 11) %}
+            <option value="{{ score }}">{{ score }}/10</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="reflection-save-btn" type="submit">Save Post-topic Outcome</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="topic-ai-content-section" id="ai-learning-content">
+    <div class="topic-ai-content-heading">
+      <h2>AI Learning Content</h2>
+      {% if generated_topic_content.content %}
+      <div class="topic-ai-content-meta">
+        <span class="ai-freshness-label">{{ generated_topic_content.freshness_label }}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>{% if generated_topic_content.generated_at %}{{ generated_topic_content.generated_at[:10] }}{% endif %}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>v{{ generated_topic_content.version }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if generated_topic_content.content %}
+    <div class="topic-ai-content-body">
+      <pre class="ai-content-text">{{ generated_topic_content.content }}</pre>
+    </div>
+    <div class="topic-ai-content-actions">
+      <button class="topic-ai-action-btn" id="ai-content-btn" onclick="generateContent(true)">Refresh Content</button>
+      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'learn')">Mark Learn Done</button>
+      <span class="ai-content-feedback" id="ai-content-feedback"></span>
+    </div>
+    {% else %}
+    <div class="topic-ai-content-empty">
+      <p>Generate a structured AI explanation for this topic.</p>
+      <button class="topic-ai-action-btn" id="ai-content-btn" onclick="generateContent(false)">Generate Learning Content</button>
+      <span class="ai-content-feedback" id="ai-content-feedback"></span>
+    </div>
+    {% endif %}
+  </section>
+
+  {% set quiz_p      = generated_topic_practice.quiz %}
+  {% set portfolio_p = generated_topic_practice.portfolio_task %}
+  {% set interview_p = generated_topic_practice.interview_practice %}
+
+  <section class="topic-ai-content-section" id="ai-quiz">
+    <div class="topic-ai-content-heading">
+      <h2>AI Quiz</h2>
+      {% if quiz_p.content %}
+      <div class="topic-ai-content-meta">
+        <span class="ai-freshness-label">{{ quiz_p.freshness_label }}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>{% if quiz_p.generated_at %}{{ quiz_p.generated_at[:10] }}{% endif %}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>v{{ quiz_p.version }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if quiz_p.content %}
+    <div class="topic-ai-content-body">
+      <pre class="ai-content-text">{{ quiz_p.content }}</pre>
+    </div>
+    <div class="topic-ai-content-actions">
+      <button class="topic-ai-action-btn" id="practice-btn-quiz" onclick="generatePractice('quiz', true)">Refresh Quiz</button>
+      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'quiz')">Mark Quiz Done</button>
+      <span class="ai-content-feedback" id="practice-feedback-quiz"></span>
+    </div>
+    {% else %}
+    <div class="topic-ai-content-empty">
+      <p>Generate a structured quiz for this topic.</p>
+      <button class="topic-ai-action-btn" id="practice-btn-quiz" onclick="generatePractice('quiz', false)">Generate Quiz</button>
+      <span class="ai-content-feedback" id="practice-feedback-quiz"></span>
+    </div>
+    {% endif %}
+
+    <div class="quiz-submission-area">
+      <h3 class="quiz-submission-heading">Your Answers</h3>
+      <textarea id="quiz-submission-text" class="quiz-submission-textarea" rows="5"
+                placeholder="Write your quiz answers here...">{{ quiz_submission.answers }}</textarea>
+      <div class="quiz-submission-actions">
+        <button class="quiz-action-btn" id="quiz-save-btn" onclick="saveQuizAnswers()">Save Answers</button>
+        <button class="quiz-action-btn quiz-evaluate-btn" id="quiz-evaluate-btn" onclick="evaluateQuiz(false)">Evaluate Answers</button>
+        <span class="quiz-submission-feedback" id="quiz-submission-feedback"></span>
+      </div>
+      {% if quiz_submission.submitted_at %}
+      <div class="quiz-submitted-meta">Submitted: {{ quiz_submission.submitted_at[:10] }}</div>
+      {% endif %}
+      {% if quiz_submission.evaluation %}
+      <div class="quiz-evaluation-block">
+        <div class="quiz-evaluation-heading">
+          <span>AI Evaluation</span>
+          {% if quiz_submission.score is not none %}
+          <span class="quiz-score-chip">Score: {{ quiz_submission.score }}/10</span>
+          {% endif %}
+          {% if quiz_submission.evaluated_at %}
+          <span class="quiz-evaluated-meta">Evaluated: {{ quiz_submission.evaluated_at[:10] }}</span>
+          {% endif %}
+        </div>
+        <pre class="quiz-evaluation-text">{{ quiz_submission.evaluation }}</pre>
+        <div class="quiz-evaluation-actions">
+          <button class="quiz-action-btn" onclick="evaluateQuiz(true)">Refresh Evaluation</button>
+        </div>
+        <form class="beta-feedback-form" method="post" action="/feedback/beta">
+          <h4>How useful was this feedback?</h4>
+          <input type="hidden" name="session_id" value="{{ session_id }}">
+          <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
+          <input type="hidden" name="feedback_context" value="quiz_feedback">
+          <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-quiz">
+          <label class="reflection-label">Usefulness
+            <select name="usefulness_score" class="reflection-textarea">
+              <option value="">Select 1-5</option>
+              {% for score in range(1, 6) %}
+              <option value="{{ score }}">{{ score }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="reflection-label">Clarity
+            <select name="clarity_score" class="reflection-textarea">
+              <option value="">Select 1-5</option>
+              {% for score in range(1, 6) %}
+              <option value="{{ score }}">{{ score }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="reflection-label">What confused you?
+            <textarea name="confusion" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <label class="reflection-label">What would make this better?
+            <textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <label class="reflection-label">Would you pay for this after the free trial?
+            <textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <button class="reflection-save-btn" type="submit">Send Feedback</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="topic-ai-content-section" id="ai-portfolio-task">
+    <div class="topic-ai-content-heading">
+      <h2>AI Portfolio Task</h2>
+      {% if portfolio_p.content %}
+      <div class="topic-ai-content-meta">
+        <span class="ai-freshness-label">{{ portfolio_p.freshness_label }}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>{% if portfolio_p.generated_at %}{{ portfolio_p.generated_at[:10] }}{% endif %}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>v{{ portfolio_p.version }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if portfolio_p.content %}
+    <div class="topic-ai-content-body">
+      <pre class="ai-content-text">{{ portfolio_p.content }}</pre>
+    </div>
+    <div class="topic-ai-content-actions">
+      <button class="topic-ai-action-btn" id="practice-btn-portfolio_task" onclick="generatePractice('portfolio_task', true)">Refresh Portfolio Task</button>
+      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'portfolio_task')">Mark Portfolio Task Done</button>
+      <span class="ai-content-feedback" id="practice-feedback-portfolio_task"></span>
+    </div>
+    {% else %}
+    <div class="topic-ai-content-empty">
+      <p>Generate a hands-on portfolio task for this topic.</p>
+      <button class="topic-ai-action-btn" id="practice-btn-portfolio_task" onclick="generatePractice('portfolio_task', false)">Generate Portfolio Task</button>
+      <span class="ai-content-feedback" id="practice-feedback-portfolio_task"></span>
+    </div>
+    {% endif %}
+
+    <div class="portfolio-submission-area">
+      <h3 class="portfolio-submission-heading">Your Submission</h3>
+      <textarea id="portfolio-submission-text" class="portfolio-submission-textarea" rows="5"
+                placeholder="Write your portfolio task response here...">{{ portfolio_submission.submission }}</textarea>
+      <div class="portfolio-submission-actions">
+        <button class="portfolio-action-btn" id="portfolio-save-btn" onclick="savePortfolioSubmission()">Save Submission</button>
+        <button class="portfolio-action-btn portfolio-feedback-btn" id="portfolio-feedback-btn" onclick="getPortfolioFeedback(false)">Get AI Feedback</button>
+        <span class="portfolio-submission-feedback" id="portfolio-submission-feedback"></span>
+      </div>
+      {% if portfolio_submission.submitted_at %}
+      <div class="portfolio-submitted-meta">Submitted: {{ portfolio_submission.submitted_at[:10] }}</div>
+      {% endif %}
+      {% if portfolio_submission.feedback %}
+      <div class="portfolio-feedback-block">
+        <div class="portfolio-feedback-heading">
+          <span>AI Feedback</span>
+          {% if portfolio_submission.score is not none %}
+          <span class="portfolio-score-chip">Score: {{ portfolio_submission.score }}/10</span>
+          {% endif %}
+          {% if portfolio_submission.reviewed_at %}
+          <span class="portfolio-reviewed-meta">Reviewed: {{ portfolio_submission.reviewed_at[:10] }}</span>
+          {% endif %}
+        </div>
+        <pre class="portfolio-feedback-text">{{ portfolio_submission.feedback }}</pre>
+        <div class="portfolio-feedback-actions">
+          <button class="portfolio-action-btn" onclick="getPortfolioFeedback(true)">Refresh Feedback</button>
+        </div>
+        <form class="beta-feedback-form" method="post" action="/feedback/beta">
+          <h4>How useful was this feedback?</h4>
+          <input type="hidden" name="session_id" value="{{ session_id }}">
+          <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
+          <input type="hidden" name="feedback_context" value="portfolio_feedback">
+          <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-portfolio-task">
+          <label class="reflection-label">Usefulness
+            <select name="usefulness_score" class="reflection-textarea">
+              <option value="">Select 1-5</option>
+              {% for score in range(1, 6) %}
+              <option value="{{ score }}">{{ score }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="reflection-label">Clarity
+            <select name="clarity_score" class="reflection-textarea">
+              <option value="">Select 1-5</option>
+              {% for score in range(1, 6) %}
+              <option value="{{ score }}">{{ score }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="reflection-label">What confused you?
+            <textarea name="confusion" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <label class="reflection-label">What would make this better?
+            <textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <label class="reflection-label">Would you pay for this after the free trial?
+            <textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <button class="reflection-save-btn" type="submit">Send Feedback</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="topic-ai-content-section" id="ai-interview-practice">
+    <div class="topic-ai-content-heading">
+      <h2>AI Interview Practice</h2>
+      {% if interview_p.content %}
+      <div class="topic-ai-content-meta">
+        <span class="ai-freshness-label">{{ interview_p.freshness_label }}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>{% if interview_p.generated_at %}{{ interview_p.generated_at[:10] }}{% endif %}</span>
+        <span class="ai-meta-sep">·</span>
+        <span>v{{ interview_p.version }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% if interview_p.content %}
+    <div class="topic-ai-content-body">
+      <pre class="ai-content-text">{{ interview_p.content }}</pre>
+    </div>
+    <div class="topic-ai-content-actions">
+      <button class="topic-ai-action-btn" id="practice-btn-interview_practice" onclick="generatePractice('interview_practice', true)">Refresh Interview Practice</button>
+      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'interview_practice')">Mark Interview Practice Done</button>
+      <span class="ai-content-feedback" id="practice-feedback-interview_practice"></span>
+    </div>
+    {% else %}
+    <div class="topic-ai-content-empty">
+      <p>Generate structured interview practice questions for this topic.</p>
+      <button class="topic-ai-action-btn" id="practice-btn-interview_practice" onclick="generatePractice('interview_practice', false)">Generate Interview Practice</button>
+      <span class="ai-content-feedback" id="practice-feedback-interview_practice"></span>
+    </div>
+    {% endif %}
+
+    <div class="interview-submission-area">
+      <h3 class="interview-submission-heading">Your Interview Answer</h3>
+      <textarea id="interview-submission-text" class="interview-submission-textarea" rows="5"
+                placeholder="Write your interview answer here...">{{ interview_submission.answer }}</textarea>
+      <div class="interview-submission-actions">
+        <button class="interview-action-btn" id="interview-save-btn" onclick="saveInterviewAnswer()">Save Answer</button>
+        <button class="interview-action-btn interview-feedback-btn" id="interview-feedback-btn" onclick="getInterviewFeedback(false)">Get AI Feedback</button>
+        <span class="interview-submission-feedback" id="interview-submission-feedback"></span>
+      </div>
+      {% if interview_submission.submitted_at %}
+      <div class="interview-submitted-meta">Submitted: {{ interview_submission.submitted_at[:10] }}</div>
+      {% endif %}
+      {% if interview_submission.feedback %}
+      <div class="interview-feedback-block">
+        <div class="interview-feedback-heading">
+          <span>AI Feedback</span>
+          {% if interview_submission.score is not none %}
+          <span class="interview-score-chip">Score: {{ interview_submission.score }}/10</span>
+          {% endif %}
+          {% if interview_submission.reviewed_at %}
+          <span class="interview-reviewed-meta">Reviewed: {{ interview_submission.reviewed_at[:10] }}</span>
+          {% endif %}
+        </div>
+        <pre class="interview-feedback-text">{{ interview_submission.feedback }}</pre>
+        <div class="interview-feedback-actions">
+          <button class="interview-action-btn" onclick="getInterviewFeedback(true)">Refresh Feedback</button>
+        </div>
+        <form class="beta-feedback-form" method="post" action="/feedback/beta">
+          <h4>How useful was this feedback?</h4>
+          <input type="hidden" name="session_id" value="{{ session_id }}">
+          <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
+          <input type="hidden" name="feedback_context" value="interview_feedback">
+          <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-interview-practice">
+          <label class="reflection-label">Usefulness
+            <select name="usefulness_score" class="reflection-textarea">
+              <option value="">Select 1-5</option>
+              {% for score in range(1, 6) %}
+              <option value="{{ score }}">{{ score }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="reflection-label">Clarity
+            <select name="clarity_score" class="reflection-textarea">
+              <option value="">Select 1-5</option>
+              {% for score in range(1, 6) %}
+              <option value="{{ score }}">{{ score }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="reflection-label">What confused you?
+            <textarea name="confusion" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <label class="reflection-label">What would make this better?
+            <textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <label class="reflection-label">Would you pay for this after the free trial?
+            <textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea>
+          </label>
+          <button class="reflection-save-btn" type="submit">Send Feedback</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="topic-journey-section">
+    <div class="topic-journey-heading">
+      <div class="topic-journey-heading-row">
+        <h2>Topic Journey</h2>
+        <div class="topic-journey-heading-actions">
+          <button class="add-suggested-plan-btn"
+                  data-topic-title="{{ topic.topic_title }}"
+                  onclick="addSuggestedPlan(this)">Add Suggested Plan for This Topic</button>
+          <a href="/todos/{{ session_id }}"    class="open-planner-link">Open My Planner</a>
+          <a href="/syllabus/{{ session_id }}" class="open-planner-link">View Syllabus</a>
+        </div>
+      </div>
+      <p>Work through this topic using the existing AI² chat flow.</p>
+    </div>
+
+    <div class="journey-grid">
+      <article class="journey-step-card">
+        <div class="journey-step-num">1</div>
+        <h3>Learn</h3>
+        <span class="step-status-badge step-status-{{ topic_progress['learn'] | replace('_', '-') }}" id="status-learn">
+          {{ topic_progress['learn'] | replace('_', ' ') | title }}
+        </span>
+        <p>Get a structured explanation before practicing.</p>
+        <a class="topic-action-btn"
+           href="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}"
+           data-topic-action
+           data-step="learn"
+           data-status="in_progress"
+           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}">
+          Start Learning
+        </a>
+        <div class="step-mark-controls">
+          <button class="step-mark-btn" onclick="markStep('learn', 'in_progress')">Mark In Progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('learn', 'done')">Mark Done</button>
+        </div>
+        <div class="step-planner-controls">
+          <button class="step-planner-btn"
+                  data-todo-title="Learn: {{ topic.topic_title }}"
+                  data-todo-type="daily"
+                  data-due-label="Today"
+                  onclick="addToPlanner(this)">Add to Today</button>
+          <button class="step-planner-btn"
+                  data-todo-title="Learn: {{ topic.topic_title }}"
+                  data-todo-type="weekly"
+                  data-due-label="Module Plan"
+                  onclick="addToPlanner(this)">Add to Module Plan</button>
+        </div>
+      </article>
+
+      <article class="journey-step-card">
+        <div class="journey-step-num">2</div>
+        <h3>Quiz</h3>
+        <span class="step-status-badge step-status-{{ topic_progress['quiz'] | replace('_', '-') }}" id="status-quiz">
+          {{ topic_progress['quiz'] | replace('_', ' ') | title }}
+        </span>
+        <p>Test your understanding with practice questions.</p>
+        <a class="topic-action-btn"
+           href="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}"
+           data-topic-action
+           data-step="quiz"
+           data-status="in_progress"
+           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}">
+          Take Quiz
+        </a>
+        <div class="step-mark-controls">
+          <button class="step-mark-btn" onclick="markStep('quiz', 'in_progress')">Mark In Progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('quiz', 'done')">Mark Done</button>
+        </div>
+        <div class="step-planner-controls">
+          <button class="step-planner-btn"
+                  data-todo-title="Quiz: {{ topic.topic_title }}"
+                  data-todo-type="daily"
+                  data-due-label="Today"
+                  onclick="addToPlanner(this)">Add to Today</button>
+          <button class="step-planner-btn"
+                  data-todo-title="Quiz: {{ topic.topic_title }}"
+                  data-todo-type="weekly"
+                  data-due-label="Module Plan"
+                  onclick="addToPlanner(this)">Add to Module Plan</button>
+        </div>
+      </article>
+
+      <article class="journey-step-card">
+        <div class="journey-step-num">3</div>
+        <h3>Portfolio Task</h3>
+        <span class="step-status-badge step-status-{{ topic_progress['portfolio_task'] | replace('_', '-') }}" id="status-portfolio_task">
+          {{ topic_progress['portfolio_task'] | replace('_', ' ') | title }}
+        </span>
+        <p>Turn the concept into a small hands-on artifact.</p>
+        <a class="topic-action-btn"
+           href="/chat/{{ session_id }}?prompt={{ topic.portfolio_prompt | urlencode }}"
+           data-topic-action
+           data-step="portfolio_task"
+           data-status="in_progress"
+           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.portfolio_prompt | urlencode }}">
+          Get Task
+        </a>
+        <div class="step-mark-controls">
+          <button class="step-mark-btn" onclick="markStep('portfolio_task', 'in_progress')">Mark In Progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('portfolio_task', 'done')">Mark Done</button>
+        </div>
+        <div class="step-planner-controls">
+          <button class="step-planner-btn"
+                  data-todo-title="Portfolio Task: {{ topic.topic_title }}"
+                  data-todo-type="daily"
+                  data-due-label="Today"
+                  onclick="addToPlanner(this)">Add to Today</button>
+          <button class="step-planner-btn"
+                  data-todo-title="Portfolio Task: {{ topic.topic_title }}"
+                  data-todo-type="weekly"
+                  data-due-label="Module Plan"
+                  onclick="addToPlanner(this)">Add to Module Plan</button>
+        </div>
+      </article>
+
+      <article class="journey-step-card">
+        <div class="journey-step-num">4</div>
+        <h3>Interview Practice</h3>
+        <span class="step-status-badge step-status-{{ topic_progress['interview_practice'] | replace('_', '-') }}" id="status-interview_practice">
+          {{ topic_progress['interview_practice'] | replace('_', ' ') | title }}
+        </span>
+        <p>Practice explaining this topic in an interview setting.</p>
+        <a class="topic-action-btn"
+           href="/chat/{{ session_id }}?prompt={{ topic.interview_prompt | urlencode }}"
+           data-topic-action
+           data-step="interview_practice"
+           data-status="in_progress"
+           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.interview_prompt | urlencode }}">
+          Practice
+        </a>
+        <div class="step-mark-controls">
+          <button class="step-mark-btn" onclick="markStep('interview_practice', 'in_progress')">Mark In Progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('interview_practice', 'done')">Mark Done</button>
+        </div>
+        <div class="step-planner-controls">
+          <button class="step-planner-btn"
+                  data-todo-title="Interview Practice: {{ topic.topic_title }}"
+                  data-todo-type="daily"
+                  data-due-label="Today"
+                  onclick="addToPlanner(this)">Add to Today</button>
+          <button class="step-planner-btn"
+                  data-todo-title="Interview Practice: {{ topic.topic_title }}"
+                  data-todo-type="weekly"
+                  data-due-label="Module Plan"
+                  onclick="addToPlanner(this)">Add to Module Plan</button>
+        </div>
+      </article>
+
+      <article class="journey-step-card" id="topic-reflection">
+        <div class="journey-step-num">5</div>
+        <h3>Reflection / Notes</h3>
+        <span class="step-status-badge step-status-{{ topic_progress['reflection'] | replace('_', '-') }}" id="status-reflection">
+          {{ topic_progress['reflection'] | replace('_', ' ') | title }}
+        </span>
+        <p>Record what you learned, what confused you, and how you can apply it.</p>
+        <div class="reflection-form">
+          <label class="reflection-label">What did you understand?
+            <textarea id="reflection-text" class="reflection-textarea" rows="3"
+                      placeholder="Key concepts, aha moments…">{{ topic_notes.reflection }}</textarea>
+          </label>
+          <label class="reflection-label">What is still confusing?
+            <textarea id="confusions-text" class="reflection-textarea" rows="2"
+                      placeholder="Open questions, gaps…">{{ topic_notes.confusions }}</textarea>
+          </label>
+          <label class="reflection-label">Where can you apply this?
+            <textarea id="application-text" class="reflection-textarea" rows="2"
+                      placeholder="Project, use case, idea…">{{ topic_notes.application_idea }}</textarea>
+          </label>
+          <div class="reflection-actions">
+            <button class="reflection-save-btn" id="reflection-save-btn" onclick="saveReflection()">Save Reflection</button>
+            <span class="reflection-feedback" id="reflection-feedback"></span>
+          </div>
+        </div>
+        <div class="step-mark-controls">
+          <button class="step-mark-btn" onclick="markStep('reflection', 'in_progress')">Mark In Progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('reflection', 'done')">Mark Done</button>
+        </div>
+      </article>
+    </div>
+  </section>
+</section>
+
+<script>
+  window.AI2_TOPIC_DETAIL = {
+    sessionId:                "{{ session_id }}",
+    topicId:                  "{{ topic.topic_id }}",
+    chatUrlBase:              "/chat/{{ session_id }}",
+    todosCreateUrl:           "/todos/create",
+    topicProgressUrl:         "/topic/progress",
+    topicNotesUrl:            "/topic/notes",
+    topicContentGenerateUrl:  "/topic/content/generate",
+    topicPracticeGenerateUrl: "/topic/practice/generate",
+    portfolioSubmitUrl:       "/portfolio/submit",
+    portfolioFeedbackUrl:     "/portfolio/feedback",
+    quizSubmitUrl:            "/quiz/submit",
+    quizEvaluateUrl:          "/quiz/evaluate",
+    interviewSubmitUrl:       "/interview/submit",
+    interviewFeedbackUrl:     "/interview/feedback",
+  };
+</script>
+<script src="/static/topic_detail.js"></script>
+{% endblock %}
