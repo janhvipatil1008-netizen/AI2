@@ -104,8 +104,8 @@
         <a class="topic-action-btn topic-open-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}">Open Topic</a>
         <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}">Learn</a>
         <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}">Quiz</a>
-        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.portfolio_prompt | urlencode }}">Portfolio Task</a>
-        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.interview_prompt | urlencode }}">Interview Practice</a>
+        <a class="topic-action-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-portfolio-task">Portfolio Task</a>
+        <a class="topic-action-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-interview-practice">Interview Practice</a>
       </div>
     </article>
     {% endfor %}
