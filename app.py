@@ -41,11 +41,7 @@ from context.session import SessionContext
 from context.learner_profile import (
     LearnerProfile, load_profile, save_profile,
 )
-from curriculum.syllabus import (
-    _WEEK_TO_PHASE, get_phase_by_id,
-    get_task_key, ROLE_TRACKS, WEEKS,
-    get_progress as syllabus_get_progress,
-)
+from curriculum.syllabus import _WEEK_TO_PHASE, get_phase_by_id
 from orchestrator import Orchestrator
 import agents.practice_arena as practice_arena
 
@@ -552,11 +548,6 @@ class EvaluateRequest(BaseModel):
     question:   str
     answer:     str
     topic:      str = ""
-
-class TaskToggleRequest(BaseModel):
-    session_id: str
-    task_key:   str
-    status:     str = "done"   # "done" | "in_progress" | "todo"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -2026,102 +2017,6 @@ async def evaluate(request: Request, body: EvaluateRequest):
     return {"response": response_text, "progress": _session_progress(session)}
 
 
-@app.get("/syllabus/{session_id}", response_class=HTMLResponse)
-async def syllabus_page(request: Request, session_id: str):
-    data    = _get_session_data(session_id, request.state.user_id or "")
-    session = data["session"]
-    role    = session.track.value
-
-    phases_data = []
-    for week in WEEKS:
-        wn        = week["num"]
-        all_tasks = []
-        role_done = role_total = 0
-        for day in week["days"]:
-            for ti, task_text in enumerate(day["all_tracks"]):
-                key    = get_task_key(wn, day["day_idx"], "all", ti)
-                status = session.syllabus_progress.get(key, "todo")
-                all_tasks.append({
-                    "key":        key,
-                    "text":       task_text,
-                    "track_name": "All Tracks",
-                    "status":     status,
-                    "roles":      list(ROLE_TRACKS.keys()),
-                    "is_my_role": True,
-                })
-                role_total += 1
-                if status == "done":
-                    role_done += 1
-            role_tasks = day["tracks"].get(role, [])
-            task_list  = role_tasks if isinstance(role_tasks, list) else [role_tasks]
-            for ti, task_text in enumerate(task_list):
-                if not task_text:
-                    continue
-                key    = get_task_key(wn, day["day_idx"], role, ti)
-                status = session.syllabus_progress.get(key, "todo")
-                all_tasks.append({
-                    "key":        key,
-                    "text":       task_text,
-                    "track_name": ROLE_TRACKS[role]["label"],
-                    "status":     status,
-                    "roles":      [role],
-                    "is_my_role": True,
-                })
-                role_total += 1
-                if status == "done":
-                    role_done += 1
-        if all_tasks:
-            phases_data.append({
-                "id":          f"week-{wn}",
-                "icon":        "📅",
-                "phase":       f"Module {wn}",
-                "weeks":       week["week_hours"],
-                "title":       week["title"],
-                "description": week["theme"],
-                "tasks":       all_tasks,
-                "done":        role_done,
-                "total":       role_total,
-                "pct":         round(role_done / role_total * 100) if role_total > 0 else 0,
-            })
-
-    overall = syllabus_get_progress(session.syllabus_progress, [role])
-
-    return templates.TemplateResponse(
-        request=request,
-        name="syllabus.html",
-        context={
-            "session_id":  session_id,
-            "progress":    _session_progress(session),
-            "phases":      phases_data,
-            "overall":     overall,
-            "test_mode":   bool(TEST_MODE),
-            "user_role":   role,
-            "role_tracks": ROLE_TRACKS,
-        },
-    )
-
-
-@app.post("/task/toggle")
-async def task_toggle(request: Request, body: TaskToggleRequest):
-    valid_statuses = {"done", "in_progress", "todo"}
-    if body.status not in valid_statuses:
-        raise HTTPException(status_code=422, detail=f"status must be one of {valid_statuses}")
-
-    data    = _get_session_data(body.session_id, request.state.user_id or "")
-    session = data["session"]
-    session.mark_task(body.task_key, body.status)
-    _save_session(body.session_id, session)
-
-    role    = session.track.value
-    overall = syllabus_get_progress(session.syllabus_progress, [role])
-    return {
-        "task_key": body.task_key,
-        "status":   body.status,
-        "overall":  overall,
-        "tasks_done": session.tasks_done_count(),
-    }
-
-
 @app.get("/chat/{session_id}", response_class=HTMLResponse)
 async def chat_page(request: Request, session_id: str):
     data    = _get_session_data(session_id, request.state.user_id or "")
@@ -2266,6 +2161,9 @@ app.include_router(dashboard_router)
 
 from routes.auth_routes import router as auth_router  # noqa: E402
 app.include_router(auth_router)
+
+from routes.syllabus import router as syllabus_router  # noqa: E402
+app.include_router(syllabus_router)
 
 from routes.topics import router as topics_router, get_next_topic_step  # noqa: E402,F401
 app.include_router(topics_router)

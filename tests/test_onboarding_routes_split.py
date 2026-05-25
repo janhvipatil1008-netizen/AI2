@@ -221,6 +221,9 @@ def test_app_py_still_has_chat_route():
     assert '@app.post("/chat")' in _app()
 
 
-def test_app_py_still_has_syllabus_route():
-    """app.py still defines /syllabus — syllabus route not moved."""
-    assert '@app.get("/syllabus/{session_id}"' in _app()
+def test_app_py_includes_syllabus_router():
+    """app.py includes syllabus router after syllabus route split."""
+    src = _app()
+    assert '@app.get("/syllabus/{session_id}"' not in src
+    assert "from routes.syllabus import router as syllabus_router" in src
+    assert "app.include_router(syllabus_router)" in src

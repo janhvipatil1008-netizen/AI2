@@ -142,7 +142,7 @@ def test_non_auth_routes_not_moved_into_auth_routes():
     assert "from routes.dashboard import router as dashboard_router" in app_source
     assert "from routes.onboarding import router as onboarding_router" in app_source
     assert '@app.get("/chat/{session_id}"' in app_source
-    assert '@app.get("/syllabus/{session_id}"' in app_source
+    assert "from routes.syllabus import router as syllabus_router" in app_source
     assert '@app.get("/jobs"' in app_source
 
     assert '"/debug/' not in auth_source

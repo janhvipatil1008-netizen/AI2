@@ -168,7 +168,7 @@ def test_non_dashboard_routes_not_moved_in_this_slice():
     dashboard_source = _read("routes/dashboard.py")
 
     assert '@app.get("/chat/{session_id}"' in app_source
-    assert '@app.get("/syllabus/{session_id}"' in app_source
+    assert "from routes.syllabus import router as syllabus_router" in app_source
     assert '@app.get("/debug/storage-status")' in app_source
     assert "from routes.onboarding import router as onboarding_router" in app_source
 
