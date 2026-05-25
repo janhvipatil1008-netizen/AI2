@@ -519,14 +519,10 @@
           {{ topic_progress['portfolio_task'] | replace('_', ' ') | title }}
         </span>
         <p>Turn the concept into a small hands-on artifact.</p>
-        <a class="topic-action-btn"
-           href="/chat/{{ session_id }}?prompt={{ topic.portfolio_prompt | urlencode }}"
-           data-topic-action
-           data-step="portfolio_task"
-           data-status="in_progress"
-           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.portfolio_prompt | urlencode }}">
-          Get Task
-        </a>
+        <button type="button" class="topic-action-btn"
+                onclick="markStep('portfolio_task', 'in_progress'); generatePractice('portfolio_task', false)">
+          Portfolio Task
+        </button>
         <div class="step-mark-controls">
           <button class="step-mark-btn" onclick="markStep('portfolio_task', 'in_progress')">Mark In Progress</button>
           <button class="step-mark-btn step-mark-done" onclick="markStep('portfolio_task', 'done')">Mark Done</button>
@@ -552,14 +548,10 @@
           {{ topic_progress['interview_practice'] | replace('_', ' ') | title }}
         </span>
         <p>Practice explaining this topic in an interview setting.</p>
-        <a class="topic-action-btn"
-           href="/chat/{{ session_id }}?prompt={{ topic.interview_prompt | urlencode }}"
-           data-topic-action
-           data-step="interview_practice"
-           data-status="in_progress"
-           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.interview_prompt | urlencode }}">
-          Practice
-        </a>
+        <button type="button" class="topic-action-btn"
+                onclick="markStep('interview_practice', 'in_progress'); generatePractice('interview_practice', false)">
+          Interview Practice
+        </button>
         <div class="step-mark-controls">
           <button class="step-mark-btn" onclick="markStep('interview_practice', 'in_progress')">Mark In Progress</button>
           <button class="step-mark-btn step-mark-done" onclick="markStep('interview_practice', 'done')">Mark Done</button>
