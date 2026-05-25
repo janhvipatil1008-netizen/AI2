@@ -28,6 +28,7 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 from fastapi.testclient import TestClient
 
 import app as app_module
+import routes.dashboard as dashboard_module
 import routes.deps as deps_module
 from config import CareerTrack
 from context.session import SessionContext
@@ -160,7 +161,7 @@ def test_dashboard_shows_current_topic_when_modular_progress_available():
     _put_session(session_id=session_id, current_week=2)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_dashboard_db_summaries",
         return_value=(_enrollment_result_disabled(), _modular_summary_available()),
     ):
@@ -177,7 +178,7 @@ def test_dashboard_shows_next_topic_when_available():
     _put_session(session_id=session_id, current_week=2)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_dashboard_db_summaries",
         return_value=(_enrollment_result_disabled(), _modular_summary_available()),
     ):
@@ -195,7 +196,7 @@ def test_dashboard_shows_current_focus_section_when_modular_available():
     _put_session(session_id=session_id, current_week=3)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_dashboard_db_summaries",
         return_value=(_enrollment_result_disabled(), _modular_summary_available()),
     ):
@@ -212,7 +213,7 @@ def test_dashboard_falls_back_to_module_n_when_modular_unavailable():
     _put_session(session_id=session_id, current_week=3)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_dashboard_db_summaries",
         return_value=(_enrollment_result_disabled(), _modular_summary_unavailable()),
     ):
@@ -229,7 +230,7 @@ def test_dashboard_falls_back_to_module_n_when_db_fails():
     _put_session(session_id=session_id, current_week=4)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("connection refused"),
     ):
@@ -244,7 +245,7 @@ def test_dashboard_does_not_show_current_focus_when_no_session():
     app_module._sessions.clear()
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("no db"),
     ):
@@ -264,7 +265,7 @@ def test_dashboard_no_learner_facing_db_error():
     _put_session(session_id=session_id)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("postgres://user:secret@localhost/db"),
     ):
@@ -282,7 +283,7 @@ def test_existing_dashboard_stats_still_render():
     _put_session(session_id=session_id, current_week=2)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("no db"),
     ):
@@ -299,7 +300,7 @@ def test_existing_dashboard_learning_summary_still_renders():
     _put_session(session_id=session_id, current_week=2)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("no db"),
     ):
@@ -315,7 +316,7 @@ def test_existing_dashboard_resume_card_still_renders():
     _put_session(session_id=session_id, current_week=2)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("no db"),
     ):
@@ -466,7 +467,7 @@ def test_current_week_remains_supported_internally():
     session = _put_session(session_id="pos-current-week", current_week=5)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("no db"),
     ):
@@ -483,7 +484,7 @@ def test_weeks_and_role_tracks_not_mutated():
     role_tracks_before = deepcopy(ROLE_TRACKS)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("no db"),
     ):
@@ -503,7 +504,7 @@ def test_no_claude_call_made_on_dashboard():
         side_effect=AssertionError("Claude must not be called"),
     ) as make_client:
         with patch.object(
-            app_module,
+            dashboard_module,
             "_open_db_connection",
             side_effect=RuntimeError("no db"),
         ):
@@ -533,7 +534,7 @@ def test_no_seed_script_called_on_dashboard():
 
     with patch("runpy.run_module", side_effect=AssertionError("seed must not run")) as run_mod:
         with patch.object(
-            app_module,
+            dashboard_module,
             "_open_db_connection",
             side_effect=RuntimeError("no db"),
         ):

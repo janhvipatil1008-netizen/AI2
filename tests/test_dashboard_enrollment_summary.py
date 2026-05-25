@@ -12,6 +12,7 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 from fastapi.testclient import TestClient
 
 import app as app_module
+import routes.dashboard as dashboard_module
 from config import CareerTrack
 from context.session import SessionContext
 from curriculum.syllabus import ROLE_TRACKS, WEEKS
@@ -83,9 +84,9 @@ def test_dashboard_renders_with_db_enrollment_source():
     _put_session(session_id=session_id)
     conn = FakeReadConn()
 
-    with patch.object(app_module, "_open_db_connection", return_value=conn):
+    with patch.object(dashboard_module, "_open_db_connection", return_value=conn):
         with patch.object(
-            app_module,
+            dashboard_module,
             "get_active_course_enrollment_with_fallback",
             return_value=_db_result(),
         ) as get_enrollment:
@@ -110,9 +111,9 @@ def test_dashboard_renders_with_fallback_enrollment_source():
     _put_session(session_id="dashboard-fallback-enrollment")
     conn = FakeReadConn()
 
-    with patch.object(app_module, "_open_db_connection", return_value=conn):
+    with patch.object(dashboard_module, "_open_db_connection", return_value=conn):
         with patch.object(
-            app_module,
+            dashboard_module,
             "get_active_course_enrollment_with_fallback",
             return_value={
                 "source": "fallback",
@@ -140,7 +141,7 @@ def test_dashboard_renders_when_db_connection_fails():
     _put_session(session_id="dashboard-db-fails")
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("postgres://user:secret@localhost/db"),
     ):
@@ -155,7 +156,7 @@ def test_no_learner_facing_db_error_is_shown():
     _put_session(session_id="dashboard-no-error-leak")
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("postgres://user:secret@localhost/db"),
     ):
@@ -170,13 +171,13 @@ def test_enrollment_summary_contains_only_safe_fields():
     conn = FakeReadConn()
     session = SessionContext(track=CareerTrack.AI_PM, user_id="user-1")
 
-    with patch.object(app_module, "_open_db_connection", return_value=conn):
+    with patch.object(dashboard_module, "_open_db_connection", return_value=conn):
         with patch.object(
-            app_module,
+            dashboard_module,
             "get_active_course_enrollment_with_fallback",
             return_value=_db_result(),
         ):
-            summary = app_module._dashboard_enrollment_summary(
+            summary = dashboard_module._dashboard_enrollment_summary(
                 user_id="user-1",
                 session_id="session-1",
                 session=session,
@@ -206,7 +207,7 @@ def test_old_dashboard_progress_still_appears():
     _put_session(session_id="dashboard-old-progress", current_week=3)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("connection unavailable"),
     ):
@@ -223,7 +224,7 @@ def test_current_week_remains_supported_internally():
     session = _put_session(session_id="dashboard-current-week", current_week=5)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("connection unavailable"),
     ):
@@ -240,7 +241,7 @@ def test_weeks_and_role_tracks_are_not_mutated():
     role_tracks_before = deepcopy(ROLE_TRACKS)
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=RuntimeError("connection unavailable"),
     ):
@@ -256,7 +257,7 @@ def test_no_claude_call_is_made():
 
     with patch.object(app_module, "_make_client", side_effect=AssertionError("Claude must not be called")) as make_client:
         with patch.object(
-            app_module,
+            dashboard_module,
             "_open_db_connection",
             side_effect=RuntimeError("connection unavailable"),
         ):
@@ -271,7 +272,7 @@ def test_no_seed_script_is_called():
 
     with patch("runpy.run_module", side_effect=AssertionError("seed scripts must not run")) as run_module:
         with patch.object(
-            app_module,
+            dashboard_module,
             "_open_db_connection",
             side_effect=RuntimeError("connection unavailable"),
         ):
@@ -285,9 +286,9 @@ def test_no_commit_or_rollback_called_for_read_only_dashboard():
     _put_session(session_id="dashboard-read-only")
     conn = FakeReadConn()
 
-    with patch.object(app_module, "_open_db_connection", return_value=conn):
+    with patch.object(dashboard_module, "_open_db_connection", return_value=conn):
         with patch.object(
-            app_module,
+            dashboard_module,
             "get_active_course_enrollment_with_fallback",
             return_value=_db_result(),
         ):
@@ -303,7 +304,7 @@ def test_no_db_connection_opened_without_user_context():
     _put_session(session_id="dashboard-no-user", user_id="")
 
     with patch.object(
-        app_module,
+        dashboard_module,
         "_open_db_connection",
         side_effect=AssertionError("DB must not be opened without user context"),
     ) as open_db:

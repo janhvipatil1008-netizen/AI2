@@ -5,8 +5,9 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 
 from fastapi.testclient import TestClient
 
-from app import app, _sessions, build_dashboard_learning_summary
+from app import app, _sessions
 from curriculum.topics import get_topics_for_week
+from routes.dashboard import build_dashboard_learning_summary
 
 client = TestClient(app)
 

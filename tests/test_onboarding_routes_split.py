@@ -198,9 +198,12 @@ def test_onboarding_save_url_unchanged():
 
 # ── No other routes accidentally moved ───────────────────────────────────────
 
-def test_app_py_still_has_dashboard_route():
-    """app.py still defines /dashboard — was not accidentally moved."""
-    assert '@app.get("/dashboard"' in _app()
+def test_app_py_includes_dashboard_router():
+    """app.py includes dashboard router after dashboard route split."""
+    src = _app()
+    assert '@app.get("/dashboard"' not in src
+    assert "from routes.dashboard import router as dashboard_router" in src
+    assert "app.include_router(dashboard_router)" in src
 
 
 def test_app_py_still_has_history_route():
