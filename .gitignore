@@ -7,3 +7,5 @@ sessions.db
 *.db
 *.db-shm
 *.db-wal
+.pytest_tmp/
+manual_tmp/
