@@ -723,11 +723,6 @@ def _session_progress(session: SessionContext) -> dict:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "test_mode": TEST_MODE}
-
-
 def _debug_access(request: Request) -> None:
     """FastAPI dependency: blocks debug endpoints in production without a valid token."""
     if not is_debug_access_allowed(request):
@@ -2018,24 +2013,6 @@ async def logout():
     return resp
 
 
-@app.get("/privacy", response_class=HTMLResponse)
-async def privacy_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="privacy.html",
-        context={"test_mode": bool(TEST_MODE)},
-    )
-
-
-@app.get("/terms", response_class=HTMLResponse)
-async def terms_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="terms.html",
-        context={"test_mode": bool(TEST_MODE)},
-    )
-
-
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     user_id = request.state.user_id or "test-user"
@@ -2377,13 +2354,6 @@ async def history_page(request: Request):
             "test_mode": bool(TEST_MODE),
         },
     )
-
-
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    if TEST_MODE or request.state.user_id:
-        return RedirectResponse(url="/dashboard", status_code=302)
-    return RedirectResponse(url="/login", status_code=302)
 
 
 @app.post("/session/start")
@@ -2789,6 +2759,9 @@ _rdeps.session_progress = _session_progress
 _rdeps.make_client      = _make_client
 _rdeps.run_blocking     = _run_blocking
 _rdeps.TEST_MODE        = TEST_MODE
+
+from routes.public import router as public_router  # noqa: E402
+app.include_router(public_router)
 
 from routes.topics import router as topics_router, get_next_topic_step  # noqa: E402,F401
 app.include_router(topics_router)
