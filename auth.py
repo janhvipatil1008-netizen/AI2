@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 from fastapi import Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
+from core.security_config import assert_auth_secret_set
+
 load_dotenv()
 
 # ── Password hashing ──────────────────────────────────────────────────────────
@@ -34,6 +36,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 AUTH_COOKIE = "ai2_user_token"
 _COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
 
+assert_auth_secret_set()
 _SECRET = os.getenv("AUTH_SECRET", "")
 if not _SECRET:
     _SECRET = secrets.token_hex(32)

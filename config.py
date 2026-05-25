@@ -28,6 +28,9 @@ TRACK_TAGLINES = {
     CareerTrack.CONTEXT_ENGINEER: "Master the art of context and memory.",
 }
 
+# compatibility-only: fixed week count for old sessions/static fallback.
+# New modular curriculum features should use course/module/topic sequence_order
+# plus learner enrollment/progress state instead of TOTAL_WEEKS.
 TOTAL_WEEKS = 5
 
 # ── Agent Identities ──────────────────────────────────────────────────────────

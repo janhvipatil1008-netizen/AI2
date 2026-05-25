@@ -8,7 +8,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-section">
       <div class="track-badge">{{ progress.track_label }}</div>
-      <div class="week-badge">Week {{ progress.current_week }} / {{ progress.total_weeks }}</div>
+      <div class="week-badge">Module {{ progress.current_week }}</div>
     </div>
 
     <div class="sidebar-section">
@@ -29,6 +29,8 @@
 
     <div class="sidebar-section">
       <a href="/syllabus/{{ session_id }}" class="syllabus-btn">📋 View Syllabus &amp; Track Progress</a>
+      <a href="/topics/{{ session_id }}" class="syllabus-btn topics-nav-btn">Browse Module Topics</a>
+      <a href="/todos/{{ session_id }}" class="syllabus-btn topics-nav-btn">📝 My Learning Planner</a>
     </div>
 
     <div class="sidebar-section">
@@ -38,7 +40,7 @@
         <button class="qa-btn qa-pick" data-mode="interview">🎯 Interview Prep</button>
         <button class="qa-btn qa-pick" data-mode="learn">🧠 Learn About</button>
         <button class="qa-btn qa-pick" data-mode="papers">📄 Papers</button>
-        <button class="qa-btn" data-msg="Give me project ideas I can build this week">💡 Ideas</button>
+        <button class="qa-btn" data-msg="Give me project ideas for my current module">💡 Ideas</button>
         <button class="qa-btn" data-msg="What should I focus on next in the curriculum?">🗺️ What's Next</button>
       </div>
     </div>
@@ -121,6 +123,14 @@
   });
 
   // ── Quick action buttons ───────────────────────────────────────────────
+  const initialPrompt = new URLSearchParams(window.location.search).get('prompt');
+  if (initialPrompt) {
+    input.value = initialPrompt;
+    input.dispatchEvent(new Event('input'));
+    window.history.replaceState({}, '', window.location.pathname);
+    setTimeout(() => sendMessage(), 100);
+  }
+
   // Instant-send buttons (Ideas, What's Next)
   document.querySelectorAll('.qa-btn:not(.qa-pick)').forEach(btn => {
     btn.addEventListener('click', () => {
