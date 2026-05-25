@@ -109,7 +109,7 @@ def test_get_onboarding_renders_form():
 
 def test_post_onboarding_save_saves_valid_profile():
     session_id = _start_session()
-    with patch("app._save_session") as save_session:
+    with patch("routes.deps.save_session") as save_session:
         response = client.post(
             "/onboarding/save",
             data=_valid_form(session_id, goal="interview_prep", level="job_ready", weekly_time="two_hours"),
@@ -215,7 +215,7 @@ def test_no_db_connection_required_for_onboarding_get_or_save():
 def test_session_ownership_helper_is_used_on_get():
     session = SessionContext(track=CareerTrack.AI_PM)
     loader = MagicMock(return_value={"session": session})
-    with patch("app._get_session_data", loader):
+    with patch("routes.deps.get_session_data", loader):
         response = client.get("/onboarding/session-123")
 
     assert response.status_code == 200
@@ -225,7 +225,7 @@ def test_session_ownership_helper_is_used_on_get():
 def test_session_ownership_helper_is_used_on_post():
     session = SessionContext(track=CareerTrack.AI_PM)
     loader = MagicMock(return_value={"session": session})
-    with patch("app._get_session_data", loader), patch("app._save_session"):
+    with patch("routes.deps.get_session_data", loader), patch("routes.deps.save_session"):
         response = client.post(
             "/onboarding/save",
             data=_valid_form("session-123"),

@@ -12,6 +12,7 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 from fastapi.testclient import TestClient
 
 import app as app_module
+import routes.onboarding as onboarding_module
 from config import CareerTrack
 from context.session import SessionContext
 from curriculum.syllabus import ROLE_TRACKS, WEEKS
@@ -91,9 +92,9 @@ def test_onboarding_still_succeeds_when_enrollment_db_write_succeeds():
     conn = FakeConn()
     conn_manager = FakeConnManager(conn)
 
-    with patch.object(app_module, "get_conn", return_value=conn_manager):
+    with patch.object(onboarding_module, "get_conn", return_value=conn_manager):
         with patch.object(
-            app_module,
+            onboarding_module,
             "ensure_course_enrollment",
             return_value={
                 "source": "created",
@@ -127,11 +128,11 @@ def test_onboarding_still_succeeds_when_db_connection_fails():
     session = _put_session(session_id=session_id)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("postgres://user:secret@localhost/db"),
     ):
-        with patch.object(app_module, "ensure_course_enrollment") as ensure:
+        with patch.object(onboarding_module, "ensure_course_enrollment") as ensure:
             response = client.post(
                 "/onboarding/save",
                 data=_form(session_id),
@@ -149,9 +150,9 @@ def test_onboarding_still_succeeds_when_ensure_course_enrollment_returns_error()
     _put_session(session_id=session_id)
     conn = FakeConn()
 
-    with patch.object(app_module, "get_conn", return_value=FakeConnManager(conn)):
+    with patch.object(onboarding_module, "get_conn", return_value=FakeConnManager(conn)):
         with patch.object(
-            app_module,
+            onboarding_module,
             "ensure_course_enrollment",
             return_value={
                 "source": "error",
@@ -177,9 +178,9 @@ def test_ensure_course_enrollment_is_called_with_onboarding_source():
     _put_session(session_id=session_id)
     conn = FakeConn()
 
-    with patch.object(app_module, "get_conn", return_value=FakeConnManager(conn)):
+    with patch.object(onboarding_module, "get_conn", return_value=FakeConnManager(conn)):
         with patch.object(
-            app_module,
+            onboarding_module,
             "ensure_course_enrollment",
             return_value={
                 "source": "existing",
@@ -203,9 +204,9 @@ def test_recommended_track_is_passed_to_enrollment_service():
     _put_session(session_id=session_id)
     conn = FakeConn()
 
-    with patch.object(app_module, "get_conn", return_value=FakeConnManager(conn)):
+    with patch.object(onboarding_module, "get_conn", return_value=FakeConnManager(conn)):
         with patch.object(
-            app_module,
+            onboarding_module,
             "ensure_course_enrollment",
             return_value={
                 "source": "created",
@@ -234,9 +235,9 @@ def test_rollback_happens_on_enrollment_exception_if_connection_was_opened():
     _put_session(session_id=session_id)
     conn = FakeConn()
 
-    with patch.object(app_module, "get_conn", return_value=FakeConnManager(conn)):
+    with patch.object(onboarding_module, "get_conn", return_value=FakeConnManager(conn)):
         with patch.object(
-            app_module,
+            onboarding_module,
             "ensure_course_enrollment",
             side_effect=RuntimeError("db write failed password=secret"),
         ):
@@ -257,11 +258,11 @@ def test_no_db_connection_opened_if_user_context_is_missing():
     session = _put_session(session_id=session_id, user_id="")
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=AssertionError("DB must not be opened without user context"),
     ) as get_conn:
-        with patch.object(app_module, "ensure_course_enrollment") as ensure:
+        with patch.object(onboarding_module, "ensure_course_enrollment") as ensure:
             response = client.post(
                 "/onboarding/save",
                 data=_form(session_id),
@@ -279,7 +280,7 @@ def test_no_learner_facing_db_error_is_shown():
     _put_session(session_id=session_id)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("postgres://user:secret@localhost/db"),
     ):
@@ -301,7 +302,7 @@ def test_session_context_onboarding_behavior_remains_unchanged():
     session = _put_session(session_id=session_id, current_week=4)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("connection unavailable"),
     ):
@@ -330,7 +331,7 @@ def test_current_week_remains_unchanged():
     session = _put_session(session_id=session_id, current_week=6)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("connection unavailable"),
     ):
@@ -351,7 +352,7 @@ def test_weeks_and_role_tracks_are_not_mutated():
     role_tracks_before = deepcopy(ROLE_TRACKS)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("connection unavailable"),
     ):
@@ -382,11 +383,11 @@ def test_save_session_still_receives_onboarding_session():
     _put_session(session_id=session_id)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("connection unavailable"),
     ):
-        with patch.object(app_module, "_save_session") as save_session:
+        with patch("routes.deps.save_session") as save_session:
             response = client.post(
                 "/onboarding/save",
                 data=_form(session_id),
@@ -404,7 +405,7 @@ def test_generic_warning_does_not_log_db_secret(caplog):
     _put_session(session_id=session_id)
 
     with patch.object(
-        app_module,
+        onboarding_module,
         "get_conn",
         side_effect=RuntimeError("postgres://user:secret@localhost/db"),
     ):
@@ -426,9 +427,9 @@ def test_no_claude_call_for_onboarding_enrollment():
     conn = FakeConn()
 
     with patch.object(app_module, "_make_client", side_effect=AssertionError("Claude must not be called")) as make_client:
-        with patch.object(app_module, "get_conn", return_value=FakeConnManager(conn)):
+        with patch.object(onboarding_module, "get_conn", return_value=FakeConnManager(conn)):
             with patch.object(
-                app_module,
+                onboarding_module,
                 "ensure_course_enrollment",
                 return_value={
                     "source": "created",

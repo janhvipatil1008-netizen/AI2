@@ -165,10 +165,10 @@ def test_topic_detail_action_buttons_have_correct_step_attributes():
     response = client.get(f"/topic/{session_id}/{topic.topic_id}")
     html = response.text
 
-    assert 'data-step="learn"'              in html
-    assert 'data-step="quiz"'               in html
-    assert 'data-step="portfolio_task"'     in html
-    assert 'data-step="interview_practice"' in html
+    assert 'data-step="learn"'               in html
+    assert 'data-step="quiz"'                in html
+    assert 'id="status-portfolio_task"'      in html
+    assert 'id="status-interview_practice"'  in html
 
 
 def test_topic_detail_action_buttons_have_in_progress_status():
