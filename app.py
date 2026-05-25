@@ -22,8 +22,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
 
-import psycopg2
-
 import anthropic
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -35,11 +33,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from auth import (
-    AUTH_COOKIE, hash_password, verify_password,
-    create_auth_token, get_current_user_id,
-)
-from core.security_config import assert_test_mode_off, get_cookie_secure, is_debug_access_allowed
+from auth import get_current_user_id
+from core.security_config import assert_test_mode_off, is_debug_access_allowed
 from database.pool import get_conn
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TOTAL_WEEKS
 from context.session import SessionContext
@@ -1839,116 +1834,6 @@ async def debug_modular_curriculum(
     }
 
 
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    if request.state.user_id:
-        return RedirectResponse(url="/dashboard", status_code=302)
-    return templates.TemplateResponse(
-        request=request, name="login.html", context={"error": ""},
-    )
-
-
-@app.post("/login")
-async def login_submit(request: Request):
-    form     = await request.form()
-    email    = str(form.get("email", "")).strip().lower()
-    password = str(form.get("password", ""))
-
-    if not TEST_MODE:
-        try:
-            with get_conn() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT user_id, password_hash FROM users WHERE email = %s", (email,)
-                    )
-                    row = cur.fetchone()
-        except Exception:
-            row = None
-
-        if not row or not verify_password(password, row[1]):
-            return templates.TemplateResponse(
-                request=request, name="login.html",
-                context={"error": "Incorrect email or password — please try again."},
-                status_code=401,
-            )
-        user_id = row[0]
-    else:
-        user_id = "test-user"
-
-    token = create_auth_token(user_id)
-    resp  = RedirectResponse(url="/dashboard", status_code=302)
-    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600, secure=get_cookie_secure())
-    return resp
-
-
-@app.get("/signup", response_class=HTMLResponse)
-async def signup_page(request: Request):
-    if request.state.user_id:
-        return RedirectResponse(url="/dashboard", status_code=302)
-    return templates.TemplateResponse(
-        request=request, name="signup.html", context={"error": ""},
-    )
-
-
-@app.post("/signup")
-async def signup_submit(request: Request):
-    form         = await request.form()
-    email        = str(form.get("email", "")).strip().lower()
-    display_name = str(form.get("display_name", "")).strip()
-    password     = str(form.get("password", ""))
-    confirm      = str(form.get("confirm_password", ""))
-
-    if not email or not password:
-        return templates.TemplateResponse(
-            request=request, name="signup.html",
-            context={"error": "Email and password are required."},
-            status_code=422,
-        )
-    if password != confirm:
-        return templates.TemplateResponse(
-            request=request, name="signup.html",
-            context={"error": "Passwords do not match."},
-            status_code=422,
-        )
-    if len(password) < 8:
-        return templates.TemplateResponse(
-            request=request, name="signup.html",
-            context={"error": "Password must be at least 8 characters."},
-            status_code=422,
-        )
-
-    user_id      = str(uuid.uuid4())
-    password_hash = hash_password(password)
-    now          = datetime.now().isoformat()
-
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO users (user_id, email, password_hash, display_name, created_at, updated_at) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (user_id, email, password_hash, display_name or email.split("@")[0], now, now),
-                )
-    except psycopg2.IntegrityError:
-        return templates.TemplateResponse(
-            request=request, name="signup.html",
-            context={"error": "An account with that email already exists."},
-            status_code=409,
-        )
-
-    token = create_auth_token(user_id)
-    resp  = RedirectResponse(url="/dashboard", status_code=302)
-    resp.set_cookie(AUTH_COOKIE, token, httponly=True, samesite="lax", max_age=30 * 24 * 3600, secure=get_cookie_secure())
-    return resp
-
-
-@app.get("/logout")
-async def logout():
-    resp = RedirectResponse(url="/login", status_code=302)
-    resp.delete_cookie(AUTH_COOKIE)
-    return resp
-
-
 @app.get("/history", response_class=HTMLResponse)
 async def history_page(request: Request):
     user_id = request.state.user_id or "test-user"
@@ -2378,6 +2263,9 @@ app.include_router(onboarding_router)
 
 from routes.dashboard import router as dashboard_router  # noqa: E402
 app.include_router(dashboard_router)
+
+from routes.auth_routes import router as auth_router  # noqa: E402
+app.include_router(auth_router)
 
 from routes.topics import router as topics_router, get_next_topic_step  # noqa: E402,F401
 app.include_router(topics_router)
