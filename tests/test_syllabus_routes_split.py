@@ -121,7 +121,7 @@ def test_non_syllabus_routes_not_moved_in_this_step():
     assert "from routes.onboarding import router as onboarding_router" in app_source
     assert '@app.get("/debug/storage-status")' in app_source
     assert '@app.post("/chat")' in app_source
-    assert '@app.get("/jobs"' in app_source
+    assert "from routes.jobs import router as jobs_router" in app_source
 
     assert '"/login"' not in syllabus_source
     assert '"/dashboard"' not in syllabus_source
