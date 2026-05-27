@@ -1,8 +1,32 @@
 """Shared runtime dependencies for route modules. Populated by app.py at startup."""
+import os
 from typing import Any, Callable
 
 from fastapi import HTTPException, Request
 from core.security_config import is_debug_access_allowed
+
+
+def safe_debug_error_message(exc: Exception) -> str:
+    """Return a short debug-safe exception summary without secrets or URLs."""
+    import re
+    from core.logging import safe_error_metadata
+    meta = safe_error_metadata(exc)
+    message = str(meta["error_message"])
+    for env_name in ("SUPABASE_DATABASE_URL", "DATABASE_URL", "ANTHROPIC_API_KEY"):
+        raw_value = os.getenv(env_name, "")
+        if raw_value:
+            message = message.replace(raw_value, "[redacted]")
+    message = re.sub(
+        r"\b(SUPABASE_DATABASE_URL|DATABASE_URL|ANTHROPIC_API_KEY|AI2_TEST_MODE)\s*=\s*\S+",
+        "[redacted]",
+        message,
+    )
+    message = re.sub(r"postgres(?:ql)?://\S+", "[redacted-db-url]", message, flags=re.IGNORECASE)
+    message = re.sub(r"\b\w+://\S+", "[redacted-url]", message)
+    message = re.sub(r"\btraceback\b", "[redacted]", message, flags=re.IGNORECASE)
+    for token in ("SUPABASE_DATABASE_URL", "DATABASE_URL", "ANTHROPIC_API_KEY", "AI2_TEST_MODE"):
+        message = message.replace(token, "[redacted]")
+    return f"{meta['error_type']}: {message[:300]}"
 
 
 def debug_access(request: Request) -> None:

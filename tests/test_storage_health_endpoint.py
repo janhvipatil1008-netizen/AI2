@@ -136,7 +136,7 @@ def test_no_session_id_returns_config_only_health(monkeypatch):
 
 def test_no_session_id_does_not_load_session(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", side_effect=AssertionError("session must not load")) as loader:
+    with patch("routes.deps.get_session_data", side_effect=AssertionError("session must not load")) as loader:
         response = client.get(URL)
 
     assert response.status_code == 200
@@ -185,7 +185,7 @@ def test_overall_status_partial_when_write_through_flag_on(monkeypatch):
 def test_session_id_loads_session_context_read_only(monkeypatch):
     _clear_flags(monkeypatch)
     session = _fake_session()
-    with patch("app._get_session_data", return_value=_fake_session_data(session)) as loader, patch(
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data(session)) as loader, patch(
         "app._save_session",
     ) as save_session:
         response = client.get(URL, params={"session_id": "sess-1"})
@@ -197,7 +197,7 @@ def test_session_id_loads_session_context_read_only(monkeypatch):
 
 def test_session_summary_includes_counts_only(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         data = client.get(URL, params={"session_id": "sess-1"}).json()
 
     session_status = data["mirrors"]["learner_state"]["session_status"]
@@ -215,7 +215,7 @@ def test_session_summary_includes_counts_only(monkeypatch):
 
 def test_legacy_topic_id_adds_topic_level_booleans_only(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         data = client.get(
             URL,
             params={"session_id": "sess-1", "legacy_topic_id": "topic-1"},
@@ -236,7 +236,7 @@ def test_legacy_topic_id_adds_topic_level_booleans_only(monkeypatch):
 
 def test_endpoint_does_not_call_save_session(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
         "app._save_session",
         side_effect=AssertionError("save_session must not be called"),
     ) as save_session:
@@ -248,7 +248,7 @@ def test_endpoint_does_not_call_save_session(monkeypatch):
 
 def test_endpoint_does_not_expose_full_session_data(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         response = client.get(URL, params={"session_id": "sess-1"})
 
     assert PRIVATE_SESSION_DATA not in response.text
@@ -257,7 +257,7 @@ def test_endpoint_does_not_expose_full_session_data(monkeypatch):
 
 def test_endpoint_does_not_expose_generated_content_submission_or_note_text(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         response = client.get(
             URL,
             params={"session_id": "sess-1", "legacy_topic_id": "topic-1"},
@@ -270,7 +270,7 @@ def test_endpoint_does_not_expose_generated_content_submission_or_note_text(monk
 
 def test_endpoint_does_not_expose_usage_metadata(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         response = client.get(URL, params={"session_id": "sess-1"})
 
     assert PRIVATE_METADATA not in response.text
@@ -282,7 +282,7 @@ def test_no_secrets_or_raw_env_values_appear_in_response(monkeypatch):
     monkeypatch.setenv("SUPABASE_DATABASE_URL", "postgresql://user:secret@host/db")
     monkeypatch.setenv("DATABASE_URL", "postgresql://other:secret@host/db")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-live-secret")
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         response = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "topic-1"})
 
     assert "postgresql://" not in response.text

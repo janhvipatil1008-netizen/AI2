@@ -163,7 +163,7 @@ def test_page_shows_mirror_sections(monkeypatch):
 
 def test_with_session_id_page_shows_safe_counts_only(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1"}).text
 
     assert "Session Counts" in text
@@ -178,7 +178,7 @@ def test_with_session_id_page_shows_safe_counts_only(monkeypatch):
 
 def test_with_legacy_topic_id_page_shows_safe_booleans_only(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(
             URL,
             params={"session_id": "sess-1", "legacy_topic_id": "topic-1"},
@@ -196,7 +196,7 @@ def test_with_legacy_topic_id_page_shows_safe_booleans_only(monkeypatch):
 
 def test_page_does_not_expose_generated_content_text(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "topic-1"}).text
 
     assert PRIVATE_CONTENT not in text
@@ -204,7 +204,7 @@ def test_page_does_not_expose_generated_content_text(monkeypatch):
 
 def test_page_does_not_expose_submission_text(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "topic-1"}).text
 
     assert PRIVATE_SUBMISSION not in text
@@ -212,7 +212,7 @@ def test_page_does_not_expose_submission_text(monkeypatch):
 
 def test_page_does_not_expose_notes_text(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "topic-1"}).text
 
     assert PRIVATE_NOTE not in text
@@ -220,7 +220,7 @@ def test_page_does_not_expose_notes_text(monkeypatch):
 
 def test_page_does_not_expose_usage_metadata(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1"}).text
 
     assert PRIVATE_METADATA not in text
@@ -229,7 +229,7 @@ def test_page_does_not_expose_usage_metadata(monkeypatch):
 
 def test_page_does_not_expose_session_data_json(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1"}).text
 
     assert PRIVATE_SESSION_DATA not in text
@@ -242,7 +242,7 @@ def test_page_does_not_expose_secrets_or_raw_env_values(monkeypatch):
     monkeypatch.setenv("SUPABASE_DATABASE_URL", "postgresql://user:secret@host/db")
     monkeypatch.setenv("DATABASE_URL", "postgresql://other:secret@host/db")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-live-secret")
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         text = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "topic-1"}).text
 
     assert "postgresql://" not in text
@@ -263,7 +263,7 @@ def test_page_does_not_open_db_connection(monkeypatch):
 
 def test_page_does_not_call_save_session(monkeypatch):
     _clear_flags(monkeypatch)
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
         "app._save_session",
         side_effect=AssertionError("save_session must not be called"),
     ) as save_session:
