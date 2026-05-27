@@ -1,6 +1,15 @@
 """Shared runtime dependencies for route modules. Populated by app.py at startup."""
 from typing import Any, Callable
 
+from fastapi import HTTPException, Request
+from core.security_config import is_debug_access_allowed
+
+
+def debug_access(request: Request) -> None:
+    """FastAPI dependency: blocks debug/admin endpoints in production without a valid token."""
+    if not is_debug_access_allowed(request):
+        raise HTTPException(status_code=404, detail="Not found.")
+
 templates:        Any      = None
 get_session_data: Callable = None
 get_user_history: Callable = None

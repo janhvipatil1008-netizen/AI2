@@ -32,7 +32,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from auth import get_current_user_id
-from core.security_config import assert_test_mode_off, is_debug_access_allowed
+from core.security_config import assert_test_mode_off
+from routes.deps import debug_access as _debug_access
 from database.pool import get_conn
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TOTAL_WEEKS
 from context.session import SessionContext
@@ -606,12 +607,6 @@ def _session_progress(session: SessionContext) -> dict:
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
-
-def _debug_access(request: Request) -> None:
-    """FastAPI dependency: blocks debug endpoints in production without a valid token."""
-    if not is_debug_access_allowed(request):
-        raise HTTPException(status_code=404, detail="Not found.")
-
 
 @app.get("/debug/storage-status")
 async def debug_storage_status(_: None = Depends(_debug_access)):
