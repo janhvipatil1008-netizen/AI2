@@ -206,9 +206,12 @@ def test_app_py_includes_dashboard_router():
     assert "app.include_router(dashboard_router)" in src
 
 
-def test_app_py_still_has_history_route():
-    """app.py still defines /history — was not accidentally moved."""
-    assert '@app.get("/history"' in _app()
+def test_app_py_includes_chat_router():
+    """app.py includes chat router after chat route split."""
+    src = _app()
+    assert '@app.get("/history"' not in src
+    assert "from routes.chat import router as chat_router" in src
+    assert "app.include_router(chat_router)" in src
 
 
 def test_app_py_still_has_debug_route():
@@ -216,9 +219,9 @@ def test_app_py_still_has_debug_route():
     assert '@app.get("/debug/storage-status")' in _app()
 
 
-def test_app_py_still_has_chat_route():
-    """app.py still defines POST /chat — chat route not moved."""
-    assert '@app.post("/chat")' in _app()
+def test_app_py_no_longer_defines_chat_route_directly():
+    """app.py no longer defines POST /chat directly after chat route split."""
+    assert '@app.post("/chat")' not in _app()
 
 
 def test_app_py_includes_syllabus_router():

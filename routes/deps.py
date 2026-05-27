@@ -3,12 +3,21 @@ from typing import Any, Callable
 
 templates:        Any      = None
 get_session_data: Callable = None
+get_user_history: Callable = None
 get_user_sessions: Callable = None
 load_profile_db:  Callable = None
+save_exchange_to_history: Callable = None
+save_profile_db: Callable = None
 save_session:     Callable = None
 session_progress: Callable = None
 make_client:      Callable = None
 run_blocking:     Callable = None
+track_from_str:   Callable = None
+mock_orchestrator_response: Callable = None
+mock_responses:   dict     = {}
+limiter:          Any      = None
+CHAT_RATE_LIMIT:  str      = ""
+PRACTICE_RATE_LIMIT: str   = ""
 session_cache:    dict     = {}
 TEST_MODE:        bool     = False
 

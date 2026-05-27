@@ -75,7 +75,12 @@ def test_context_building_opens_no_db_connection():
 
     with patch("database.pool._connect", side_effect=AssertionError("DB must not open")):
         with patch.object(app_module, "get_conn", side_effect=AssertionError("DB must not open")):
-            with patch.object(app_module, "_open_db_connection", side_effect=AssertionError("DB must not open")):
+            with patch.object(
+                app_module,
+                "_open_db_connection",
+                side_effect=AssertionError("DB must not open"),
+                create=True,
+            ):
                 assert "Current module" in session.as_prompt_context()
                 assert "Current module" in session.progress_summary()
 
@@ -85,7 +90,12 @@ def test_chat_route_still_works_without_db_or_claude_calls():
 
     with patch.object(app_module, "_make_client", side_effect=AssertionError("Claude must not be called")) as make_client:
         with patch.object(app_module, "get_conn", side_effect=AssertionError("DB must not open")) as get_conn:
-            with patch.object(app_module, "_open_db_connection", side_effect=AssertionError("DB must not open")) as open_db:
+            with patch.object(
+                app_module,
+                "_open_db_connection",
+                side_effect=AssertionError("DB must not open"),
+                create=True,
+            ) as open_db:
                 start = client.post("/session/start", json={"track": "aipm", "week": 2})
                 assert start.status_code == 200, start.text
                 session_id = start.json()["session_id"]

@@ -190,9 +190,12 @@ def test_app_py_includes_onboarding_router():
     assert "app.include_router(onboarding_router)" in src
 
 
-def test_app_py_still_has_chat_route():
-    """app.py still defines POST /chat — chat route not moved."""
-    assert '@app.post("/chat")' in _app()
+def test_app_py_includes_chat_router():
+    """app.py includes chat router after chat route split."""
+    src = _app()
+    assert '@app.post("/chat")' not in src
+    assert "from routes.chat import router as chat_router" in src
+    assert "app.include_router(chat_router)" in src
 
 
 # ── Route URLs not changed ────────────────────────────────────────────────────

@@ -17,7 +17,6 @@ import functools
 import json
 import os
 import logging
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
@@ -28,7 +27,6 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -43,7 +41,6 @@ from context.learner_profile import (
 )
 from curriculum.syllabus import _WEEK_TO_PHASE, get_phase_by_id
 from orchestrator import Orchestrator
-import agents.practice_arena as practice_arena
 
 load_dotenv()
 
@@ -513,30 +510,6 @@ def _mock_orchestrator_response(message: str, session: SessionContext) -> tuple[
 
 
 # ── Request / response models ─────────────────────────────────────────────────
-
-class StartSessionRequest(BaseModel):
-    track: str          # "aipm" | "evals" | "context"
-    week:  int = 1
-
-class ChatRequest(BaseModel):
-    session_id: str
-    message:    str
-
-class QuizRequest(BaseModel):
-    session_id: str
-    topic:      str
-    difficulty: str = "all"
-
-class InterviewRequest(BaseModel):
-    session_id: str
-    topic:      str
-    difficulty: str = "all"
-
-class EvaluateRequest(BaseModel):
-    session_id: str
-    question:   str
-    answer:     str
-    topic:      str = ""
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1814,213 +1787,6 @@ async def debug_modular_curriculum(
     }
 
 
-@app.get("/history", response_class=HTMLResponse)
-async def history_page(request: Request):
-    user_id = request.state.user_id or "test-user"
-    entries = _get_user_history(user_id, limit=200)
-    return templates.TemplateResponse(
-        request=request,
-        name="history.html",
-        context={
-            "entries":   entries,
-            "test_mode": bool(TEST_MODE),
-        },
-    )
-
-
-@app.post("/session/start")
-@limiter.limit(_CHAT_RATE_LIMIT)
-async def start_session(request: Request, body: StartSessionRequest):
-    user_id = getattr(request.state, "user_id", None) or ""
-    track   = _track_from_str(body.track)
-    session = SessionContext(track=track, user_id=user_id, current_week=max(1, min(body.week, TOTAL_WEEKS)))
-    client  = None if TEST_MODE else _make_client()
-
-    # Load or create learner profile
-    profile = _load_profile_db(user_id) if user_id else None
-    if profile is None and user_id:
-        profile = LearnerProfile.new_for_user(user_id, track)
-
-    orch = None if TEST_MODE else Orchestrator(client=client, session=session, profile=profile)
-
-    session_id = str(uuid.uuid4())
-    _sessions[session_id] = {"session": session, "orch": orch, "client": client, "profile": profile}
-    _save_session(session_id, session)
-
-    return {
-        "session_id": session_id,
-        "progress":   _session_progress(session),
-    }
-
-
-@app.post("/chat")
-@limiter.limit(_CHAT_RATE_LIMIT)
-async def chat(request: Request, body: ChatRequest):
-    data    = _get_session_data(body.session_id, request.state.user_id or "")
-    session: SessionContext = data["session"]
-
-    if not body.message.strip():
-        raise HTTPException(status_code=422, detail="Message cannot be empty")
-
-    # ── Interactive quiz intercept ─────────────────────────────────────────────
-    # If the learner is mid-quiz and types A/B/C/D, handle it directly without
-    # going to the orchestrator. This makes quiz answers instant (no API call).
-    if session.quiz_state and session.quiz_state.get("questions"):
-        cleaned = body.message.strip().rstrip(".!?,").upper()
-        if cleaned in ("A", "B", "C", "D"):
-            response_text = practice_arena.handle_quiz_answer(session, cleaned)
-            agent_used    = "practice_arena"
-            session.add_exchange(body.message, response_text[:500], agent_used)
-            _save_session(body.session_id, session)
-            return {
-                "response":   response_text,
-                "agent_used": agent_used,
-                "progress":   _session_progress(session),
-            }
-
-    if TEST_MODE:
-        response_text, agent_used = _mock_orchestrator_response(body.message, session)
-        session.add_exchange(body.message, response_text[:500], agent_used)
-        session.note_topic(body.message[:60])
-    else:
-        orch: Orchestrator = data["orch"]
-        try:
-            response_text = await _run_blocking(orch.process, body.message)
-            agent_used = session.history[-1].agent_used if session.history else "orchestrator"
-        except anthropic.APIError as exc:
-            raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
-
-    _save_session(body.session_id, session)
-
-    # Persist this exchange to the permanent history table
-    _save_exchange_to_history(
-        user_id=session.user_id,
-        session_id=body.session_id,
-        user_message=body.message,
-        assistant_reply=response_text[:2000],
-        agent_used=agent_used,
-    )
-
-    # Update learner profile after each exchange
-    profile: Optional[LearnerProfile] = data.get("profile")
-    if profile and session.user_id:
-        profile.total_exchanges = sum(
-            1 for _ in session.history
-        )
-        _save_profile_db(profile)
-
-    return {
-        "response":   response_text,
-        "agent_used": agent_used,
-        "progress":   _session_progress(session),
-    }
-
-
-@app.get("/progress/{session_id}")
-async def get_progress(request: Request, session_id: str):
-    data    = _get_session_data(session_id, request.state.user_id or "")
-    session = data["session"]
-    return _session_progress(session)
-
-
-@app.post("/quiz")
-@limiter.limit(_PRACTICE_RATE_LIMIT)
-async def quiz(request: Request, body: QuizRequest):
-    data    = _get_session_data(body.session_id, request.state.user_id or "")
-    session = data["session"]
-
-    if TEST_MODE:
-        response_text = _MOCK_RESPONSES["practice_arena_mcq"]
-        session.note_topic(body.topic)
-        session.mark_exercise_done()
-    else:
-        client = data["client"]
-        response_text = await _run_blocking(
-            practice_arena.generate_mcq_quiz,
-            client, body.topic, session, body.difficulty,
-        )
-
-    _save_session(body.session_id, session)
-    return {"response": response_text, "progress": _session_progress(session)}
-
-
-@app.post("/interview")
-@limiter.limit(_PRACTICE_RATE_LIMIT)
-async def interview(request: Request, body: InterviewRequest):
-    data    = _get_session_data(body.session_id, request.state.user_id or "")
-    session = data["session"]
-
-    if TEST_MODE:
-        response_text = _MOCK_RESPONSES["practice_arena_interview"]
-        session.note_topic(body.topic)
-        session.mark_exercise_done()
-    else:
-        client = data["client"]
-        response_text = await _run_blocking(
-            practice_arena.generate_interview_questions,
-            client, body.topic, session, body.difficulty,
-        )
-
-    _save_session(body.session_id, session)
-    return {"response": response_text, "progress": _session_progress(session)}
-
-
-@app.post("/evaluate")
-@limiter.limit(_PRACTICE_RATE_LIMIT)
-async def evaluate(request: Request, body: EvaluateRequest):
-    data    = _get_session_data(body.session_id, request.state.user_id or "")
-    session = data["session"]
-
-    if TEST_MODE:
-        response_text = (
-            "📋  ANSWER EVALUATION\n"
-            "─────────────────────────────────────────────────────\n"
-            f"Question: {body.question}\n\n"
-            f"Your answer: {body.answer}\n\n"
-            "─────────────────────────────────────────────────────\n"
-            "SCORECARD\n"
-            "  Clarity    : 8/10 — Well-structured and easy to follow\n"
-            "  Accuracy   : 7/10 — Core concepts correct; minor gaps\n"
-            "  Depth      : 6/10 — Good surface coverage; could go deeper on tradeoffs\n"
-            "  Relevance  : 9/10 — Directly addresses the question\n"
-            "  ─────────────────────────\n"
-            "  TOTAL      : 30/40  (75%)  ⭐⭐⭐\n\n"
-            "✅  WHAT YOU GOT RIGHT\n"
-            "  • Correctly identified the core mechanism\n"
-            "  • Good use of concrete example\n\n"
-            "🔧  WHERE TO IMPROVE\n"
-            "  • Add tradeoff discussion (latency vs accuracy)\n"
-            "  • Mention a specific tool or metric\n\n"
-            "✨  MODEL ANSWER\n"
-            "  [A stronger version would be here in production mode]\n\n"
-            "💡  ONE DRILL\n"
-            "  Practice the STAR format: Situation → Task → Action → Result"
-        )
-    else:
-        client = data["client"]
-        response_text = await _run_blocking(
-            practice_arena.evaluate_answer,
-            client, body.question, body.answer, session, body.topic,
-        )
-
-    return {"response": response_text, "progress": _session_progress(session)}
-
-
-@app.get("/chat/{session_id}", response_class=HTMLResponse)
-async def chat_page(request: Request, session_id: str):
-    data    = _get_session_data(session_id, request.state.user_id or "")
-    session = data["session"]
-    return templates.TemplateResponse(
-        request=request,
-        name="chat.html",
-        context={
-            "session_id": session_id,
-            "progress":   _session_progress(session),
-            "test_mode":  bool(TEST_MODE),
-        },
-    )
-
-
 # ── Async helper ──────────────────────────────────────────────────────────────
 
 async def _run_blocking(fn, *args, **kwargs):
@@ -2034,12 +1800,21 @@ async def _run_blocking(fn, *args, **kwargs):
 import routes.deps as _rdeps  # noqa: E402
 _rdeps.templates        = templates
 _rdeps.get_session_data = _get_session_data
+_rdeps.get_user_history = _get_user_history
 _rdeps.get_user_sessions = _get_user_sessions
 _rdeps.load_profile_db  = _load_profile_db
+_rdeps.save_exchange_to_history = _save_exchange_to_history
+_rdeps.save_profile_db = _save_profile_db
 _rdeps.save_session     = _save_session
 _rdeps.session_progress = _session_progress
 _rdeps.make_client      = _make_client
 _rdeps.run_blocking     = _run_blocking
+_rdeps.track_from_str   = _track_from_str
+_rdeps.mock_orchestrator_response = _mock_orchestrator_response
+_rdeps.mock_responses   = _MOCK_RESPONSES
+_rdeps.limiter          = limiter
+_rdeps.CHAT_RATE_LIMIT  = _CHAT_RATE_LIMIT
+_rdeps.PRACTICE_RATE_LIMIT = _PRACTICE_RATE_LIMIT
 _rdeps.session_cache    = _sessions
 _rdeps.TEST_MODE        = TEST_MODE
 
@@ -2060,6 +1835,9 @@ app.include_router(syllabus_router)
 
 from routes.jobs import router as jobs_router  # noqa: E402
 app.include_router(jobs_router)
+
+from routes.chat import router as chat_router  # noqa: E402
+app.include_router(chat_router)
 
 from routes.topics import router as topics_router, get_next_topic_step  # noqa: E402,F401
 app.include_router(topics_router)
