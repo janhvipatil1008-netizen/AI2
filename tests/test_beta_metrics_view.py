@@ -84,7 +84,7 @@ def _start_session() -> str:
 
 def test_beta_metrics_route_exists_non_production_without_token(monkeypatch):
     monkeypatch.delenv("AI2_ENV", raising=False)
-    with patch("app.get_conn", side_effect=RuntimeError("no test DB")):
+    with patch("routes.admin.get_conn", side_effect=RuntimeError("no test DB")):
         response = client.get(URL)
 
     assert response.status_code == 200
@@ -96,7 +96,7 @@ def test_production_access_requires_debug_token(monkeypatch):
     monkeypatch.setenv("AI2_ENV", "production")
     monkeypatch.delenv("AI2_DEBUG_TOKEN", raising=False)
 
-    with patch("app.get_conn", side_effect=AssertionError("DB must not be opened")) as get_conn:
+    with patch("routes.admin.get_conn", side_effect=AssertionError("DB must not be opened")) as get_conn:
         response = client.get(URL)
 
     assert response.status_code == 404
@@ -118,7 +118,7 @@ def test_production_access_allows_correct_token(monkeypatch):
     monkeypatch.setenv("AI2_ENV", "production")
     monkeypatch.setenv("AI2_DEBUG_TOKEN", TOKEN)
 
-    with patch("app.get_conn", side_effect=RuntimeError("no test DB")):
+    with patch("routes.admin.get_conn", side_effect=RuntimeError("no test DB")):
         response = client.get(URL, headers={"X-AI2-Debug-Token": TOKEN})
 
     assert response.status_code == 200
@@ -130,7 +130,7 @@ def test_db_success_shows_safe_counts(monkeypatch):
     monkeypatch.delenv("AI2_ENV", raising=False)
     get_conn = MagicMock(return_value=_conn_context())
 
-    with patch("app.get_conn", get_conn), patch(
+    with patch("routes.admin.get_conn", get_conn), patch(
         "repositories.beta_metrics_repository.collect_beta_metrics",
         return_value=_metrics(),
     ):
@@ -147,7 +147,7 @@ def test_db_success_shows_safe_counts(monkeypatch):
 def test_db_failure_shows_friendly_unavailable_state(monkeypatch):
     monkeypatch.delenv("AI2_ENV", raising=False)
 
-    with patch("app.get_conn", side_effect=RuntimeError(f"cannot connect {SECRET_URL}")) as get_conn:
+    with patch("routes.admin.get_conn", side_effect=RuntimeError(f"cannot connect {SECRET_URL}")) as get_conn:
         response = client.get(URL)
 
     assert response.status_code == 200
@@ -160,7 +160,7 @@ def test_db_failure_shows_friendly_unavailable_state(monkeypatch):
 def test_private_feedback_generated_content_submissions_and_notes_not_exposed(monkeypatch):
     monkeypatch.delenv("AI2_ENV", raising=False)
 
-    with patch("app.get_conn", return_value=_conn_context()), patch(
+    with patch("routes.admin.get_conn", return_value=_conn_context()), patch(
         "repositories.beta_metrics_repository.collect_beta_metrics",
         return_value=_metrics(),
     ):
@@ -181,7 +181,7 @@ def test_no_secrets_or_raw_env_values_are_exposed(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", SECRET_URL)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret-value")
 
-    with patch("app.get_conn", side_effect=RuntimeError(f"failure {SECRET_URL} ANTHROPIC_API_KEY=sk-secret-value")):
+    with patch("routes.admin.get_conn", side_effect=RuntimeError(f"failure {SECRET_URL} ANTHROPIC_API_KEY=sk-secret-value")):
         response = client.get(URL)
 
     assert response.status_code == 200
@@ -196,7 +196,7 @@ def test_one_db_connection_max(monkeypatch):
     monkeypatch.delenv("AI2_ENV", raising=False)
     get_conn = MagicMock(return_value=_conn_context())
 
-    with patch("app.get_conn", get_conn), patch(
+    with patch("routes.admin.get_conn", get_conn), patch(
         "repositories.beta_metrics_repository.collect_beta_metrics",
         return_value=_metrics(),
     ):

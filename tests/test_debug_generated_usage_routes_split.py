@@ -354,6 +354,5 @@ def test_existing_debug_routes_still_work(monkeypatch):
 
 def test_admin_beta_metrics_and_modular_curriculum_remain_in_app_py():
     app_source = _app_source()
-    assert '@app.get("/admin/beta-metrics"' in app_source
-    assert "async def admin_beta_metrics" in app_source
+    assert "async def admin_beta_metrics" not in app_source
     assert "async def debug_modular_curriculum" not in app_source

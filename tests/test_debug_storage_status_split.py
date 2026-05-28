@@ -153,5 +153,5 @@ def test_other_debug_routes_still_in_app_py():
     app_path = os.path.join(os.path.dirname(__file__), "..", "app.py")
     with open(app_path, encoding="utf-8") as f:
         source = f.read()
-    assert "async def debug_storage_health" in source
-    assert "async def admin_beta_metrics" in source
+    assert "async def debug_storage_health" not in source
+    assert "async def admin_beta_metrics" not in source

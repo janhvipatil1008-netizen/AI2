@@ -606,40 +606,6 @@ def _session_progress(session: SessionContext) -> dict:
     }
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-
-@app.get("/admin/beta-metrics", response_class=HTMLResponse)
-async def admin_beta_metrics(
-    request: Request,
-    _: None = Depends(_debug_access),
-):
-    """Simple protected internal view for private beta aggregate metrics."""
-    from services.beta_metrics_service import build_beta_metrics_payload
-
-    db_available = False
-    db_metrics = None
-    try:
-        from repositories.beta_metrics_repository import collect_beta_metrics
-
-        with get_conn() as conn:
-            db_metrics = collect_beta_metrics(conn)
-        db_available = True
-    except Exception as exc:
-        logger.warning("beta metrics unavailable: %s", _safe_debug_error_message(exc))
-
-    metrics = build_beta_metrics_payload(
-        db_available=db_available,
-        db_metrics=db_metrics,
-    )
-    return templates.TemplateResponse(
-        request=request,
-        name="beta_metrics.html",
-        context={
-            "metrics": metrics,
-            "test_mode": bool(TEST_MODE),
-        },
-    )
-
 # ── Async helper ──────────────────────────────────────────────────────────────
 
 async def _run_blocking(fn, *args, **kwargs):
@@ -703,3 +669,6 @@ app.include_router(submissions_router)
 
 from routes.debug import router as debug_router  # noqa: E402
 app.include_router(debug_router)
+
+from routes.admin import router as admin_router  # noqa: E402
+app.include_router(admin_router)
