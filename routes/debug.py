@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 import routes.deps as _deps
 from routes.deps import debug_access, safe_debug_error_message
 from context.session import SessionContext
+from database.pool import get_conn
 
 router = APIRouter()
 
@@ -284,4 +285,283 @@ def _storage_health_topic_status(session: SessionContext, legacy_topic_id: str) 
         "portfolio_submission_present": legacy_topic_id in (getattr(session, "portfolio_submissions", {}) or {}),
         "interview_submission_present": legacy_topic_id in (getattr(session, "interview_submissions", {}) or {}),
         "notes_present": legacy_topic_id in (getattr(session, "topic_notes", {}) or {}),
+    }
+
+
+@router.get("/debug/curriculum-db-check")
+async def debug_curriculum_db_check(
+    track_key: str = "aipm",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: attempt curriculum DB reads and report readiness.
+
+    Returns only boolean flags, normalised row dicts, and human-readable notes.
+    Never returns env var values, secrets, DB URLs, stack traces, or user data.
+    Safe to call when AI2_CURRICULUM_DB_READS_ENABLED is off — no DB connection
+    is opened in that case.
+    """
+    from services.storage_flags import is_curriculum_db_reads_enabled
+    from services.curriculum_read_service import (
+        get_track_by_key_from_db,
+        get_topic_by_legacy_id_from_db,
+    )
+    from core.logging import safe_error_metadata
+
+    reads_enabled = is_curriculum_db_reads_enabled()
+    topic_id = legacy_topic_id or ""
+
+    if not reads_enabled:
+        return {
+            "curriculum_db_reads_enabled": False,
+            "attempted_db_connection": False,
+            "track_key": track_key,
+            "legacy_topic_id": topic_id,
+            "track_found": False,
+            "topic_found": False,
+            "track": None,
+            "topic": None,
+            "source": "disabled",
+            "error": None,
+            "notes": [
+                "Curriculum DB reads are disabled.",
+                "Set AI2_CURRICULUM_DB_READS_ENABLED=1 to enable.",
+            ],
+        }
+
+    track_row = None
+    topic_row = None
+    error_msg = None
+    source = "db"
+
+    try:
+        with get_conn() as conn:
+            track_row = get_track_by_key_from_db(conn, track_key)
+            if topic_id:
+                topic_row = get_topic_by_legacy_id_from_db(conn, topic_id)
+    except Exception as exc:
+        meta = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        source = "error"
+        track_row = None
+        topic_row = None
+
+    notes: list[str] = []
+    if source == "db":
+        notes.append("Curriculum DB reads are enabled.")
+        if not topic_id:
+            notes.append("No legacy_topic_id provided; topic lookup skipped.")
+        elif topic_row is None:
+            notes.append(f"No topic found for legacy_topic_id={topic_id!r}.")
+        if track_row is None:
+            notes.append(f"No track found for track_key={track_key!r}.")
+    else:
+        notes.append("DB read failed. Check DB connectivity and schema.")
+
+    return {
+        "curriculum_db_reads_enabled": True,
+        "attempted_db_connection": True,
+        "track_key": track_key,
+        "legacy_topic_id": topic_id,
+        "track_found": track_row is not None,
+        "topic_found": topic_row is not None,
+        "track": track_row,
+        "topic": topic_row,
+        "source": source,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@router.get("/debug/curriculum-fallback-check")
+async def debug_curriculum_fallback_check(
+    track_key: str = "aipm",
+    legacy_topic_id: Optional[str] = None,
+    include_topics: bool = False,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: inspect curriculum fallback reader behavior.
+
+    Shows whether track, topic, and topics-list data come from DB or the
+    existing syllabus helpers.  Safe to call when
+    AI2_CURRICULUM_DB_READS_ENABLED is off — no DB connection is opened.
+    Never returns secrets, env var values, DB URLs, stack traces, or user
+    session data.
+    """
+    from services.storage_flags import is_curriculum_db_reads_enabled
+    from services.curriculum_fallback_service import (
+        get_track_with_fallback,
+        get_topic_with_fallback,
+        get_topics_for_track_with_fallback,
+    )
+    from core.logging import safe_error_metadata
+
+    reads_enabled = is_curriculum_db_reads_enabled()
+    topic_id      = legacy_topic_id or ""
+
+    track_result:  dict | None = None
+    topic_result:  dict | None = None
+    topics_result: dict | None = None
+    error_msg:     str  | None = None
+    notes: list[str] = []
+
+    if not reads_enabled:
+        track_result = get_track_with_fallback(conn=None, track_key=track_key)
+        if topic_id:
+            topic_result = get_topic_with_fallback(conn=None, legacy_topic_id=topic_id)
+        if include_topics:
+            topics_result = get_topics_for_track_with_fallback(conn=None, track_key=track_key)
+        notes.append(
+            "AI2_CURRICULUM_DB_READS_ENABLED is off; all results from fallback."
+        )
+        return {
+            "track_key":                   track_key,
+            "legacy_topic_id":             topic_id,
+            "include_topics":              include_topics,
+            "curriculum_db_reads_enabled": False,
+            "attempted_db_connection":     False,
+            "track_result":                track_result,
+            "topic_result":                topic_result,
+            "topics_result":               topics_result,
+            "source_summary": {
+                "track_source":  track_result.get("source") if track_result else None,
+                "topic_source":  topic_result.get("source") if topic_result else None,
+                "topics_source": topics_result.get("source") if topics_result else None,
+            },
+            "error": None,
+            "notes": notes,
+        }
+
+    try:
+        with get_conn() as conn:
+            track_result = get_track_with_fallback(conn=conn, track_key=track_key)
+            if topic_id:
+                topic_result = get_topic_with_fallback(conn=conn, legacy_topic_id=topic_id)
+            if include_topics:
+                topics_result = get_topics_for_track_with_fallback(conn=conn, track_key=track_key)
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        notes.append("DB connection failed; results unavailable.")
+
+    return {
+        "track_key":                   track_key,
+        "legacy_topic_id":             topic_id,
+        "include_topics":              include_topics,
+        "curriculum_db_reads_enabled": True,
+        "attempted_db_connection":     True,
+        "track_result":                track_result,
+        "topic_result":                topic_result,
+        "topics_result":               topics_result,
+        "source_summary": {
+            "track_source":  track_result.get("source") if track_result else None,
+            "topic_source":  topic_result.get("source") if topic_result else None,
+            "topics_source": topics_result.get("source") if topics_result else None,
+        },
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@router.get("/debug/learner-state-db-check")
+async def debug_learner_state_db_check(
+    session_id: str = "",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: attempt learner-state DB reads and report readiness.
+
+    Reads from topic_progress and todos mirrors via flag-gated service functions.
+    Never returns raw env values, secrets, DB URLs, stack traces, or private session data.
+    Safe to call when both read flags are off — no DB connection is opened in that case.
+    """
+    from services.storage_flags import (
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    from services.learner_state_read_service import (
+        get_topic_progress_from_db,
+        list_todos_from_db,
+    )
+    from core.logging import safe_error_metadata
+
+    progress_enabled = is_progress_db_reads_enabled()
+    todos_enabled    = is_todos_db_reads_enabled()
+    topic_id         = legacy_topic_id or ""
+
+    if not progress_enabled and not todos_enabled:
+        return {
+            "progress_db_reads_enabled": False,
+            "todos_db_reads_enabled":    False,
+            "attempted_db_connection":   False,
+            "session_id":                session_id,
+            "legacy_topic_id":           topic_id,
+            "progress_found":            False,
+            "todos_found":               False,
+            "topic_progress":            None,
+            "todos":                     None,
+            "source":                    "disabled",
+            "error":                     None,
+            "notes": [
+                "Learner-state DB reads are disabled.",
+                "Set AI2_PROGRESS_DB_READS_ENABLED=1 or AI2_TODOS_DB_READS_ENABLED=1 to enable.",
+            ],
+        }
+
+    topic_progress = None
+    todos          = None
+    error_msg      = None
+    source         = "db"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            if progress_enabled:
+                if topic_id:
+                    topic_progress = get_topic_progress_from_db(
+                        conn,
+                        session_id=session_id,
+                        legacy_topic_id=topic_id,
+                    )
+                else:
+                    notes.append(
+                        "legacy_topic_id is required for topic progress DB check; "
+                        "progress lookup skipped."
+                    )
+            if todos_enabled:
+                todos = list_todos_from_db(conn, session_id=session_id)
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        source         = "error"
+        topic_progress = None
+        todos          = None
+
+    if source == "db":
+        active = []
+        if progress_enabled:
+            active.append("progress")
+        if todos_enabled:
+            active.append("todos")
+        notes.insert(0, f"Learner-state DB reads enabled for: {', '.join(active)}.")
+        if progress_enabled and topic_id and topic_progress is None:
+            notes.append(f"No progress found for legacy_topic_id={topic_id!r}.")
+        if todos_enabled and todos is not None and len(todos) == 0:
+            notes.append("No todos found for this session.")
+    else:
+        notes.append("DB read failed. Check DB connectivity and schema.")
+
+    return {
+        "progress_db_reads_enabled": progress_enabled,
+        "todos_db_reads_enabled":    todos_enabled,
+        "attempted_db_connection":   True,
+        "session_id":                session_id,
+        "legacy_topic_id":           topic_id,
+        "progress_found":            topic_progress is not None,
+        "todos_found":               bool(todos),
+        "topic_progress":            topic_progress,
+        "todos":                     todos,
+        "source":                    source,
+        "error":                     error_msg,
+        "notes":                     notes,
     }

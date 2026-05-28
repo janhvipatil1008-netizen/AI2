@@ -169,7 +169,7 @@ def test_progress_flag_on_db_connection_attempted():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", return_value=None):
         r = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag-basics"})
 
@@ -181,7 +181,7 @@ def test_progress_flag_on_progress_found_when_db_returns_row():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch(
              "services.learner_state_read_service.get_topic_progress_from_db",
              return_value=_FAKE_PROGRESS,
@@ -200,7 +200,7 @@ def test_todos_flag_on_db_connection_attempted():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=False), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=True), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.list_todos_from_db", return_value=[]):
         r = client.get(URL, params={"session_id": "sess-1"})
 
@@ -212,7 +212,7 @@ def test_todos_flag_on_todos_found_when_db_returns_rows():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=False), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=True), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch(
              "services.learner_state_read_service.list_todos_from_db",
              return_value=_FAKE_TODOS,
@@ -234,7 +234,7 @@ def test_both_flags_on_both_reads_attempted():
 
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=True), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", mock_progress), \
          patch("services.learner_state_read_service.list_todos_from_db", mock_todos):
         r = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag-basics"})
@@ -264,7 +264,7 @@ def test_both_flags_on_only_one_conn_opened():
 
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=True), \
-         patch("app.get_conn", _counting_get_conn), \
+         patch("routes.debug.get_conn", _counting_get_conn), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", return_value=None), \
          patch("services.learner_state_read_service.list_todos_from_db", return_value=[]):
         client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag-basics"})
@@ -280,7 +280,7 @@ def test_missing_legacy_topic_id_skips_progress_lookup():
 
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", mock_progress):
         r = client.get(URL, params={"session_id": "sess-1"})
 
@@ -293,7 +293,7 @@ def test_missing_legacy_topic_id_adds_note():
 
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", return_value=None):
         r = client.get(URL, params={"session_id": "sess-1"})
 
@@ -307,7 +307,7 @@ def test_missing_legacy_topic_id_adds_note():
 def test_db_error_returns_http_200_with_source_error():
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn_raises(RuntimeError("connection refused"))):
+         patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("connection refused"))):
         r = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag"})
 
     assert r.status_code == 200
@@ -317,7 +317,7 @@ def test_db_error_returns_http_200_with_source_error():
 def test_db_error_error_field_is_safe_string():
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn_raises(RuntimeError("boom"))):
+         patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("boom"))):
         r = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag"})
 
     data = r.json()
@@ -328,7 +328,7 @@ def test_db_error_error_field_is_safe_string():
 def test_db_error_progress_and_todos_are_none():
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=True), \
-         patch("app.get_conn", _fake_get_conn_raises(RuntimeError("boom"))):
+         patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("boom"))):
         r = client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag"})
 
     data = r.json()
@@ -342,7 +342,7 @@ def test_service_error_inside_conn_returns_source_error():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch(
              "services.learner_state_read_service.get_topic_progress_from_db",
              side_effect=Exception("query failed"),
@@ -359,7 +359,7 @@ def test_connection_closed_on_success():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", return_value=_FAKE_PROGRESS):
         client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag-basics"})
 
@@ -370,7 +370,7 @@ def test_connection_closed_on_service_error():
     conn = _make_conn()
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch(
              "services.learner_state_read_service.get_topic_progress_from_db",
              side_effect=Exception("query failed"),
@@ -397,7 +397,7 @@ def test_no_database_url_in_error_response():
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
          patch(
-             "app.get_conn",
+             "routes.debug.get_conn",
              _fake_get_conn_raises(
                  RuntimeError("could not connect to postgresql://user:secret@host/db")
              ),
@@ -444,7 +444,7 @@ def test_only_progress_flag_on_todos_service_not_called():
 
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=True), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=False), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", return_value=None), \
          patch("services.learner_state_read_service.list_todos_from_db", mock_todos):
         client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag"})
@@ -458,7 +458,7 @@ def test_only_todos_flag_on_progress_service_not_called():
 
     with patch("services.storage_flags.is_progress_db_reads_enabled", return_value=False), \
          patch("services.storage_flags.is_todos_db_reads_enabled",    return_value=True), \
-         patch("app.get_conn", _fake_get_conn(conn)), \
+         patch("routes.debug.get_conn", _fake_get_conn(conn)), \
          patch("services.learner_state_read_service.get_topic_progress_from_db", mock_progress), \
          patch("services.learner_state_read_service.list_todos_from_db", return_value=[]):
         client.get(URL, params={"session_id": "sess-1", "legacy_topic_id": "rag"})

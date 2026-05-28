@@ -159,7 +159,7 @@ def test_flag_off_curriculum_db_reads_enabled_false():
 
 def test_flag_off_get_conn_not_called():
     with _FLAG_OFF:
-        with patch("app.get_conn") as mock_conn:
+        with patch("routes.debug.get_conn") as mock_conn:
             client.get("/debug/curriculum-fallback-check")
     mock_conn.assert_not_called()
 
@@ -238,7 +238,7 @@ def test_flag_off_include_topics_true_returns_topics_result():
 def test_flag_on_attempted_db_connection_true():
     conn = _make_conn()
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn(conn)):
+        with patch("routes.debug.get_conn", _fake_get_conn(conn)):
             with patch(
                 "services.curriculum_fallback_service.get_track_with_fallback",
                 return_value=_FAKE_TRACK_FALLBACK,
@@ -251,7 +251,7 @@ def test_flag_on_attempted_db_connection_true():
 def test_flag_on_db_returns_row_track_source_db():
     conn = _make_conn()
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn(conn)):
+        with patch("routes.debug.get_conn", _fake_get_conn(conn)):
             with patch(
                 "services.curriculum_fallback_service.get_track_with_fallback",
                 return_value=_FAKE_TRACK_DB,
@@ -266,7 +266,7 @@ def test_flag_on_db_returns_row_track_source_db():
 def test_flag_on_db_missing_row_track_source_fallback():
     conn = _make_conn()
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn(conn)):
+        with patch("routes.debug.get_conn", _fake_get_conn(conn)):
             with patch(
                 "services.curriculum_fallback_service.get_track_with_fallback",
                 return_value=_FAKE_TRACK_FALLBACK,
@@ -279,14 +279,14 @@ def test_flag_on_db_missing_row_track_source_fallback():
 
 def test_db_connection_error_returns_http_200():
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
+        with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
             resp = client.get("/debug/curriculum-fallback-check")
     assert resp.status_code == 200
 
 
 def test_db_connection_error_sets_error_field():
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("connection refused"))):
+        with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("connection refused"))):
             resp = client.get("/debug/curriculum-fallback-check")
     data = resp.json()
     assert data["error"] is not None
@@ -295,7 +295,7 @@ def test_db_connection_error_sets_error_field():
 
 def test_db_connection_error_track_result_is_none():
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
+        with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
             resp = client.get("/debug/curriculum-fallback-check")
     assert resp.json()["track_result"] is None
 
@@ -303,7 +303,7 @@ def test_db_connection_error_track_result_is_none():
 def test_service_error_inside_conn_returns_safe_response():
     conn = _make_conn()
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn(conn)):
+        with patch("routes.debug.get_conn", _fake_get_conn(conn)):
             with patch(
                 "services.curriculum_fallback_service.get_track_with_fallback",
                 side_effect=RuntimeError("service explosion"),
@@ -318,7 +318,7 @@ def test_service_error_inside_conn_returns_safe_response():
 def test_connection_closed_on_success():
     conn = _make_conn()
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn(conn)):
+        with patch("routes.debug.get_conn", _fake_get_conn(conn)):
             with patch(
                 "services.curriculum_fallback_service.get_track_with_fallback",
                 return_value=_FAKE_TRACK_FALLBACK,
@@ -330,7 +330,7 @@ def test_connection_closed_on_success():
 def test_connection_closed_on_service_error():
     conn = _make_conn()
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn(conn)):
+        with patch("routes.debug.get_conn", _fake_get_conn(conn)):
             with patch(
                 "services.curriculum_fallback_service.get_track_with_fallback",
                 side_effect=RuntimeError("boom"),
@@ -352,7 +352,7 @@ def test_no_raw_env_var_names_in_flag_off_response():
 def test_no_database_url_in_error_response():
     exc = Exception("postgresql://user:secret@db.supabase.co/postgres")
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn_raises(exc)):
+        with patch("routes.debug.get_conn", _fake_get_conn_raises(exc)):
             resp = client.get("/debug/curriculum-fallback-check")
     assert "SUPABASE_DATABASE_URL" not in resp.text
     assert resp.json()["error"] is not None
@@ -362,7 +362,7 @@ def test_no_database_url_in_error_response():
 def test_db_error_message_is_truncated():
     exc = RuntimeError("X" * 400)
     with _FLAG_ON:
-        with patch("app.get_conn", _fake_get_conn_raises(exc)):
+        with patch("routes.debug.get_conn", _fake_get_conn_raises(exc)):
             resp = client.get("/debug/curriculum-fallback-check")
     assert len(resp.json()["error"]) <= 350
 

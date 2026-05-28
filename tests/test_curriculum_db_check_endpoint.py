@@ -169,7 +169,7 @@ def test_flag_on_db_connection_attempted():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         return_value=None,
     ):
@@ -187,7 +187,7 @@ def test_flag_on_track_found_when_db_returns_row():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         return_value=_FAKE_TRACK,
     ), patch(
@@ -207,7 +207,7 @@ def test_flag_on_topic_found_when_provided_and_db_returns_row():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         return_value=_FAKE_TRACK,
     ), patch(
@@ -231,7 +231,7 @@ def test_no_legacy_topic_id_topic_found_false_and_no_topic_lookup():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         return_value=_FAKE_TRACK,
     ), patch(
@@ -254,7 +254,7 @@ def test_db_error_returns_http_200_with_source_error():
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
     ), patch(
-        "app.get_conn",
+        "routes.debug.get_conn",
         _fake_get_conn_raises(RuntimeError("SUPABASE_DATABASE_URL env var is not set")),
     ):
         r = client.get(URL)
@@ -268,7 +268,7 @@ def test_db_error_error_field_is_safe_string():
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
     ), patch(
-        "app.get_conn",
+        "routes.debug.get_conn",
         _fake_get_conn_raises(RuntimeError("connection refused")),
     ):
         r = client.get(URL)
@@ -283,7 +283,7 @@ def test_db_error_track_and_topic_are_none():
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
     ), patch(
-        "app.get_conn",
+        "routes.debug.get_conn",
         _fake_get_conn_raises(RuntimeError("boom")),
     ):
         r = client.get(URL)
@@ -300,7 +300,7 @@ def test_service_error_inside_conn_also_returns_source_error():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         side_effect=Exception("query failed"),
     ):
@@ -318,7 +318,7 @@ def test_connection_closed_on_success():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         return_value=_FAKE_TRACK,
     ):
@@ -332,7 +332,7 @@ def test_connection_closed_on_service_error():
     with patch(
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
-    ), patch("app.get_conn", _fake_get_conn(conn)), patch(
+    ), patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.curriculum_read_service.get_track_by_key_from_db",
         side_effect=Exception("query failed"),
     ):
@@ -362,7 +362,7 @@ def test_no_database_url_in_error_response():
         "services.storage_flags.is_curriculum_db_reads_enabled",
         return_value=True,
     ), patch(
-        "app.get_conn",
+        "routes.debug.get_conn",
         _fake_get_conn_raises(RuntimeError(f"could not connect to {db_url}")),
     ):
         r = client.get(URL)
