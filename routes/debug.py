@@ -892,3 +892,190 @@ async def debug_learner_state_db_check(
         "error":                     error_msg,
         "notes":                     notes,
     }
+
+
+@router.get("/debug/learner-state-mismatch-check")
+async def debug_learner_state_mismatch_check(
+    request: Request,
+    session_id: str = "",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: compare DB mirror state against a loaded SessionContext.
+
+    Loads the session via the standard helper (read-only — never calls save_session).
+    Reads DB mirrors only when the relevant feature flags are on.
+    Returns only mismatch comparison output; never returns full session_data, generated
+    content, quiz answers, portfolio submissions, or raw env values.
+    """
+    from services.storage_flags import (
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    from services.learner_state_read_service import (
+        get_topic_progress_from_db,
+        list_todos_from_db,
+    )
+    from services.state_mismatch_service import compare_learner_state
+    from core.logging import safe_error_metadata
+
+    data    = _deps.get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+
+    progress_enabled = is_progress_db_reads_enabled()
+    todos_enabled    = is_todos_db_reads_enabled()
+    topic_id         = legacy_topic_id or ""
+
+    if not progress_enabled and not todos_enabled:
+        return {
+            "session_id":                session_id,
+            "legacy_topic_id":           topic_id,
+            "progress_db_reads_enabled": False,
+            "todos_db_reads_enabled":    False,
+            "attempted_db_connection":   False,
+            "source":                    "session_only",
+            "matches":                   None,
+            "comparison":                None,
+            "error":                     None,
+            "notes": [
+                "DB mirror comparison requires AI2_PROGRESS_DB_READS_ENABLED=1 "
+                "or AI2_TODOS_DB_READS_ENABLED=1.",
+            ],
+        }
+
+    db_progress  = None
+    db_todos     = None
+    error_msg    = None
+    source       = "db_compare"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            if progress_enabled:
+                if topic_id:
+                    db_progress = get_topic_progress_from_db(
+                        conn,
+                        session_id=session_id,
+                        legacy_topic_id=topic_id,
+                    )
+                else:
+                    notes.append(
+                        "legacy_topic_id is required for progress comparison; "
+                        "progress DB read skipped."
+                    )
+            if todos_enabled:
+                db_todos = list_todos_from_db(conn, session_id=session_id)
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        source    = "error"
+
+    comparison = None
+    matches    = None
+    if source == "db_compare":
+        comparison = compare_learner_state(
+            session=session,
+            legacy_topic_id=topic_id if (progress_enabled and topic_id) else None,
+            db_progress=db_progress,
+            db_todos=db_todos,
+        )
+        matches = comparison["matches"]
+
+    return {
+        "session_id":                session_id,
+        "legacy_topic_id":           topic_id,
+        "progress_db_reads_enabled": progress_enabled,
+        "todos_db_reads_enabled":    todos_enabled,
+        "attempted_db_connection":   True,
+        "source":                    source,
+        "matches":                   matches,
+        "comparison":                comparison,
+        "error":                     error_msg,
+        "notes":                     notes,
+    }
+
+
+@router.get("/debug/learner-state-fallback-check")
+async def debug_learner_state_fallback_check(
+    request: Request,
+    session_id: str = "",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: inspect learner-state fallback reader behavior.
+
+    Shows whether topic progress and todos come from DB or SessionContext
+    fallback.  Loads session read-only (never calls save_session).
+    Safe to call when both DB read flags are off — no DB connection is opened.
+    Never returns secrets, env var values, DB URLs, stack traces, or private
+    session data.
+    """
+    from services.storage_flags import (
+        is_progress_db_reads_enabled,
+        is_todos_db_reads_enabled,
+    )
+    from services.learner_state_fallback_service import get_learner_state_with_fallback
+    from core.logging import safe_error_metadata
+
+    data    = _deps.get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+
+    progress_enabled = is_progress_db_reads_enabled()
+    todos_enabled    = is_todos_db_reads_enabled()
+    topic_id         = legacy_topic_id or ""
+
+    result:    dict | None = None
+    error_msg: str  | None = None
+    notes: list[str] = []
+
+    if not progress_enabled and not todos_enabled:
+        result = get_learner_state_with_fallback(
+            conn=None,
+            session=session,
+            session_id=session_id,
+            legacy_topic_id=topic_id or None,
+        )
+        notes.append(
+            "Both DB read flags are off; SessionContext fallback was used."
+        )
+        return {
+            "session_id":                session_id,
+            "legacy_topic_id":           topic_id,
+            "progress_db_reads_enabled": False,
+            "todos_db_reads_enabled":    False,
+            "attempted_db_connection":   False,
+            "result":                    result,
+            "source_summary":            result["source_summary"],
+            "error":                     None,
+            "notes":                     notes + result.get("notes", []),
+        }
+
+    try:
+        with get_conn() as conn:
+            result = get_learner_state_with_fallback(
+                conn=conn,
+                session=session,
+                session_id=session_id,
+                legacy_topic_id=topic_id or None,
+            )
+    except Exception as exc:
+        meta      = safe_error_metadata(exc)
+        error_msg = f"{meta['error_type']}: {meta['error_message']}"
+        notes.append("DB connection failed.")
+
+    source_summary = (
+        result["source_summary"] if result else
+        {"topic_progress_source": None, "todos_source": None}
+    )
+
+    return {
+        "session_id":                session_id,
+        "legacy_topic_id":           topic_id,
+        "progress_db_reads_enabled": progress_enabled,
+        "todos_db_reads_enabled":    todos_enabled,
+        "attempted_db_connection":   True,
+        "result":                    result,
+        "source_summary":            source_summary,
+        "error":                     error_msg,
+        "notes":                     notes + (result.get("notes", []) if result else []),
+    }

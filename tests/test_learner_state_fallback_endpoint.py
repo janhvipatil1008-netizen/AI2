@@ -149,21 +149,21 @@ def _apply(*patches):
 # ── Existence and shape ───────────────────────────────────────────────────────
 
 def test_endpoint_exists_returns_200():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             resp = client.get(URL)
     assert resp.status_code == 200
 
 
 def test_endpoint_returns_json():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             resp = client.get(URL)
     assert resp.headers["content-type"].startswith("application/json")
 
 
 def test_response_has_all_required_keys():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             resp = client.get(URL)
     data = resp.json()
@@ -177,7 +177,7 @@ def test_response_has_all_required_keys():
 
 
 def test_source_summary_has_required_keys():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             with patch(
                 "services.learner_state_fallback_service.get_learner_state_with_fallback",
@@ -192,22 +192,22 @@ def test_source_summary_has_required_keys():
 # ── Flags off: no DB connection ───────────────────────────────────────────────
 
 def test_flags_off_attempted_db_connection_false():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             resp = client.get(URL)
     assert resp.json()["attempted_db_connection"] is False
 
 
 def test_flags_off_get_conn_not_called():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
-            with patch("app.get_conn") as mock_conn:
+            with patch("routes.debug.get_conn") as mock_conn:
                 client.get(URL)
     mock_conn.assert_not_called()
 
 
 def test_flags_off_result_uses_session_fallback_sources():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             with patch(
                 "services.learner_state_fallback_service.get_learner_state_with_fallback",
@@ -221,7 +221,7 @@ def test_flags_off_result_uses_session_fallback_sources():
 
 
 def test_flags_off_notes_mention_flags_off():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             with patch(
                 "services.learner_state_fallback_service.get_learner_state_with_fallback",
@@ -236,9 +236,9 @@ def test_flags_off_notes_mention_flags_off():
 
 def test_progress_flag_on_db_connection_attempted():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_PROGRESS_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     return_value=_FAKE_FALLBACK_RESULT,
@@ -250,9 +250,9 @@ def test_progress_flag_on_db_connection_attempted():
 
 def test_todos_flag_on_db_connection_attempted():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_TODOS_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     return_value=_FAKE_FALLBACK_RESULT,
@@ -264,9 +264,9 @@ def test_todos_flag_on_db_connection_attempted():
 
 def test_both_flags_on_one_connection_opened():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     return_value=_FAKE_DB_RESULT,
@@ -277,9 +277,9 @@ def test_both_flags_on_one_connection_opened():
 
 def test_flag_on_db_result_source_summary_shows_db():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     return_value=_FAKE_DB_RESULT,
@@ -293,17 +293,17 @@ def test_flag_on_db_result_source_summary_shows_db():
 # ── Error handling ────────────────────────────────────────────────────────────
 
 def test_db_connection_error_returns_http_200():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
+            with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
                 resp = client.get(URL)
     assert resp.status_code == 200
 
 
 def test_db_connection_error_sets_error_field():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("refused"))):
+            with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("refused"))):
                 resp = client.get(URL)
     data = resp.json()
     assert data["error"] is not None
@@ -311,18 +311,18 @@ def test_db_connection_error_sets_error_field():
 
 
 def test_db_connection_error_result_is_none():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
+            with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("DB down"))):
                 resp = client.get(URL)
     assert resp.json()["result"] is None
 
 
 def test_service_error_inside_conn_returns_safe_response():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     side_effect=RuntimeError("service explosion"),
@@ -336,9 +336,9 @@ def test_service_error_inside_conn_returns_safe_response():
 
 def test_connection_closed_on_success():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     return_value=_FAKE_DB_RESULT,
@@ -349,9 +349,9 @@ def test_connection_closed_on_success():
 
 def test_connection_closed_on_service_error():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     side_effect=RuntimeError("boom"),
@@ -363,7 +363,7 @@ def test_connection_closed_on_service_error():
 # ── Session safety ────────────────────────────────────────────────────────────
 
 def test_endpoint_does_not_call_save_session():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             with patch("app._save_session") as mock_save:
                 client.get(URL)
@@ -372,9 +372,9 @@ def test_endpoint_does_not_call_save_session():
 
 def test_endpoint_does_not_call_save_session_when_flags_on():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn(conn)):
+            with patch("routes.debug.get_conn", _fake_get_conn(conn)):
                 with patch(
                     "services.learner_state_fallback_service.get_learner_state_with_fallback",
                     return_value=_FAKE_DB_RESULT,
@@ -387,7 +387,7 @@ def test_endpoint_does_not_call_save_session_when_flags_on():
 # ── Security ──────────────────────────────────────────────────────────────────
 
 def test_no_raw_env_var_names_in_flags_off_response():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             resp = client.get(URL)
     body = resp.text
@@ -397,9 +397,9 @@ def test_no_raw_env_var_names_in_flags_off_response():
 
 def test_no_database_url_in_error_response():
     exc = Exception("postgresql://user:secret@db.supabase.co/postgres")
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn_raises(exc)):
+            with patch("routes.debug.get_conn", _fake_get_conn_raises(exc)):
                 resp = client.get(URL)
     assert "SUPABASE_DATABASE_URL" not in resp.text
     assert resp.json()["error"] is not None
@@ -408,15 +408,15 @@ def test_no_database_url_in_error_response():
 
 def test_error_message_is_truncated():
     exc = RuntimeError("X" * 400)
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_BOTH_ON):
-            with patch("app.get_conn", _fake_get_conn_raises(exc)):
+            with patch("routes.debug.get_conn", _fake_get_conn_raises(exc)):
                 resp = client.get(URL)
     assert len(resp.json()["error"]) <= 350
 
 
 def test_session_id_reflected_in_response():
-    with patch("app._get_session_data", return_value=_fake_session_data()):
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()):
         with _apply(*_FLAGS_OFF):
             resp = client.get(URL, params={"session_id": "test-session-42"})
     assert resp.json()["session_id"] == "test-session-42"
