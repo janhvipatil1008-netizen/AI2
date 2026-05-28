@@ -324,4 +324,4 @@ def test_other_debug_routes_still_in_app_py():
     assert "async def debug_learner_state_db_check" not in source
     assert "async def debug_generated_learning_db_check" not in source
     assert "async def debug_usage_events_db_check" not in source
-    assert "async def debug_modular_curriculum" in source
+    assert "async def debug_modular_curriculum" not in source

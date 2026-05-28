@@ -1079,3 +1079,80 @@ async def debug_learner_state_fallback_check(
         "error":                     error_msg,
         "notes":                     notes + (result.get("notes", []) if result else []),
     }
+
+
+@router.get("/debug/modular-curriculum")
+async def debug_modular_curriculum(
+    course_key: str = "aipm-foundations",
+    legacy_topic_id: Optional[str] = None,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: inspect the modular curriculum structure.
+
+    Tries modular DB reads via the fallback service; falls back to the static
+    WEEKS / ROLE_TRACKS curriculum when the DB is unavailable or not yet seeded.
+
+    Never returns secrets, DB URLs, stack traces, learner submissions, notes,
+    feedback, usage metadata, or session data.  Uses at most one DB connection.
+    Does not modify runtime curriculum reads.
+    """
+    from services.modular_curriculum_fallback_service import (
+        get_course_structure_with_fallback,
+        get_topic_structure_by_legacy_id_with_fallback,
+    )
+
+    notes: list[str] = [
+        "Modular curriculum debug endpoint.",
+        "Runtime reads still use the static curriculum path.",
+        "This endpoint is for inspection only and does not modify any data.",
+    ]
+
+    conn_error: str | None = None
+    result: dict = {}
+
+    try:
+        with get_conn() as conn:
+            if legacy_topic_id:
+                result = get_topic_structure_by_legacy_id_with_fallback(
+                    conn,
+                    legacy_topic_id=legacy_topic_id,
+                )
+            else:
+                result = get_course_structure_with_fallback(
+                    conn,
+                    course_key=course_key,
+                )
+    except Exception as exc:
+        conn_error = safe_debug_error_message(exc)
+        notes.append("DB connection failed; using static curriculum fallback.")
+        if legacy_topic_id:
+            result = get_topic_structure_by_legacy_id_with_fallback(
+                None,
+                legacy_topic_id=legacy_topic_id,
+            )
+        else:
+            result = get_course_structure_with_fallback(
+                None,
+                course_key=course_key,
+            )
+
+    if result.get("source") != "db":
+        notes.append("Data served from static curriculum (DB not seeded or unavailable).")
+
+    if legacy_topic_id:
+        return {
+            "mode":            "topic",
+            "legacy_topic_id": legacy_topic_id,
+            "source":          result.get("source", "fallback"),
+            "topic":           result.get("topic"),
+            "error":           conn_error or result.get("error"),
+            "notes":           notes,
+        }
+    return {
+        "mode":             "course",
+        "course_key":       course_key,
+        "source":           result.get("source", "fallback"),
+        "course_structure": result.get("course_structure"),
+        "error":            conn_error or result.get("error"),
+        "notes":            notes,
+    }

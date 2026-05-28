@@ -295,11 +295,11 @@ def test_admin_beta_metrics_still_in_app_py():
     assert "async def admin_beta_metrics" in source
 
 
-def test_modular_curriculum_still_in_app_py():
+def test_modular_curriculum_not_in_app_py():
     app_path = os.path.join(os.path.dirname(__file__), "..", "app.py")
     with open(app_path, encoding="utf-8") as f:
         source = f.read()
-    assert "async def debug_modular_curriculum" in source
+    assert "async def debug_modular_curriculum" not in source
 
 
 def test_moved_routes_not_in_app_py():
