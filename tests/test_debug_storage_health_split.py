@@ -221,4 +221,4 @@ def test_other_debug_routes_still_in_app_py():
     with open(app_path, encoding="utf-8") as f:
         source = f.read()
     assert "async def admin_beta_metrics" in source
-    assert "async def debug_generated_learning_db_check" in source
+    assert "async def debug_generated_learning_db_check" not in source

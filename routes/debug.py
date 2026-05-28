@@ -288,6 +288,333 @@ def _storage_health_topic_status(session: SessionContext, legacy_topic_id: str) 
     }
 
 
+def _empty_generated_learning_state_found() -> dict:
+    return {
+        "generated_topic_content": False,
+        "generated_topic_practice": {
+            "quiz": False,
+            "portfolio_task": False,
+            "interview_practice": False,
+        },
+        "quiz_submission": False,
+        "portfolio_submission": False,
+        "interview_submission": False,
+        "topic_notes": False,
+    }
+
+
+def _generated_learning_state_found(state: dict | None) -> dict:
+    found = _empty_generated_learning_state_found()
+    if not state:
+        return found
+
+    found["generated_topic_content"] = state.get("generated_topic_content") is not None
+    practice = state.get("generated_topic_practice") or {}
+    found["generated_topic_practice"] = {
+        "quiz": practice.get("quiz") is not None,
+        "portfolio_task": practice.get("portfolio_task") is not None,
+        "interview_practice": practice.get("interview_practice") is not None,
+    }
+    found["quiz_submission"] = state.get("quiz_submission") is not None
+    found["portfolio_submission"] = state.get("portfolio_submission") is not None
+    found["interview_submission"] = state.get("interview_submission") is not None
+    found["topic_notes"] = state.get("topic_notes") is not None
+    return found
+
+
+def _safe_debug_limit(value, *, default: int = 50, minimum: int = 1, maximum: int = 200) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(parsed, maximum))
+
+
+def _flatten_generated_learning_found(found: dict) -> list[bool]:
+    practice = found.get("generated_topic_practice") or {}
+    return [
+        bool(found.get("generated_topic_content")),
+        bool(practice.get("quiz")),
+        bool(practice.get("portfolio_task")),
+        bool(practice.get("interview_practice")),
+        bool(found.get("quiz_submission")),
+        bool(found.get("portfolio_submission")),
+        bool(found.get("interview_submission")),
+        bool(found.get("topic_notes")),
+    ]
+
+
+_GENERATED_LEARNING_PRIVATE_FIELDS = frozenset({
+    "content",
+    "answers",
+    "evaluation",
+    "submission",
+    "feedback",
+    "answer",
+    "reflection",
+    "confusions",
+    "application_idea",
+})
+
+
+def _redact_generated_learning_state(state):
+    if state is None:
+        return None
+    if isinstance(state, list):
+        return [_redact_generated_learning_state(item) for item in state]
+    if not isinstance(state, dict):
+        return state
+
+    redacted = {}
+    for key, value in state.items():
+        if value is None:
+            redacted[key] = None
+        elif key == "metadata":
+            redacted[key] = {}
+        elif key in _GENERATED_LEARNING_PRIVATE_FIELDS:
+            redacted[key] = "[redacted]"
+        else:
+            redacted[key] = _redact_generated_learning_state(value)
+    return redacted
+
+
+def _redact_usage_event(event):
+    if not isinstance(event, dict):
+        return event
+    return {
+        key: ({} if key == "metadata" and value is not None else value)
+        for key, value in event.items()
+    }
+
+
+@router.get("/debug/generated-learning-db-check")
+async def debug_generated_learning_db_check(
+    session_id: str,
+    legacy_topic_id: str,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: inspect generated-learning DB mirror state.
+
+    Opens one DB connection only when this endpoint is called. Returns redacted
+    generated-learning mirror state from generated_learning_read_service.
+    Never returns env var values, DB URLs, stack traces, or full session data.
+    """
+    from services.generated_learning_read_service import get_generated_learning_state_from_db
+
+    state = None
+    error_msg = None
+    source = "db"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            state = get_generated_learning_state_from_db(
+                conn,
+                session_id=session_id,
+                legacy_topic_id=legacy_topic_id,
+            )
+    except Exception as exc:
+        source = "error"
+        state = None
+        error_msg = safe_debug_error_message(exc)
+        notes.append("Generated-learning DB mirror read failed. Check DB connectivity and schema.")
+
+    if source == "db":
+        notes.append("Generated-learning DB mirror read completed.")
+        if not any(_flatten_generated_learning_found(_generated_learning_state_found(state))):
+            notes.append("No generated-learning mirror state found for this session/topic.")
+
+    return {
+        "session_id": session_id,
+        "legacy_topic_id": legacy_topic_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "state_found": _generated_learning_state_found(state),
+        "state": _redact_generated_learning_state(state),
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@router.get("/debug/usage-events-db-check")
+async def debug_usage_events_db_check(
+    session_id: str,
+    limit: str = "50",
+    _: None = Depends(debug_access),
+):
+    """Debug-only: inspect usage_events DB mirror state for a session.
+
+    Opens one DB connection only when this endpoint is called. Returns only
+    usage_events mirror rows with metadata redacted and aggregate counts from the usage-events
+    repository. Never returns env var values, DB URLs, stack traces, or full
+    session data.
+    """
+    from repositories.usage_events_repository import (
+        list_usage_events_for_session,
+        usage_event_summary_for_session,
+    )
+
+    safe_limit = _safe_debug_limit(limit)
+    events = []
+    summary = None
+    error_msg = None
+    source = "db"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            events = list_usage_events_for_session(
+                conn,
+                session_id=session_id,
+                limit=safe_limit,
+            )
+            summary = usage_event_summary_for_session(
+                conn,
+                session_id=session_id,
+            )
+    except Exception as exc:
+        source = "error"
+        events = []
+        summary = None
+        error_msg = safe_debug_error_message(exc)
+        notes.append("Usage-events DB mirror read failed. Check DB connectivity and schema.")
+
+    if source == "db":
+        notes.append("Usage-events DB mirror read completed.")
+        if not events:
+            notes.append("No usage_events mirror rows found for this session.")
+
+    return {
+        "session_id": session_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "events_count": len(events),
+        "summary": summary,
+        "events": [_redact_usage_event(event) for event in events],
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@router.get("/debug/usage-events-mismatch-check")
+async def debug_usage_events_mismatch_check(
+    request: Request,
+    session_id: str,
+    limit: str = "200",
+    _: None = Depends(debug_access),
+):
+    """Debug-only: compare usage_events DB mirror state against SessionContext.
+
+    Loads SessionContext read-only, then reads usage_events DB mirror state
+    and returns only the sanitized comparison output. Never calls save_session.
+    """
+    from repositories.usage_events_repository import (
+        list_usage_events_for_session,
+        usage_event_summary_for_session,
+    )
+    from services.usage_events_mismatch_service import compare_usage_events_state
+
+    data = _deps.get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+    safe_limit = _safe_debug_limit(limit, default=200, minimum=1, maximum=500)
+
+    comparison = None
+    error_msg = None
+    source = "db_compare"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            db_events = list_usage_events_for_session(
+                conn,
+                session_id=session_id,
+                limit=safe_limit,
+            )
+            db_summary = usage_event_summary_for_session(
+                conn,
+                session_id=session_id,
+            )
+            comparison = compare_usage_events_state(
+                session=session,
+                db_summary=db_summary,
+                db_events=db_events,
+            )
+    except Exception as exc:
+        source = "error"
+        comparison = None
+        error_msg = safe_debug_error_message(exc)
+        notes.append("Usage-events DB mirror comparison failed. Check DB connectivity and schema.")
+
+    if source == "db_compare":
+        notes.append("Usage-events DB mirror comparison completed.")
+
+    return {
+        "session_id": session_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "matches": comparison.get("matches") if comparison is not None else None,
+        "comparison": comparison,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
+@router.get("/debug/generated-learning-mismatch-check")
+async def debug_generated_learning_mismatch_check(
+    request: Request,
+    session_id: str,
+    legacy_topic_id: str,
+    _: None = Depends(debug_access),
+):
+    """Debug-only: compare generated-learning DB mirror state against SessionContext.
+
+    Loads SessionContext read-only, then reads generated-learning DB mirror state
+    and returns only the sanitized comparison output. Never calls save_session.
+    """
+    from services.generated_learning_read_service import get_generated_learning_state_from_db
+    from services.generated_learning_mismatch_service import compare_generated_learning_state
+
+    data = _deps.get_session_data(session_id, getattr(request.state, "user_id", "") or "")
+    session = data["session"]
+
+    comparison = None
+    error_msg = None
+    source = "db_compare"
+    notes: list[str] = []
+
+    try:
+        with get_conn() as conn:
+            db_state = get_generated_learning_state_from_db(
+                conn,
+                session_id=session_id,
+                legacy_topic_id=legacy_topic_id,
+            )
+            comparison = compare_generated_learning_state(
+                session=session,
+                legacy_topic_id=legacy_topic_id,
+                db_state=db_state,
+            )
+    except Exception as exc:
+        source = "error"
+        comparison = None
+        error_msg = safe_debug_error_message(exc)
+        notes.append("Generated-learning DB mirror comparison failed. Check DB connectivity and schema.")
+
+    if source == "db_compare":
+        notes.append("Generated-learning DB mirror comparison completed.")
+
+    return {
+        "session_id": session_id,
+        "legacy_topic_id": legacy_topic_id,
+        "attempted_db_connection": True,
+        "source": source,
+        "matches": comparison.get("matches") if comparison is not None else None,
+        "comparison": comparison,
+        "error": error_msg,
+        "notes": notes,
+    }
+
+
 @router.get("/debug/curriculum-db-check")
 async def debug_curriculum_db_check(
     track_key: str = "aipm",

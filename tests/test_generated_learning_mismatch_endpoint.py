@@ -92,8 +92,8 @@ def _comparison(matches=True):
 
 def test_endpoint_exists():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -115,10 +115,10 @@ def test_endpoint_requires_session_id_and_legacy_topic_id():
 def test_endpoint_loads_session_context_read_only():
     conn = _make_conn()
     session = object()
-    with patch("app._get_session_data", return_value=_fake_session_data(session)) as get_session, patch(
-        "app._save_session"
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data(session)) as get_session, patch(
+        "routes.deps.save_session"
     ) as save_session, patch(
-        "app.get_conn", _fake_get_conn(conn)
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -135,8 +135,8 @@ def test_endpoint_loads_session_context_read_only():
 def test_endpoint_attempts_one_db_connection():
     conn = _make_conn()
     calls = []
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn, calls)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn, calls)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -155,8 +155,8 @@ def test_fake_db_state_and_comparison_returns_source_db_compare():
     read_service = MagicMock(return_value=_db_state())
     compare_service = MagicMock(return_value=_comparison(True))
     session = object()
-    with patch("app._get_session_data", return_value=_fake_session_data(session)), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data(session)), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         read_service,
@@ -180,8 +180,8 @@ def test_fake_db_state_and_comparison_returns_source_db_compare():
 
 def test_matches_true_when_comparison_says_true():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -196,8 +196,8 @@ def test_matches_true_when_comparison_says_true():
 
 def test_matches_false_when_comparison_says_false():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -218,8 +218,8 @@ def test_db_errors_return_source_error_with_safe_error():
         f"failed {secret_url} ANTHROPIC_API_KEY=sk-secret SUPABASE_DATABASE_URL={secret_url}"
         + "x" * 600
     )
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn_raises(error)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn_raises(error)
     ):
         response = client.get(URL, params=_params())
 
@@ -238,8 +238,8 @@ def test_db_errors_return_source_error_with_safe_error():
 
 def test_comparison_errors_return_source_error_with_safe_error():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -259,8 +259,8 @@ def test_comparison_errors_return_source_error_with_safe_error():
 
 def test_connection_closed_on_success():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -275,8 +275,8 @@ def test_connection_closed_on_success():
 
 def test_connection_closed_on_error():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         side_effect=RuntimeError("query failed"),
@@ -288,10 +288,10 @@ def test_connection_closed_on_error():
 
 def test_endpoint_does_not_call_save_session():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app._save_session"
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.deps.save_session"
     ) as save_session, patch(
-        "app.get_conn", _fake_get_conn(conn)
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -308,8 +308,8 @@ def test_no_secrets_or_raw_env_values_appear_in_response(monkeypatch):
     monkeypatch.setenv("SUPABASE_DATABASE_URL", "postgresql://user:secret@host/db")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-live-secret")
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),
@@ -327,8 +327,8 @@ def test_no_secrets_or_raw_env_values_appear_in_response(monkeypatch):
 
 def test_no_full_generated_or_user_text_appears_in_response():
     conn = _make_conn()
-    with patch("app._get_session_data", return_value=_fake_session_data()), patch(
-        "app.get_conn", _fake_get_conn(conn)
+    with patch("routes.deps.get_session_data", return_value=_fake_session_data()), patch(
+        "routes.debug.get_conn", _fake_get_conn(conn)
     ), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_db_state(),

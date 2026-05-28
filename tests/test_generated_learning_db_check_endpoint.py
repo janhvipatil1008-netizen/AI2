@@ -129,7 +129,7 @@ def _params():
 
 def test_endpoint_exists():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
     ):
@@ -147,7 +147,7 @@ def test_endpoint_requires_session_id_and_legacy_topic_id():
 def test_endpoint_attempts_one_db_connection():
     conn = _make_conn()
     calls = []
-    with patch("app.get_conn", _fake_get_conn(conn, calls)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn, calls)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
     ):
@@ -160,7 +160,7 @@ def test_endpoint_attempts_one_db_connection():
 
 def test_fake_db_state_returns_source_db_and_state():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_fake_state(),
     ):
@@ -168,14 +168,19 @@ def test_fake_db_state_returns_source_db_and_state():
 
     data = response.json()
     assert data["source"] == "db"
-    assert data["state"]["generated_topic_content"]["content"] == "Learning content"
+    assert data["state"]["generated_topic_content"]["content"] == "[redacted]"
+    assert "Learning content" not in response.text
+    assert "Quiz content" not in response.text
+    assert "Interview content" not in response.text
+    assert "Q1: A" not in response.text
+    assert "Reflection" not in response.text
     assert data["error"] is None
 
 
 def test_read_service_called_with_session_and_topic():
     conn = _make_conn()
     service = MagicMock(return_value=_empty_state())
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         service,
     ):
@@ -192,7 +197,7 @@ def test_state_found_marks_generated_topic_content():
     conn = _make_conn()
     state = _empty_state()
     state["generated_topic_content"] = {"content": "x"}
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=state,
     ):
@@ -209,7 +214,7 @@ def test_state_found_marks_practice_types():
         "portfolio_task": None,
         "interview_practice": {"content": "interview"},
     }
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=state,
     ):
@@ -224,7 +229,7 @@ def test_state_found_marks_practice_types():
 
 def test_state_found_marks_submissions_and_notes():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_fake_state(),
     ):
@@ -238,7 +243,7 @@ def test_state_found_marks_submissions_and_notes():
 
 def test_empty_state_returns_false_values():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
     ):
@@ -264,7 +269,7 @@ def test_db_errors_return_source_error_with_safe_truncated_error():
         f"failed {secret_url} ANTHROPIC_API_KEY=sk-secret SUPABASE_DATABASE_URL={secret_url}"
         + "x" * 600
     )
-    with patch("app.get_conn", _fake_get_conn_raises(error)):
+    with patch("routes.debug.get_conn", _fake_get_conn_raises(error)):
         response = client.get(URL, params=_params())
 
     data = response.json()
@@ -280,7 +285,7 @@ def test_db_errors_return_source_error_with_safe_truncated_error():
 
 
 def test_error_state_found_values_are_false():
-    with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("boom"))):
+    with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("boom"))):
         found = client.get(URL, params=_params()).json()["state_found"]
 
     assert found == {
@@ -299,7 +304,7 @@ def test_error_state_found_values_are_false():
 
 def test_connection_closed_on_success():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
     ):
@@ -310,7 +315,7 @@ def test_connection_closed_on_success():
 
 def test_connection_closed_on_error():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("boom"), conn=conn)):
+    with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("boom"), conn=conn)):
         client.get(URL, params=_params())
 
     conn.close.assert_called_once()
@@ -320,7 +325,7 @@ def test_no_secrets_or_raw_env_values_appear_in_success_response(monkeypatch):
     monkeypatch.setenv("SUPABASE_DATABASE_URL", "postgresql://user:secret@host/db")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-live-secret")
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
     ):
@@ -334,10 +339,10 @@ def test_no_secrets_or_raw_env_values_appear_in_success_response(monkeypatch):
 
 def test_learner_facing_session_loading_is_not_called():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
-    ), patch("app._get_session_data") as get_session:
+    ), patch("routes.deps.get_session_data") as get_session:
         client.get(URL, params=_params())
 
     get_session.assert_not_called()
@@ -345,10 +350,10 @@ def test_learner_facing_session_loading_is_not_called():
 
 def test_endpoint_does_not_call_save_session():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "services.generated_learning_read_service.get_generated_learning_state_from_db",
         return_value=_empty_state(),
-    ), patch("app._save_session") as save_session:
+    ), patch("routes.deps.save_session") as save_session:
         client.get(URL, params=_params())
 
     save_session.assert_not_called()

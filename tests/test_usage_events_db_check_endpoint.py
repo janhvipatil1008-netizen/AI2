@@ -73,6 +73,10 @@ def _events():
     ]
 
 
+def _redacted_events():
+    return [{**event, "metadata": {}} for event in _events()]
+
+
 def _summary():
     return {
         "total_events": 2,
@@ -95,7 +99,7 @@ def _params(**overrides):
 
 def test_endpoint_exists():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=[],
     ), patch(
@@ -115,7 +119,7 @@ def test_endpoint_requires_session_id():
 def test_endpoint_attempts_one_db_connection():
     conn = _make_conn()
     calls = []
-    with patch("app.get_conn", _fake_get_conn(conn, calls)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn, calls)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=[],
     ), patch(
@@ -131,23 +135,25 @@ def test_endpoint_attempts_one_db_connection():
 
 def test_fake_db_events_return_source_db():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=_events(),
     ), patch(
         "repositories.usage_events_repository.usage_event_summary_for_session",
         return_value=_summary(),
     ):
-        data = client.get(URL, params=_params()).json()
+        response = client.get(URL, params=_params())
 
+    data = response.json()
     assert data["source"] == "db"
-    assert data["events"] == _events()
+    assert data["events"] == _redacted_events()
+    assert '"refresh"' not in response.text
     assert data["error"] is None
 
 
 def test_events_count_equals_len_events():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=_events(),
     ), patch(
@@ -161,7 +167,7 @@ def test_events_count_equals_len_events():
 
 def test_summary_is_returned():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=_events(),
     ), patch(
@@ -176,7 +182,7 @@ def test_summary_is_returned():
 def test_limit_is_clamped_to_max_200():
     conn = _make_conn()
     list_fn = MagicMock(return_value=[])
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         list_fn,
     ), patch(
@@ -191,7 +197,7 @@ def test_limit_is_clamped_to_max_200():
 def test_limit_below_one_becomes_one():
     conn = _make_conn()
     list_fn = MagicMock(return_value=[])
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         list_fn,
     ), patch(
@@ -206,7 +212,7 @@ def test_limit_below_one_becomes_one():
 def test_invalid_limit_falls_back_to_50():
     conn = _make_conn()
     list_fn = MagicMock(return_value=[])
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         list_fn,
     ), patch(
@@ -227,7 +233,7 @@ def test_db_errors_return_safe_error(monkeypatch):
         "failed SUPABASE_DATABASE_URL=postgresql://user:secret@db.example/prod "
         "ANTHROPIC_API_KEY=sk-ant-super-secret Traceback line"
     )
-    with patch("app.get_conn", _fake_get_conn_raises(exc, conn=conn)):
+    with patch("routes.debug.get_conn", _fake_get_conn_raises(exc, conn=conn)):
         data = client.get(URL, params=_params()).json()
 
     assert data["source"] == "error"
@@ -246,7 +252,7 @@ def test_db_errors_return_safe_error(monkeypatch):
 
 def test_connection_is_closed_on_success():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=[],
     ), patch(
@@ -260,7 +266,7 @@ def test_connection_is_closed_on_success():
 
 def test_connection_is_closed_on_error():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn_raises(RuntimeError("DB down"), conn=conn)):
+    with patch("routes.debug.get_conn", _fake_get_conn_raises(RuntimeError("DB down"), conn=conn)):
         response = client.get(URL, params=_params())
 
     assert response.status_code == 200
@@ -271,7 +277,7 @@ def test_no_secrets_or_raw_env_values_appear_in_success_response(monkeypatch):
     monkeypatch.setenv("SUPABASE_DATABASE_URL", "postgresql://user:secret@host/db")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-super-secret")
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
         return_value=[],
     ), patch(
@@ -289,8 +295,8 @@ def test_no_secrets_or_raw_env_values_appear_in_success_response(monkeypatch):
 
 def test_learner_facing_session_loading_is_not_called():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
-        "app._get_session_data",
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
+        "routes.deps.get_session_data",
         side_effect=AssertionError("session loading must not be called"),
     ) as loader, patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
@@ -307,8 +313,8 @@ def test_learner_facing_session_loading_is_not_called():
 
 def test_endpoint_does_not_call_save_session():
     conn = _make_conn()
-    with patch("app.get_conn", _fake_get_conn(conn)), patch(
-        "app._save_session",
+    with patch("routes.debug.get_conn", _fake_get_conn(conn)), patch(
+        "routes.deps.save_session",
         side_effect=AssertionError("save_session must not be called"),
     ) as saver, patch(
         "repositories.usage_events_repository.list_usage_events_for_session",
