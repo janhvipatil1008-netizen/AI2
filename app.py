@@ -42,6 +42,10 @@ from context.learner_profile import (
 )
 from curriculum.syllabus import _WEEK_TO_PHASE, get_phase_by_id
 from orchestrator import Orchestrator
+from services.session_persistence import (
+    get_user_history,
+    save_exchange_to_history,
+)
 
 load_dotenv()
 
@@ -50,6 +54,12 @@ load_dotenv()
 TEST_MODE = os.getenv("AI2_TEST_MODE") == "1"
 assert_test_mode_off()
 logger    = logging.getLogger(__name__)
+_get_user_history = functools.partial(get_user_history, test_mode=TEST_MODE)
+_save_exchange_to_history = functools.partial(
+    save_exchange_to_history,
+    test_mode=TEST_MODE,
+    logger=logger,
+)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 
@@ -96,27 +106,6 @@ def _save_session(session_id: str, session: SessionContext) -> None:
                 )
     except Exception as exc:
         logger.warning(f"_save_session failed (non-fatal): {exc}")
-
-
-def _save_exchange_to_history(
-    user_id: str, session_id: str,
-    user_message: str, assistant_reply: str, agent_used: str,
-) -> None:
-    """Append a single exchange to the permanent conversation_history table."""
-    if TEST_MODE or not user_id:
-        return
-    now = datetime.now().isoformat()
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO conversation_history "
-                    "(user_id, session_id, user_message, assistant_reply, agent_used, timestamp) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)",
-                    (user_id, session_id, user_message, assistant_reply, agent_used, now),
-                )
-    except Exception as exc:
-        logger.warning(f"_save_exchange_to_history failed (non-fatal): {exc}")
 
 
 def _save_profile_db(profile: LearnerProfile) -> None:
@@ -183,33 +172,6 @@ def _get_user_sessions(user_id: str, limit: int = 10) -> list[dict]:
             except Exception:
                 continue
         return result
-    except Exception:
-        return []
-
-
-def _get_user_history(user_id: str, limit: int = 200) -> list[dict]:
-    """Return full conversation history for a user from the permanent table."""
-    if TEST_MODE or not user_id:
-        return []
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT session_id, user_message, assistant_reply, agent_used, timestamp "
-                    "FROM conversation_history WHERE user_id = %s ORDER BY timestamp DESC LIMIT %s",
-                    (user_id, limit),
-                )
-                rows = cur.fetchall()
-        return [
-            {
-                "session_id":      r[0],
-                "user_message":    r[1],
-                "assistant_reply": r[2],
-                "agent_used":      r[3],
-                "timestamp":       r[4],
-            }
-            for r in rows
-        ]
     except Exception:
         return []
 

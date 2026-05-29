@@ -178,8 +178,8 @@ def test_non_chat_routes_not_moved_in_this_step():
     assert "from routes.onboarding import router as onboarding_router" in app_source
     assert "from routes.syllabus import router as syllabus_router" in app_source
     assert "from routes.jobs import router as jobs_router" in app_source
-    assert '@app.get("/debug/storage-status")' in app_source
-    assert '@app.get("/admin/beta-metrics"' in app_source
+    assert "from routes.debug import router as debug_router" in app_source
+    assert "from routes.admin import router as admin_router" in app_source
 
     assert '"/health"' not in chat_source
     assert '"/login"' not in chat_source
