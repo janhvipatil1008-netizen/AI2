@@ -37,13 +37,13 @@ from routes.deps import debug_access as _debug_access, safe_debug_error_message 
 from database.pool import get_conn
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TOTAL_WEEKS
 from context.session import SessionContext
-from context.learner_profile import (
-    LearnerProfile, load_profile, save_profile,
-)
 from curriculum.syllabus import _WEEK_TO_PHASE, get_phase_by_id
 from orchestrator import Orchestrator
 from services.session_persistence import (
+    get_user_sessions,
+    load_profile_db,
     get_user_history,
+    save_profile_db,
     save_exchange_to_history,
 )
 
@@ -57,6 +57,13 @@ logger    = logging.getLogger(__name__)
 _get_user_history = functools.partial(get_user_history, test_mode=TEST_MODE)
 _save_exchange_to_history = functools.partial(
     save_exchange_to_history,
+    test_mode=TEST_MODE,
+    logger=logger,
+)
+_get_user_sessions = functools.partial(get_user_sessions, test_mode=TEST_MODE)
+_load_profile_db = functools.partial(load_profile_db, test_mode=TEST_MODE)
+_save_profile_db = functools.partial(
+    save_profile_db,
     test_mode=TEST_MODE,
     logger=logger,
 )
@@ -108,27 +115,6 @@ def _save_session(session_id: str, session: SessionContext) -> None:
         logger.warning(f"_save_session failed (non-fatal): {exc}")
 
 
-def _save_profile_db(profile: LearnerProfile) -> None:
-    """Persist a LearnerProfile to PostgreSQL."""
-    if TEST_MODE:
-        return
-    try:
-        with get_conn() as conn:
-            save_profile(profile, conn)
-    except Exception as exc:
-        logger.warning(f"_save_profile_db failed (non-fatal): {exc}")
-
-
-def _load_profile_db(user_id: str) -> Optional[LearnerProfile]:
-    if TEST_MODE or not user_id:
-        return None
-    try:
-        with get_conn() as conn:
-            return load_profile(user_id, conn)
-    except Exception:
-        return None
-
-
 def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
     """Load a session from PostgreSQL (used on cache miss — e.g. after restart)."""
     try:
@@ -144,36 +130,6 @@ def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
     except Exception:
         pass
     return None
-
-
-def _get_user_sessions(user_id: str, limit: int = 10) -> list[dict]:
-    """Return recent sessions for a user, ordered by updated_at desc."""
-    if TEST_MODE or not user_id:
-        return []
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT session_id, session_data, updated_at FROM sessions "
-                    "WHERE user_id = %s ORDER BY updated_at DESC LIMIT %s",
-                    (user_id, limit),
-                )
-                rows = cur.fetchall()
-        result = []
-        for session_id, data_json, updated_at in rows:
-            try:
-                data = json.loads(data_json)
-                result.append({
-                    "session_id":   session_id,
-                    "track":        data.get("track", ""),
-                    "current_week": data.get("current_week", 1),
-                    "updated_at":   updated_at,
-                })
-            except Exception:
-                continue
-        return result
-    except Exception:
-        return []
 
 
 def _startup_db() -> None:

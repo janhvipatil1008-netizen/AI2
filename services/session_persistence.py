@@ -1,9 +1,12 @@
 """Session persistence helpers shared by app and route dependency wiring."""
 
+import json
 import logging
 import os
 from datetime import datetime
+from typing import Optional
 
+from context.learner_profile import LearnerProfile, load_profile, save_profile
 from database.pool import get_conn
 
 _logger = logging.getLogger(__name__)
@@ -70,5 +73,70 @@ def get_user_history(
             }
             for r in rows
         ]
+    except Exception:
+        return []
+
+
+def save_profile_db(
+    profile: LearnerProfile,
+    *,
+    test_mode: bool | None = None,
+    logger: logging.Logger | None = None,
+) -> None:
+    """Persist a LearnerProfile to PostgreSQL."""
+    if _is_test_mode(test_mode):
+        return
+    try:
+        with get_conn() as conn:
+            save_profile(profile, conn)
+    except Exception as exc:
+        (logger or _logger).warning(f"_save_profile_db failed (non-fatal): {exc}")
+
+
+def load_profile_db(
+    user_id: str,
+    *,
+    test_mode: bool | None = None,
+) -> Optional[LearnerProfile]:
+    if _is_test_mode(test_mode) or not user_id:
+        return None
+    try:
+        with get_conn() as conn:
+            return load_profile(user_id, conn)
+    except Exception:
+        return None
+
+
+def get_user_sessions(
+    user_id: str,
+    limit: int = 10,
+    *,
+    test_mode: bool | None = None,
+) -> list[dict]:
+    """Return recent sessions for a user, ordered by updated_at desc."""
+    if _is_test_mode(test_mode) or not user_id:
+        return []
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT session_id, session_data, updated_at FROM sessions "
+                    "WHERE user_id = %s ORDER BY updated_at DESC LIMIT %s",
+                    (user_id, limit),
+                )
+                rows = cur.fetchall()
+        result = []
+        for session_id, data_json, updated_at in rows:
+            try:
+                data = json.loads(data_json)
+                result.append({
+                    "session_id":   session_id,
+                    "track":        data.get("track", ""),
+                    "current_week": data.get("current_week", 1),
+                    "updated_at":   updated_at,
+                })
+            except Exception:
+                continue
+        return result
     except Exception:
         return []
