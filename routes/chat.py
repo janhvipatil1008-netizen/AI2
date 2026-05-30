@@ -14,6 +14,7 @@ from config import TOTAL_WEEKS
 from context.learner_profile import LearnerProfile
 from context.session import SessionContext
 from orchestrator import Orchestrator
+from services.llm_observability import build_safe_trace_metadata, trace_llm_call
 
 router = APIRouter()
 
@@ -115,11 +116,19 @@ async def chat(request: Request, body: ChatRequest):
         session.note_topic(body.message[:60])
     else:
         orch: Orchestrator = data["orch"]
-        try:
-            response_text = await deps.run_blocking(orch.process, body.message)
-            agent_used = session.history[-1].agent_used if session.history else "orchestrator"
-        except anthropic.APIError as exc:
-            raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
+        with trace_llm_call(
+            "chat.orchestrator_process",
+            metadata=build_safe_trace_metadata(
+                session_id=body.session_id,
+                route_type="chat",
+                turn_count=len(session.history),
+            ),
+        ):
+            try:
+                response_text = await deps.run_blocking(orch.process, body.message)
+                agent_used = session.history[-1].agent_used if session.history else "orchestrator"
+            except anthropic.APIError as exc:
+                raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
 
     deps.save_session(body.session_id, session)
 
