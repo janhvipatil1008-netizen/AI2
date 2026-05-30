@@ -202,8 +202,11 @@ async def generate_learning_content_for_topic(
     if shared_cache_write is not None:
         try:
             shared_cache_write(content, model)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "shared content_cache write failed: %s",
+                safe_error_metadata(exc, topic_id=topic.topic_id, model=model),
+            )
 
     return {
         "content":                 saved["content"],
