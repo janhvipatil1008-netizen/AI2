@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+      SUPABASE_DATABASE_URL: postgresql://test:test@localhost:5432/test
+      ANTHROPIC_API_KEY: test-key
+      AUTH_SECRET: test-auth-secret-long-enough
+      AI2_ENV: test
+      TEST_MODE: "1"
+      AI2_TEST_MODE: "1"
+      AI2_MODULAR_CURRICULUM_READS_ENABLED: "false"
+      AI2_DB_WRITE_THROUGH_ENABLED: "false"
+      AI2_TODOS_DB_READS_ENABLED: "false"
+      AI2_PROGRESS_DB_READS_ENABLED: "false"
+      AI2_USAGE_LIMITS_ENABLED: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          python -m pytest \
+            tests/test_public_routes_split.py \
+            tests/test_auth_routes_split.py \
+            tests/test_dashboard_routes_split.py \
+            tests/test_chat_routes_split.py \
+            tests/test_session_cache_eviction.py \
+            tests/test_core_session_persistence_split.py \
+            tests/test_debug_endpoint_protection.py \
+            tests/test_topic_content.py \
+            tests/test_topic_practice.py \
+            tests/test_usage_limit_enforcement.py
