@@ -148,7 +148,7 @@ def test_non_jobs_routes_not_moved_in_this_step():
     assert "from routes.dashboard import router as dashboard_router" in app_source
     assert "from routes.onboarding import router as onboarding_router" in app_source
     assert "from routes.syllabus import router as syllabus_router" in app_source
-    assert '@app.get("/debug/storage-status")' in app_source
+    assert "from routes.debug import router as debug_router" in app_source
     assert "from routes.chat import router as chat_router" in app_source
 
     assert '"/login"' not in jobs_source

@@ -13,6 +13,7 @@ test_privacy_terms_pages.py suites.
 import ast
 import os
 import re
+from pathlib import Path
 
 APP_PATH     = os.path.join(os.path.dirname(__file__), "..", "app.py")
 PUBLIC_PATH  = os.path.join(os.path.dirname(__file__), "..", "routes", "public.py")
@@ -177,9 +178,14 @@ def test_app_py_includes_dashboard_router():
     assert "app.include_router(dashboard_router)" in src
 
 
-def test_app_py_still_has_debug_route():
-    """app.py still defines /debug/storage-status — debug routes not moved."""
-    assert '@app.get("/debug/storage-status")' in _app()
+def test_app_py_includes_debug_router():
+    """app.py includes debug_router after the debug route split."""
+    app_src   = _app()
+    debug_src = Path("routes/debug.py").read_text(encoding="utf-8")
+    assert "from routes.debug import router as debug_router" in app_src
+    assert "app.include_router(debug_router)" in app_src
+    assert '@router.get("/debug/storage-status")' in debug_src
+    assert '@app.get("/debug/storage-status")' not in app_src
 
 
 def test_app_py_includes_onboarding_router():
