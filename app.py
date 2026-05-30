@@ -16,6 +16,7 @@ import asyncio
 import functools
 import json
 import os
+import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
@@ -88,14 +89,79 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # In-memory session cache
 _sessions: dict[str, dict] = {}
+_sessions_last_accessed: dict[str, float] = {}
+
+# Cache eviction: 30-min inactivity TTL, max 500 entries, 10-min sweep
+_SESSION_CACHE_TTL_SECONDS            = 30 * 60
+_SESSION_CACHE_MAX_ENTRIES            = 500
+_SESSION_CACHE_SWEEP_INTERVAL_SECONDS = 10 * 60
+
 _executor = ThreadPoolExecutor(max_workers=4)
+
+
+# ── Session cache eviction ────────────────────────────────────────────────────
+
+
+def _session_touch(session_id: str) -> None:
+    _sessions_last_accessed[session_id] = time.monotonic()
+
+
+def _evict_expired_sessions(now: float | None = None) -> int:
+    ts = now if now is not None else time.monotonic()
+    expired = [
+        sid for sid, last in list(_sessions_last_accessed.items())
+        if ts - last > _SESSION_CACHE_TTL_SECONDS
+    ]
+    for sid in expired:
+        _sessions.pop(sid, None)
+        _sessions_last_accessed.pop(sid, None)
+    if expired:
+        logger.info("session_cache_evict_ttl count=%d", len(expired))
+    return len(expired)
+
+
+def _enforce_session_cache_cap(now: float | None = None) -> int:
+    overflow = len(_sessions) - _SESSION_CACHE_MAX_ENTRIES
+    if overflow <= 0:
+        return 0
+    sorted_ids = sorted(
+        _sessions_last_accessed,
+        key=lambda sid: _sessions_last_accessed.get(sid, 0.0),
+    )
+    to_evict = sorted_ids[:overflow]
+    for sid in to_evict:
+        _sessions.pop(sid, None)
+        _sessions_last_accessed.pop(sid, None)
+    logger.info("session_cache_evict_cap count=%d", len(to_evict))
+    return len(to_evict)
+
+
+def _sweep_session_cache_once(now: float | None = None) -> dict:
+    ts = now if now is not None else time.monotonic()
+    ttl_evicted = _evict_expired_sessions(now=ts)
+    cap_evicted = _enforce_session_cache_cap(now=ts)
+    return {"ttl_evicted": ttl_evicted, "cap_evicted": cap_evicted, "remaining": len(_sessions)}
+
+
+@app.on_event("startup")
+async def _schedule_session_cache_sweep() -> None:
+    if TEST_MODE:
+        return
+
+    async def _loop() -> None:
+        while True:
+            await asyncio.sleep(_SESSION_CACHE_SWEEP_INTERVAL_SECONDS)
+            _sweep_session_cache_once()
+
+    asyncio.create_task(_loop())
 
 
 # ── Session persistence (PostgreSQL) ─────────────────────────────────────────
 
 
 def _save_session(session_id: str, session: SessionContext) -> None:
-    return save_session(session_id, session, test_mode=TEST_MODE, logger=logger)
+    save_session(session_id, session, test_mode=TEST_MODE, logger=logger)
+    _session_touch(session_id)
 
 
 def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
@@ -423,7 +489,7 @@ def _make_client() -> anthropic.Anthropic:
 
 
 def _get_session_data(session_id: str, user_id: str = "") -> dict:
-    return get_session_data(
+    data = get_session_data(
         session_id,
         user_id,
         session_cache=_sessions,
@@ -432,6 +498,8 @@ def _get_session_data(session_id: str, user_id: str = "") -> dict:
         load_profile_db=_load_profile_db,
         orchestrator_cls=Orchestrator,
     )
+    _session_touch(session_id)
+    return data
 def _track_from_str(track_str: str) -> CareerTrack:
     mapping = {t.value: t for t in CareerTrack}
     if track_str not in mapping:

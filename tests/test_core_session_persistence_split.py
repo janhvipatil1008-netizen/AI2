@@ -50,13 +50,13 @@ def test_app_keeps_sessions_cache_and_thin_wrappers_only():
     save_wrapper = _function_source(APP, "_save_session")
 
     assert "_sessions: dict[str, dict] = {}" in app_source
-    assert "return get_session_data(" in get_wrapper
+    assert "get_session_data(" in get_wrapper
     assert "session_cache=_sessions" in get_wrapper
     assert "orchestrator_cls=Orchestrator" in get_wrapper
     assert "SELECT session_data FROM sessions" not in get_wrapper
     assert "Access denied." not in get_wrapper
 
-    assert "return save_session(" in save_wrapper
+    assert "save_session(" in save_wrapper
     assert "INSERT INTO sessions" not in save_wrapper
     assert "_save_session failed" not in save_wrapper
 
