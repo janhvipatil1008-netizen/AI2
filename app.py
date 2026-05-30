@@ -18,7 +18,6 @@ import json
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 from typing import Optional
 
 import anthropic
@@ -40,10 +39,12 @@ from context.session import SessionContext
 from curriculum.syllabus import _WEEK_TO_PHASE, get_phase_by_id
 from orchestrator import Orchestrator
 from services.session_persistence import (
+    get_session_data,
     get_user_sessions,
     load_profile_db,
     get_user_history,
     save_profile_db,
+    save_session,
     save_exchange_to_history,
 )
 
@@ -94,25 +95,7 @@ _executor = ThreadPoolExecutor(max_workers=4)
 
 
 def _save_session(session_id: str, session: SessionContext) -> None:
-    """Write-through: persist session to PostgreSQL after every mutation."""
-    if TEST_MODE:
-        return
-    data = json.dumps(session.to_dict())
-    now  = datetime.now().isoformat()
-    try:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO sessions "
-                    "(session_id, session_data, created_at, updated_at, user_id) "
-                    "VALUES (%s, %s, %s, %s, %s) "
-                    "ON CONFLICT (session_id) DO UPDATE "
-                    "SET session_data=%s, updated_at=%s, user_id=%s",
-                    (session_id, data, session.start_time, now, session.user_id or None,
-                     data, now, session.user_id or None),
-                )
-    except Exception as exc:
-        logger.warning(f"_save_session failed (non-fatal): {exc}")
+    return save_session(session_id, session, test_mode=TEST_MODE, logger=logger)
 
 
 def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
@@ -440,60 +423,15 @@ def _make_client() -> anthropic.Anthropic:
 
 
 def _get_session_data(session_id: str, user_id: str = "") -> dict:
-    # ── In-memory cache hit ───────────────────────────────────────────────────
-    if session_id in _sessions:
-        data = _sessions[session_id]
-        if not TEST_MODE and user_id:
-            owner = data["session"].user_id
-            if owner and owner != user_id:
-                raise HTTPException(status_code=403, detail="Access denied.")
-        return data
-
-    # ── DB restore (cache miss after restart / multi-worker) ─────────────────
-    if not TEST_MODE:
-        try:
-            with get_conn() as conn:
-                with conn.cursor() as cur:
-                    if user_id:
-                        cur.execute(
-                            "SELECT session_data FROM sessions "
-                            "WHERE session_id = %s AND user_id = %s",
-                            (session_id, user_id),
-                        )
-                        row = cur.fetchone()
-                        if row is None:
-                            # Distinguish 404 (doesn't exist) from 403 (exists, wrong user)
-                            cur.execute(
-                                "SELECT user_id FROM sessions WHERE session_id = %s",
-                                (session_id,),
-                            )
-                            exists = cur.fetchone()
-                            if exists is None:
-                                raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-                            raise HTTPException(status_code=403, detail="Access denied.")
-                    else:
-                        cur.execute(
-                            "SELECT session_data FROM sessions WHERE session_id = %s",
-                            (session_id,),
-                        )
-                        row = cur.fetchone()
-                        if row is None:
-                            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-
-            session = SessionContext.from_dict(json.loads(row[0]))
-            client  = _make_client()
-            profile = _load_profile_db(session.user_id) if session.user_id else None
-            orch    = Orchestrator(client=client, session=session, profile=profile)
-            _sessions[session_id] = {"session": session, "orch": orch, "client": client, "profile": profile}
-            return _sessions[session_id]
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-
-
+    return get_session_data(
+        session_id,
+        user_id,
+        session_cache=_sessions,
+        test_mode=TEST_MODE,
+        make_client=_make_client,
+        load_profile_db=_load_profile_db,
+        orchestrator_cls=Orchestrator,
+    )
 def _track_from_str(track_str: str) -> CareerTrack:
     mapping = {t.value: t for t in CareerTrack}
     if track_str not in mapping:
