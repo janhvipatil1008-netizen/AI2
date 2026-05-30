@@ -15,6 +15,7 @@ from harness.prompt_templates import (
     build_portfolio_feedback_prompt,
     build_quiz_evaluation_prompt,
 )
+from services.llm_observability import build_safe_trace_metadata, trace_llm_call
 
 
 logger = get_logger(__name__)
@@ -102,39 +103,48 @@ async def evaluate_quiz_answers(
             quiz_content.get("content", ""),
             existing["answers"],
         )
-        try:
-            evaluation_text = await _create_message_text(
-                make_client=make_client,
-                run_blocking=run_blocking,
-                model=model,
-                max_tokens=1000,
-                prompt=prompt,
-                error_prefix="Evaluation failed",
-            )
-        except SubmissionGenerationError as exc:
-            metadata = safe_error_metadata(
-                exc,
+        with trace_llm_call(
+            "structured.quiz_feedback",
+            metadata=build_safe_trace_metadata(
                 topic_id=topic.topic_id,
-                event_type="quiz_evaluation",
+                activity_type="quiz_feedback",
                 model=model,
-                refresh=refresh,
-            )
-            session.record_usage_event(
-                event_type="quiz_evaluation",
-                topic_id=topic.topic_id,
-                model=model,
-                source="claude",
-                status="error",
-                metadata={
-                    "refresh": refresh,
-                    "from_cache": False,
-                    "error": metadata["error_message"],
-                },
-            )
-            logger.error("Claude quiz evaluation failed", extra={"ai2_metadata": metadata})
-            raise
-        score = parse_score(evaluation_text)
-        saved_model = model
+                from_cache=False,
+            ),
+        ):
+            try:
+                evaluation_text = await _create_message_text(
+                    make_client=make_client,
+                    run_blocking=run_blocking,
+                    model=model,
+                    max_tokens=1000,
+                    prompt=prompt,
+                    error_prefix="Evaluation failed",
+                )
+            except SubmissionGenerationError as exc:
+                metadata = safe_error_metadata(
+                    exc,
+                    topic_id=topic.topic_id,
+                    event_type="quiz_evaluation",
+                    model=model,
+                    refresh=refresh,
+                )
+                session.record_usage_event(
+                    event_type="quiz_evaluation",
+                    topic_id=topic.topic_id,
+                    model=model,
+                    source="claude",
+                    status="error",
+                    metadata={
+                        "refresh": refresh,
+                        "from_cache": False,
+                        "error": metadata["error_message"],
+                    },
+                )
+                logger.error("Claude quiz evaluation failed", extra={"ai2_metadata": metadata})
+                raise
+            score = parse_score(evaluation_text)
+            saved_model = model
 
     saved = session.save_quiz_evaluation(
         topic_id=topic.topic_id,
@@ -229,39 +239,48 @@ async def generate_portfolio_feedback(
             portfolio_task_content.get("content", ""),
             existing["submission"],
         )
-        try:
-            feedback_text = await _create_message_text(
-                make_client=make_client,
-                run_blocking=run_blocking,
-                model=model,
-                max_tokens=1200,
-                prompt=prompt,
-                error_prefix="Feedback generation failed",
-            )
-        except SubmissionGenerationError as exc:
-            metadata = safe_error_metadata(
-                exc,
+        with trace_llm_call(
+            "structured.portfolio_feedback",
+            metadata=build_safe_trace_metadata(
                 topic_id=topic.topic_id,
-                event_type="portfolio_feedback",
+                activity_type="portfolio_feedback",
                 model=model,
-                refresh=refresh,
-            )
-            session.record_usage_event(
-                event_type="portfolio_feedback",
-                topic_id=topic.topic_id,
-                model=model,
-                source="claude",
-                status="error",
-                metadata={
-                    "refresh": refresh,
-                    "from_cache": False,
-                    "error": metadata["error_message"],
-                },
-            )
-            logger.error("Claude portfolio feedback failed", extra={"ai2_metadata": metadata})
-            raise
-        score = parse_score(feedback_text, "Portfolio Readiness Score")
-        saved_model = model
+                from_cache=False,
+            ),
+        ):
+            try:
+                feedback_text = await _create_message_text(
+                    make_client=make_client,
+                    run_blocking=run_blocking,
+                    model=model,
+                    max_tokens=1200,
+                    prompt=prompt,
+                    error_prefix="Feedback generation failed",
+                )
+            except SubmissionGenerationError as exc:
+                metadata = safe_error_metadata(
+                    exc,
+                    topic_id=topic.topic_id,
+                    event_type="portfolio_feedback",
+                    model=model,
+                    refresh=refresh,
+                )
+                session.record_usage_event(
+                    event_type="portfolio_feedback",
+                    topic_id=topic.topic_id,
+                    model=model,
+                    source="claude",
+                    status="error",
+                    metadata={
+                        "refresh": refresh,
+                        "from_cache": False,
+                        "error": metadata["error_message"],
+                    },
+                )
+                logger.error("Claude portfolio feedback failed", extra={"ai2_metadata": metadata})
+                raise
+            score = parse_score(feedback_text, "Portfolio Readiness Score")
+            saved_model = model
 
     saved = session.save_portfolio_feedback(
         topic_id=topic.topic_id,
@@ -356,39 +375,48 @@ async def generate_interview_feedback(
             practice_content.get("content", ""),
             existing["answer"],
         )
-        try:
-            feedback_text = await _create_message_text(
-                make_client=make_client,
-                run_blocking=run_blocking,
-                model=model,
-                max_tokens=1000,
-                prompt=prompt,
-                error_prefix="Feedback generation failed",
-            )
-        except SubmissionGenerationError as exc:
-            metadata = safe_error_metadata(
-                exc,
+        with trace_llm_call(
+            "structured.interview_feedback",
+            metadata=build_safe_trace_metadata(
                 topic_id=topic.topic_id,
-                event_type="interview_feedback",
+                activity_type="interview_feedback",
                 model=model,
-                refresh=refresh,
-            )
-            session.record_usage_event(
-                event_type="interview_feedback",
-                topic_id=topic.topic_id,
-                model=model,
-                source="claude",
-                status="error",
-                metadata={
-                    "refresh": refresh,
-                    "from_cache": False,
-                    "error": metadata["error_message"],
-                },
-            )
-            logger.error("Claude interview feedback failed", extra={"ai2_metadata": metadata})
-            raise
-        score = parse_score(feedback_text)
-        saved_model = model
+                from_cache=False,
+            ),
+        ):
+            try:
+                feedback_text = await _create_message_text(
+                    make_client=make_client,
+                    run_blocking=run_blocking,
+                    model=model,
+                    max_tokens=1000,
+                    prompt=prompt,
+                    error_prefix="Feedback generation failed",
+                )
+            except SubmissionGenerationError as exc:
+                metadata = safe_error_metadata(
+                    exc,
+                    topic_id=topic.topic_id,
+                    event_type="interview_feedback",
+                    model=model,
+                    refresh=refresh,
+                )
+                session.record_usage_event(
+                    event_type="interview_feedback",
+                    topic_id=topic.topic_id,
+                    model=model,
+                    source="claude",
+                    status="error",
+                    metadata={
+                        "refresh": refresh,
+                        "from_cache": False,
+                        "error": metadata["error_message"],
+                    },
+                )
+                logger.error("Claude interview feedback failed", extra={"ai2_metadata": metadata})
+                raise
+            score = parse_score(feedback_text)
+            saved_model = model
 
     saved = session.save_interview_feedback(
         topic_id=topic.topic_id,
