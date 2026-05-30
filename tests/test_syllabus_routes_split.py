@@ -114,12 +114,15 @@ def test_app_no_longer_defines_syllabus_route_handlers_directly():
 def test_non_syllabus_routes_not_moved_in_this_step():
     app_source = _read("app.py")
     syllabus_source = _read("routes/syllabus.py")
+    debug_source = _read("routes/debug.py")
 
     assert "from routes.auth_routes import router as auth_router" in app_source
     assert "from routes.public import router as public_router" in app_source
     assert "from routes.dashboard import router as dashboard_router" in app_source
     assert "from routes.onboarding import router as onboarding_router" in app_source
-    assert '@app.get("/debug/storage-status")' in app_source
+    assert "from routes.debug import router as debug_router" in app_source
+    assert "app.include_router(debug_router)" in app_source
+    assert '@router.get("/debug/storage-status")' in debug_source
     assert "from routes.chat import router as chat_router" in app_source
     assert "from routes.jobs import router as jobs_router" in app_source
 

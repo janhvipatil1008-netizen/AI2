@@ -15,6 +15,7 @@ import os
 
 APP_PATH        = os.path.join(os.path.dirname(__file__), "..", "app.py")
 ONBOARDING_PATH = os.path.join(os.path.dirname(__file__), "..", "routes", "onboarding.py")
+DEBUG_PATH      = os.path.join(os.path.dirname(__file__), "..", "routes", "debug.py")
 
 
 def _app() -> str:
@@ -24,6 +25,11 @@ def _app() -> str:
 
 def _onb() -> str:
     with open(ONBOARDING_PATH, encoding="utf-8") as f:
+        return f.read()
+
+
+def _debug() -> str:
+    with open(DEBUG_PATH, encoding="utf-8") as f:
         return f.read()
 
 
@@ -214,9 +220,13 @@ def test_app_py_includes_chat_router():
     assert "app.include_router(chat_router)" in src
 
 
-def test_app_py_still_has_debug_route():
-    """app.py still defines debug routes — debug routes not moved."""
-    assert '@app.get("/debug/storage-status")' in _app()
+def test_app_py_includes_debug_router():
+    """app.py includes debug router after debug route split."""
+    src = _app()
+    assert '@app.get("/debug/storage-status")' not in src
+    assert "from routes.debug import router as debug_router" in src
+    assert "app.include_router(debug_router)" in src
+    assert '@router.get("/debug/storage-status")' in _debug()
 
 
 def test_app_py_no_longer_defines_chat_route_directly():
