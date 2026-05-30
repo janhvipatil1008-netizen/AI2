@@ -11,6 +11,7 @@ from harness.prompt_templates import (
     build_learning_content_prompt,
     build_practice_generation_prompt,
 )
+from services.llm_observability import build_safe_trace_metadata, trace_llm_call
 
 
 logger = get_logger(__name__)
@@ -144,38 +145,47 @@ async def generate_learning_content_for_topic(
     )
     prompt = build_learning_content_prompt(context)
 
-    try:
-        client   = make_client()
-        response = await run_blocking(
-            lambda: client.messages.create(
-                model=model,
-                max_tokens=1500,
-                messages=[{"role": "user", "content": prompt}],
+    with trace_llm_call(
+        "structured.generate_lesson",
+        metadata=build_safe_trace_metadata(
+            topic_id=topic.topic_id,
+            activity_type="generate_lesson",
+            model=model,
+            from_cache=False,
+        ),
+    ):
+        try:
+            client   = make_client()
+            response = await run_blocking(
+                lambda: client.messages.create(
+                    model=model,
+                    max_tokens=1500,
+                    messages=[{"role": "user", "content": prompt}],
+                )
             )
-        )
-    except Exception as exc:
-        metadata = safe_error_metadata(
-            exc,
-            topic_id=topic.topic_id,
-            event_type="topic_learning_content",
-            model=model,
-            refresh=refresh,
-        )
-        session.record_usage_event(
-            event_type="topic_learning_content",
-            topic_id=topic.topic_id,
-            model=model,
-            source="claude",
-            status="error",
-            metadata={
-                "refresh": refresh,
-                "from_cache": False,
-                "error": metadata["error_message"],
-            },
-        )
-        logger.error("Claude learning content generation failed", extra={"ai2_metadata": metadata})
-        raise
-    content = response.content[0].text
+        except Exception as exc:
+            metadata = safe_error_metadata(
+                exc,
+                topic_id=topic.topic_id,
+                event_type="topic_learning_content",
+                model=model,
+                refresh=refresh,
+            )
+            session.record_usage_event(
+                event_type="topic_learning_content",
+                topic_id=topic.topic_id,
+                model=model,
+                source="claude",
+                status="error",
+                metadata={
+                    "refresh": refresh,
+                    "from_cache": False,
+                    "error": metadata["error_message"],
+                },
+            )
+            logger.error("Claude learning content generation failed", extra={"ai2_metadata": metadata})
+            raise
+        content = response.content[0].text
 
     saved = session.save_generated_topic_content(
         topic_id=topic.topic_id,
@@ -360,40 +370,50 @@ async def generate_practice_content_for_topic(
     )
     prompt = build_practice_generation_prompt(context, practice_type)
 
-    try:
-        client   = make_client()
-        response = await run_blocking(
-            lambda: client.messages.create(
-                model=model,
-                max_tokens=1800,
-                messages=[{"role": "user", "content": prompt}],
-            )
-        )
-    except Exception as exc:
-        metadata = safe_error_metadata(
-            exc,
+    with trace_llm_call(
+        "structured.generate_practice",
+        metadata=build_safe_trace_metadata(
             topic_id=topic.topic_id,
-            event_type=event_type,
+            activity_type="generate_practice",
+            model=model,
             practice_type=practice_type,
-            model=model,
-            refresh=refresh,
-        )
-        session.record_usage_event(
-            event_type=event_type,
-            topic_id=topic.topic_id,
-            model=model,
-            source="claude",
-            status="error",
-            metadata={
-                "refresh": refresh,
-                "from_cache": False,
-                "practice_type": practice_type,
-                "error": metadata["error_message"],
-            },
-        )
-        logger.error("Claude practice content generation failed", extra={"ai2_metadata": metadata})
-        raise
-    content = response.content[0].text
+            from_cache=False,
+        ),
+    ):
+        try:
+            client   = make_client()
+            response = await run_blocking(
+                lambda: client.messages.create(
+                    model=model,
+                    max_tokens=1800,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+            )
+        except Exception as exc:
+            metadata = safe_error_metadata(
+                exc,
+                topic_id=topic.topic_id,
+                event_type=event_type,
+                practice_type=practice_type,
+                model=model,
+                refresh=refresh,
+            )
+            session.record_usage_event(
+                event_type=event_type,
+                topic_id=topic.topic_id,
+                model=model,
+                source="claude",
+                status="error",
+                metadata={
+                    "refresh": refresh,
+                    "from_cache": False,
+                    "practice_type": practice_type,
+                    "error": metadata["error_message"],
+                },
+            )
+            logger.error("Claude practice content generation failed", extra={"ai2_metadata": metadata})
+            raise
+        content = response.content[0].text
 
     saved = session.save_generated_topic_practice(
         topic_id=topic.topic_id,
