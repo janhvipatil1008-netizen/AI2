@@ -54,15 +54,15 @@
       {% endif %}
       <div class="topic-ai-content-meta">
         <span>Baseline saved: {{ "Yes" if outcome.has_baseline else "No" }}</span>
-        <span class="ai-meta-sep">Â·</span>
+        <span class="ai-meta-sep">·</span>
         <span>Post-topic saved: {{ "Yes" if outcome.has_post else "No" }}</span>
-        <span class="ai-meta-sep">Â·</span>
+        <span class="ai-meta-sep">·</span>
         <span>Baseline score: {{ outcome.baseline_score if outcome.baseline_score is not none else "Not set" }}</span>
-        <span class="ai-meta-sep">Â·</span>
+        <span class="ai-meta-sep">·</span>
         <span>Post score: {{ outcome.post_score if outcome.post_score is not none else "Not set" }}</span>
-        <span class="ai-meta-sep">Â·</span>
+        <span class="ai-meta-sep">·</span>
         <span>Improvement delta: {{ outcome.improvement_delta if outcome.improvement_delta is not none else "Not set" }}</span>
-        <span class="ai-meta-sep">Â·</span>
+        <span class="ai-meta-sep">·</span>
         <span>Status: {{ outcome.status if outcome.status else "Not started" }}</span>
       </div>
     </div>

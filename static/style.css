@@ -1308,3 +1308,466 @@ button { cursor: pointer; border: none; font-family: var(--font); }
 .week-stat-completed   { background: rgba(63,185,80,.12); color: var(--success); border: 1px solid rgba(63,185,80,.3); }
 .week-stat-in-progress { background: rgba(255,196,0,.12); color: #d4a017; border: 1px solid rgba(255,196,0,.3); }
 .week-stat-not-started { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   BETA POLISH — added for learner-facing pages (topics / topic_detail /
+   todos / syllabus). All rules below are additive; nothing above this
+   line was changed. Aligned with the dark dashboard tokens.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared section spacing on learner pages ───────────────────────────── */
+.topics-page,
+.topic-detail-page,
+.todos-page,
+.syl-layout {
+  color: var(--text);
+}
+
+/* ── Topics page: polish topbar + cards ────────────────────────────────── */
+.topics-topbar { flex-wrap: wrap; }
+.topics-topbar > div:first-child { flex: 1 1 320px; min-width: 0; }
+.topics-topbar .topics-secondary-link {
+  background: var(--surface);
+  font-size: 0.83rem;
+  font-weight: 600;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.topics-topbar .topics-secondary-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+  background: rgba(0,180,216,.06);
+}
+
+.topic-card {
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.topic-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(0,0,0,.35);
+}
+.topic-card h2 { margin: 2px 0; }
+.topic-button-row .topic-action-btn {
+  flex: 1 1 auto;
+  text-align: center;
+  min-width: 100px;
+}
+.topic-action-btn { transition: background .15s, border-color .15s, color .15s; }
+
+/* ── Topic detail: completion bar ──────────────────────────────────────── */
+.topic-completion-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.topic-completion-label { font-size: 0.85rem; color: var(--text-dim); }
+.topic-completion-label strong { color: var(--accent); font-size: 1rem; }
+.topic-progress-track {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.topic-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  transition: width .4s ease;
+}
+
+/* ── Topic Journey heading + actions row ──────────────────────────────── */
+.topic-journey-section { margin-top: 28px; }
+.topic-journey-heading-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.topic-journey-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.add-suggested-plan-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: var(--radius);
+  padding: 7px 13px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  transition: background .15s, color .15s;
+}
+.add-suggested-plan-btn:hover { background: var(--accent); color: #0d1117; }
+.open-planner-link {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color .15s, color .15s;
+}
+.open-planner-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* ── Journey step card: status + mark + planner controls ──────────────── */
+.step-status-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+.step-status-not-started { background: var(--surface-2); color: var(--text-dim); border-color: var(--border); }
+.step-status-in-progress { background: rgba(210,153,34,.15); color: var(--warning); border-color: rgba(210,153,34,.4); }
+.step-status-done        { background: rgba(63,185,80,.15);  color: var(--success); border-color: rgba(63,185,80,.4); }
+
+.step-mark-controls,
+.step-planner-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.step-planner-controls { padding-top: 8px; border-top: 1px dashed var(--border); }
+
+.step-mark-btn,
+.step-planner-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.step-mark-btn:hover,
+.step-planner-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,180,216,.06);
+}
+.step-mark-btn.step-mark-done { border-color: rgba(63,185,80,.45); color: var(--success); }
+.step-mark-btn.step-mark-done:hover { background: rgba(63,185,80,.12); color: var(--success); }
+
+/* ── Reflection form (notes step) ──────────────────────────────────────── */
+.reflection-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.reflection-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.reflection-textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  padding: 8px 11px;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+}
+.reflection-textarea:focus { border-color: var(--accent); }
+.reflection-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.reflection-save-btn {
+  background: var(--accent);
+  color: #0d1117;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.reflection-save-btn:hover { background: #38d1f0; }
+.reflection-save-btn:disabled { opacity: 0.55; cursor: wait; }
+.reflection-feedback { font-size: 0.8rem; color: var(--text-dim); }
+
+/* ── Beta feedback form (inline under AI evaluation) ──────────────────── */
+.beta-feedback-form {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.beta-feedback-form h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ── Todos / planner page ─────────────────────────────────────────────── */
+.todos-page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 30px 20px 64px;
+}
+.todos-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+}
+.todos-header h1 {
+  font-size: 1.7rem;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.todos-header p { color: var(--text-dim); max-width: 620px; }
+
+.todos-counts-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.todo-count-chip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.todo-count-total       { color: var(--text); }
+.todo-count-inprogress  { color: var(--warning); border-color: rgba(210,153,34,.35); background: rgba(210,153,34,.08); }
+.todo-count-done        { color: var(--success); border-color: rgba(63,185,80,.35);  background: rgba(63,185,80,.08); }
+
+.todo-create-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 26px;
+}
+.todo-create-section h2 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.todo-create-form {
+  display: grid;
+  grid-template-columns: minmax(200px, 2fr) minmax(140px, 1fr) minmax(140px, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+.todo-title-input,
+.todo-due-input,
+.todo-type-select {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.88rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color .15s;
+}
+.todo-title-input:focus,
+.todo-due-input:focus,
+.todo-type-select:focus { border-color: var(--accent); }
+.todo-create-btn {
+  background: var(--accent);
+  color: #0d1117;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0 18px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.todo-create-btn:hover { background: #38d1f0; }
+.todo-create-error {
+  margin-top: 10px;
+  color: var(--error);
+  background: rgba(248,81,73,.08);
+  border: 1px solid rgba(248,81,73,.3);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: 0.83rem;
+}
+
+.todo-list-section { margin-top: 24px; }
+.todo-list-section h2 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: var(--text);
+  letter-spacing: .01em;
+}
+.todo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+}
+.todo-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  transition: border-color .15s, transform .15s;
+}
+.todo-item:hover { border-color: var(--accent); }
+.todo-item.todo-status-in-progress { border-left-color: var(--warning); }
+.todo-item.todo-status-done        { border-left-color: var(--success); opacity: 0.78; }
+.todo-item.todo-status-done .todo-item-title { text-decoration: line-through; color: var(--text-dim); }
+
+.todo-item-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.todo-item-title {
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.todo-due-label {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.todo-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 2px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+.todo-badge-todo        { background: var(--surface-2);     color: var(--text-dim); border-color: var(--border); }
+.todo-badge-in-progress { background: rgba(210,153,34,.15); color: var(--warning);  border-color: rgba(210,153,34,.4); }
+.todo-badge-done        { background: rgba(63,185,80,.15);  color: var(--success);  border-color: rgba(63,185,80,.4); }
+
+.todo-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.todo-status-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 0.77rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.todo-status-btn:hover { border-color: var(--accent); color: var(--accent); }
+.todo-status-btn.todo-btn-progress:hover { border-color: var(--warning); color: var(--warning); background: rgba(210,153,34,.08); }
+.todo-status-btn.todo-btn-done:hover     { border-color: var(--success); color: var(--success); background: rgba(63,185,80,.08); }
+
+.todo-empty {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  padding: 16px 18px;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+/* ── Syllabus polish (small fixes on top of existing rules) ───────────── */
+.syl-phase-card { transition: border-color .2s, box-shadow .2s; }
+.syl-phase-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+.role-pill { white-space: nowrap; }
+
+/* ── Responsive: tighten everything below ~720px ──────────────────────── */
+@media (max-width: 720px) {
+  .topics-page,
+  .topic-detail-page,
+  .todos-page { padding: 20px 14px 48px; }
+
+  .topic-detail-header h1 { font-size: 1.5rem; }
+  .topics-topbar h1       { font-size: 1.4rem; }
+  .todos-header h1        { font-size: 1.4rem; }
+
+  .topic-card-grid,
+  .journey-grid { grid-template-columns: 1fr; }
+
+  .topic-ai-content-section { padding: 1rem 1.05rem; }
+  .topic-ai-content-heading { flex-direction: column; align-items: flex-start; }
+
+  .topic-journey-heading-row { flex-direction: column; align-items: flex-start; }
+
+  .todo-create-form { grid-template-columns: 1fr; }
+  .todo-item { flex-direction: column; align-items: stretch; }
+  .todo-item-actions { justify-content: flex-end; }
+
+  .syl-topbar { flex-direction: column; align-items: flex-start; }
+  .syl-overall { width: 100%; justify-content: flex-start; }
+  .overall-bar-wrap { flex: 1; }
+}
+
+@media (max-width: 460px) {
+  .topic-button-row .topic-action-btn { flex-basis: 100%; }
+  .step-mark-controls .step-mark-btn,
+  .step-planner-controls .step-planner-btn { flex: 1 1 auto; text-align: center; }
+}
