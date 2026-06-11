@@ -1,0 +1,239 @@
+/*
+ * AI² Design Tokens
+ * Single source of truth — every value used in screens comes from here.
+ * Load order: tokens.css → style.css (legacy, being phased out) → screen CSS
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
+
+:root {
+
+  /* ── Colour: backgrounds ───────────────────────────────────────────── */
+  --bg:               #FAF7F4;   /* warm off-white — never stark #FFF */
+  --surface:          #F3EFE9;   /* cards, panels */
+  --surface-2:        #EDE8E1;   /* nested surfaces, hover states */
+  --surface-raised:   #FFFFFF;   /* modals, popovers that need lift */
+
+  /* ── Colour: text ──────────────────────────────────────────────────── */
+  --text:             #2A2320;   /* warm near-black — never pure #000 */
+  --text-muted:       #6B5F58;   /* secondary labels, captions — AA contrast on --bg */
+  --text-on-accent:   #FFFFFF;   /* text sitting on --accent fill */
+
+  /* ── Colour: accent (ENCOURAGEMENT) ───────────────────────────────── */
+  --accent:           #E85D26;   /* progress, streaks, primary actions */
+  --accent-soft:      #FDF0EA;   /* tinted backgrounds behind accent UI */
+  --accent-hover:     #CF4F1E;   /* darker for :hover / :active states */
+
+  /* ── Colour: semantic ──────────────────────────────────────────────── */
+  --success:          #2E7D52;   /* completion, correct, done */
+  --success-soft:     #EAF5EE;   /* tinted success background */
+  --danger-muted:     #B84040;   /* errors — intentionally different from accent */
+  --danger-soft:      #FBEDED;   /* tinted error background */
+  --warning:          #8A6200;   /* caution — warm amber, not orange */
+  --warning-soft:     #FFF8E6;
+
+  /* ── Colour: chrome ────────────────────────────────────────────────── */
+  --border:           #E0D9D2;   /* default dividers */
+  --border-focus:     #E85D26;   /* input focus ring */
+  --overlay:          rgba(42, 35, 32, 0.45);
+
+  /* ── Typography ────────────────────────────────────────────────────── */
+  /* Figtree loaded via @import above; Inter → system-ui → -apple-system are the fallback chain */
+  --font-display:     'Figtree', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body:        'Figtree', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:        'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+
+  --text-xs:          0.75rem;    /*  12px */
+  --text-sm:          0.875rem;   /*  14px */
+  --text-base:        1.0625rem;  /*  17px — warm reading size */
+  --text-lg:          1.125rem;   /*  18px */
+  --text-xl:          1.25rem;    /*  20px */
+  --text-2xl:         1.5rem;     /*  24px */
+  --text-3xl:         1.875rem;   /*  30px */
+
+  --leading-tight:    1.25;
+  --leading-normal:   1.6;
+  --leading-relaxed:  1.75;       /* long-form reading */
+  --lh-body:          1.65;       /* body text line-height — comfortable for ~17px prose */
+
+  --weight-normal:    400;
+  --weight-medium:    500;
+  --weight-semibold:  600;
+  --weight-bold:      700;
+
+  /* ── Spacing (4-pt grid) ───────────────────────────────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   24px;
+  --space-6:   32px;
+  --space-7:   48px;
+  --space-8:   64px;
+
+  /* ── Radii ─────────────────────────────────────────────────────────── */
+  --radius-sm:    6px;
+  --radius-md:    12px;
+  --radius-lg:    20px;
+  --radius-xl:    28px;
+  --radius-pill:  9999px;
+
+  /* ── Shadows (warm-tinted, never cold gray) ────────────────────────── */
+  --shadow-sm:   0 1px 3px rgba(42, 35, 32, 0.08),
+                 0 1px 2px rgba(42, 35, 32, 0.05);
+  --shadow-md:   0 4px 12px rgba(42, 35, 32, 0.10),
+                 0 2px 4px  rgba(42, 35, 32, 0.06);
+  --shadow-lg:   0 12px 32px rgba(42, 35, 32, 0.12),
+                 0 4px  8px  rgba(42, 35, 32, 0.07);
+
+  /* ── Motion ────────────────────────────────────────────────────────── */
+  --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast:   150ms;
+  --duration-base:   220ms;
+  --duration-slow:   320ms;
+
+  /* ── Layout ────────────────────────────────────────────────────────── */
+  --content-max:     720px;   /* readable measure for long-form content */
+  --page-max:        1080px;  /* full-page container cap */
+  --page-px:         var(--space-5);  /* horizontal page padding */
+}
+
+/* ── ProgressMeter component ───────────────────────────────────────────────── */
+/*
+ * Usage:
+ *   <div class="progress-meter" data-pct="42">
+ *     <div class="progress-meter__bar">
+ *       <div class="progress-meter__fill" style="width: 42%"></div>
+ *     </div>
+ *     <span class="progress-meter__label">42% complete</span>
+ *   </div>
+ *
+ *   Add class  .progress-meter--celebrate  once pct >= 100.
+ */
+
+.progress-meter {
+  display:        flex;
+  flex-direction: column;
+  gap:            var(--space-2);
+}
+
+.progress-meter__bar {
+  height:           8px;
+  background:       var(--surface-2);
+  border-radius:    var(--radius-pill);
+  overflow:         hidden;
+}
+
+.progress-meter__fill {
+  height:           100%;
+  background:       var(--accent);
+  border-radius:    var(--radius-pill);
+  transition:       width var(--duration-slow) var(--ease-out);
+  min-width:        3px;
+}
+
+.progress-meter--celebrate .progress-meter__fill {
+  background: var(--success);
+}
+
+.progress-meter__label {
+  font-size:    var(--text-sm);
+  font-weight:  var(--weight-medium);
+  color:        var(--text-muted);
+}
+
+.progress-meter--celebrate .progress-meter__label {
+  color:        var(--success);
+  font-weight:  var(--weight-semibold);
+}
+
+
+/* ── TodoList component ────────────────────────────────────────────────────── */
+/*
+ * Usage:
+ *   <ul class="todo-list">
+ *     <li class="todo-item todo-item--todo"  data-id="…">…</li>
+ *     <li class="todo-item todo-item--in-progress" data-id="…">…</li>
+ *     <li class="todo-item todo-item--done"  data-id="…">…</li>
+ *   </ul>
+ */
+
+.todo-list {
+  list-style:   none;
+  padding:      0;
+  margin:       0;
+  display:      flex;
+  flex-direction: column;
+  gap:          var(--space-2);
+}
+
+.todo-item {
+  display:          flex;
+  align-items:      flex-start;
+  gap:              var(--space-3);
+  padding:          var(--space-3) var(--space-4);
+  background:       var(--surface);
+  border:           1px solid var(--border);
+  border-radius:    var(--radius-md);
+  font-size:        var(--text-sm);
+  transition:       background var(--duration-fast) var(--ease-out),
+                    border-color var(--duration-fast) var(--ease-out);
+}
+
+.todo-item:hover {
+  background:   var(--surface-2);
+}
+
+.todo-item__check {
+  flex-shrink:  0;
+  width:        18px;
+  height:       18px;
+  border-radius: var(--radius-sm);
+  border:       2px solid var(--border);
+  background:   var(--surface-raised);
+  margin-top:   1px;
+  transition:   border-color var(--duration-fast) var(--ease-out),
+                background   var(--duration-fast) var(--ease-out);
+  cursor:       pointer;
+}
+
+.todo-item--in-progress .todo-item__check {
+  border-color: var(--accent);
+}
+
+.todo-item--done .todo-item__check {
+  background:   var(--success);
+  border-color: var(--success);
+}
+
+.todo-item__text {
+  flex:         1;
+  color:        var(--text);
+  line-height:  var(--leading-normal);
+}
+
+.todo-item--done .todo-item__text {
+  color:           var(--text-muted);
+  text-decoration: line-through;
+}
+
+.todo-item__type-badge {
+  font-size:    var(--text-xs);
+  font-weight:  var(--weight-medium);
+  padding:      2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background:   var(--accent-soft);
+  color:        var(--accent);
+  white-space:  nowrap;
+}
+
+
+/* ── prefers-reduced-motion guard ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
+}

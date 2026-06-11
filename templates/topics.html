@@ -1,119 +1,663 @@
 {% extends "base.html" %}
-{% block title %}AI² - Module {{ current_week }} Topics{% endblock %}
+{% block title %}AI² — Your Learning Hub{% endblock %}
+
+{% block head %}
+<style>
+/* ══ Topic Hub ══════════════════════════════════════════════════════════════ */
+/* All colour, spacing, radius, type, and motion values come from tokens.css  */
+
+/* ── Page shell ─────────────────────────────────────────────────────────── */
+.hub {
+  font-family:  var(--font-body);
+  font-size:    var(--text-base);
+  line-height:  var(--lh-body);
+  color:        var(--text);
+  background:   var(--bg);
+  min-height:   100vh;
+  padding-bottom: var(--space-8);
+}
+
+.hub-inner {
+  max-width:  var(--page-max);
+  margin:     0 auto;
+  padding:    0 var(--page-px);
+}
+
+/* ── Top nav strip ──────────────────────────────────────────────────────── */
+.hub-nav {
+  display:          flex;
+  align-items:      center;
+  gap:              var(--space-4);
+  padding:          var(--space-4) 0;
+  border-bottom:    1px solid var(--border);
+  flex-wrap:        wrap;
+}
+
+.hub-nav__back {
+  font-size:    var(--text-sm);
+  font-weight:  var(--weight-medium);
+  color:        var(--text-muted);
+  text-decoration: none;
+  display:      flex;
+  align-items:  center;
+  gap:          var(--space-1);
+  transition:   color var(--duration-fast) var(--ease-out);
+}
+.hub-nav__back:hover { color: var(--text); text-decoration: none; }
+
+.hub-nav__links {
+  display:    flex;
+  gap:        var(--space-4);
+  margin-left: auto;
+  flex-wrap:  wrap;
+}
+
+.hub-nav__link {
+  font-size:    var(--text-sm);
+  color:        var(--text-muted);
+  text-decoration: none;
+  transition:   color var(--duration-fast) var(--ease-out);
+}
+.hub-nav__link:hover { color: var(--accent); text-decoration: none; }
+
+/* ── Page header ────────────────────────────────────────────────────────── */
+.hub-header {
+  padding:  var(--space-6) 0 var(--space-5);
+}
+
+.hub-eyebrow {
+  font-size:    var(--text-sm);
+  font-weight:  var(--weight-medium);
+  color:        var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-2);
+}
+
+.hub-title {
+  font-family:  var(--font-display);
+  font-size:    var(--text-3xl);
+  font-weight:  var(--weight-bold);
+  color:        var(--text);
+  line-height:  var(--leading-tight);
+  margin-bottom: var(--space-2);
+}
+
+.hub-subtitle {
+  font-size:  var(--text-base);
+  color:      var(--text-muted);
+  margin-bottom: var(--space-5);
+}
+
+/* ── Module progress bar ────────────────────────────────────────────────── */
+.hub-module-progress {
+  background:   var(--surface);
+  border:       1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding:      var(--space-4) var(--space-5);
+  display:      flex;
+  align-items:  center;
+  gap:          var(--space-5);
+  flex-wrap:    wrap;
+  margin-bottom: var(--space-6);
+  box-shadow:   var(--shadow-sm);
+}
+
+.hub-module-progress__meter {
+  flex: 1;
+  min-width: 180px;
+}
+
+.hub-module-progress__stats {
+  display:  flex;
+  gap:      var(--space-4);
+  flex-wrap: wrap;
+}
+
+.hub-stat {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            2px;
+}
+
+.hub-stat__num {
+  font-size:    var(--text-xl);
+  font-weight:  var(--weight-bold);
+  color:        var(--text);
+  line-height:  1;
+}
+
+.hub-stat__label {
+  font-size:  var(--text-xs);
+  color:      var(--text-muted);
+  white-space: nowrap;
+}
+
+.hub-stat--accent .hub-stat__num  { color: var(--accent); }
+.hub-stat--success .hub-stat__num { color: var(--success); }
+
+/* ── Spotlight (current topic) ──────────────────────────────────────────── */
+.hub-spotlight {
+  background:   var(--surface-raised);
+  border:       1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding:      var(--space-6);
+  box-shadow:   var(--shadow-md);
+  margin-bottom: var(--space-6);
+  position:     relative;
+  overflow:     hidden;
+}
+
+/* warm left accent stripe */
+.hub-spotlight::before {
+  content:  '';
+  position: absolute;
+  left:     0; top: 0; bottom: 0;
+  width:    4px;
+  background: var(--accent);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.hub-spotlight__tag {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            var(--space-1);
+  font-size:      var(--text-xs);
+  font-weight:    var(--weight-semibold);
+  color:          var(--accent);
+  background:     var(--accent-soft);
+  border-radius:  var(--radius-pill);
+  padding:        3px var(--space-3);
+  margin-bottom:  var(--space-3);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.hub-spotlight__meta {
+  font-size:    var(--text-sm);
+  color:        var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.hub-spotlight__title {
+  font-family:  var(--font-display);
+  font-size:    var(--text-2xl);
+  font-weight:  var(--weight-bold);
+  color:        var(--text);
+  line-height:  var(--leading-tight);
+  margin-bottom: var(--space-3);
+}
+
+.hub-spotlight__desc {
+  font-size:    var(--text-base);
+  color:        var(--text-muted);
+  line-height:  var(--lh-body);
+  max-width:    var(--content-max);
+  margin-bottom: var(--space-5);
+}
+
+.hub-spotlight__progress {
+  margin-bottom: var(--space-5);
+  max-width:    360px;
+}
+
+/* Activity chips row */
+.hub-activities {
+  display:    flex;
+  flex-wrap:  wrap;
+  gap:        var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.hub-activity {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            var(--space-1);
+  font-size:      var(--text-sm);
+  font-weight:    var(--weight-medium);
+  padding:        var(--space-2) var(--space-3);
+  border-radius:  var(--radius-pill);
+  border:         1px solid var(--border);
+  background:     var(--surface);
+  color:          var(--text-muted);
+  text-decoration: none;
+  transition:     background var(--duration-fast) var(--ease-out),
+                  border-color var(--duration-fast) var(--ease-out),
+                  color var(--duration-fast) var(--ease-out);
+}
+.hub-activity:hover {
+  background:   var(--accent-soft);
+  border-color: var(--accent);
+  color:        var(--accent);
+  text-decoration: none;
+}
+
+.hub-activity--done {
+  background:   var(--success-soft);
+  border-color: var(--success);
+  color:        var(--success);
+}
+
+.hub-activity--in-progress {
+  background:   var(--accent-soft);
+  border-color: var(--accent);
+  color:        var(--accent);
+}
+
+.hub-activity__dot {
+  width:  7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Main CTA */
+.hub-cta {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            var(--space-2);
+  font-size:      var(--text-base);
+  font-weight:    var(--weight-semibold);
+  color:          var(--text-on-accent);
+  background:     var(--accent);
+  border-radius:  var(--radius-pill);
+  padding:        var(--space-3) var(--space-6);
+  text-decoration: none;
+  transition:     background var(--duration-base) var(--ease-out),
+                  transform  var(--duration-fast) var(--ease-out),
+                  box-shadow var(--duration-base) var(--ease-out);
+  box-shadow:     0 2px 8px rgba(232, 93, 38, 0.25);
+}
+.hub-cta:hover {
+  background:    var(--accent-hover);
+  box-shadow:    0 4px 16px rgba(232, 93, 38, 0.35);
+  transform:     translateY(-1px);
+  text-decoration: none;
+  color:         var(--text-on-accent);
+}
+.hub-cta:active { transform: translateY(0); }
+
+.hub-cta--review {
+  background:  var(--surface-2);
+  color:       var(--text);
+  box-shadow:  var(--shadow-sm);
+}
+.hub-cta--review:hover {
+  background:  var(--surface);
+  color:       var(--text);
+  box-shadow:  var(--shadow-md);
+}
+
+/* ── Quick-links row ────────────────────────────────────────────────────── */
+.hub-quicklinks {
+  display:    flex;
+  gap:        var(--space-3);
+  flex-wrap:  wrap;
+  margin-bottom: var(--space-7);
+}
+
+.hub-quicklink {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            var(--space-2);
+  font-size:      var(--text-sm);
+  font-weight:    var(--weight-medium);
+  color:          var(--text-muted);
+  background:     var(--surface);
+  border:         1px solid var(--border);
+  border-radius:  var(--radius-md);
+  padding:        var(--space-2) var(--space-4);
+  text-decoration: none;
+  transition:     color var(--duration-fast) var(--ease-out),
+                  border-color var(--duration-fast) var(--ease-out),
+                  background   var(--duration-fast) var(--ease-out);
+}
+.hub-quicklink:hover {
+  color:        var(--text);
+  border-color: var(--text-muted);
+  background:   var(--surface-2);
+  text-decoration: none;
+}
+
+/* ── All topics section ─────────────────────────────────────────────────── */
+.hub-section-label {
+  font-family:  var(--font-display);
+  font-size:    var(--text-lg);
+  font-weight:  var(--weight-semibold);
+  color:        var(--text);
+  margin-bottom: var(--space-4);
+}
+
+.hub-topic-list {
+  display:  flex;
+  flex-direction: column;
+  gap:      var(--space-3);
+}
+
+/* compact topic row card */
+.hub-topic-row {
+  display:        flex;
+  align-items:    center;
+  gap:            var(--space-4);
+  background:     var(--surface);
+  border:         1px solid var(--border);
+  border-radius:  var(--radius-md);
+  padding:        var(--space-4) var(--space-5);
+  text-decoration: none;
+  transition:     background var(--duration-fast) var(--ease-out),
+                  box-shadow  var(--duration-fast) var(--ease-out);
+  box-shadow:     var(--shadow-sm);
+}
+.hub-topic-row:hover {
+  background:    var(--surface-2);
+  box-shadow:    var(--shadow-md);
+  text-decoration: none;
+}
+
+/* highlight the active topic in the list too */
+.hub-topic-row--active {
+  border-color: var(--accent);
+  background:   var(--accent-soft);
+}
+
+.hub-topic-row__pct {
+  flex-shrink:  0;
+  width:        40px;
+  height:       40px;
+  border-radius: 50%;
+  background:   var(--surface-2);
+  display:      flex;
+  align-items:  center;
+  justify-content: center;
+  font-size:    var(--text-xs);
+  font-weight:  var(--weight-bold);
+  color:        var(--text-muted);
+}
+
+.hub-topic-row--active  .hub-topic-row__pct { background: var(--accent-soft); color: var(--accent); }
+.hub-topic-row--done    .hub-topic-row__pct { background: var(--success-soft); color: var(--success); }
+
+.hub-topic-row__body { flex: 1; min-width: 0; }
+
+.hub-topic-row__title {
+  font-size:    var(--text-base);
+  font-weight:  var(--weight-semibold);
+  color:        var(--text);
+  line-height:  var(--leading-tight);
+  white-space:  nowrap;
+  overflow:     hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-topic-row--active .hub-topic-row__title { color: var(--accent); }
+
+.hub-topic-row__meta {
+  font-size:  var(--text-sm);
+  color:      var(--text-muted);
+  margin-top: 2px;
+}
+
+.hub-topic-row__steps {
+  display:    flex;
+  gap:        var(--space-1);
+  flex-shrink: 0;
+}
+
+.hub-step-dot {
+  width:  8px;
+  height: 8px;
+  border-radius: 50%;
+  background:   var(--border);
+  flex-shrink:  0;
+}
+.hub-step-dot--done       { background: var(--success); }
+.hub-step-dot--in-progress { background: var(--accent); }
+
+.hub-topic-row__arrow {
+  color:      var(--text-muted);
+  font-size:  var(--text-base);
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-out),
+              color     var(--duration-fast) var(--ease-out);
+}
+.hub-topic-row:hover .hub-topic-row__arrow {
+  transform: translateX(3px);
+  color:     var(--accent);
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.hub-empty {
+  text-align:   center;
+  padding:      var(--space-8) var(--space-5);
+  color:        var(--text-muted);
+}
+
+.hub-empty__icon {
+  font-size:    2.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.hub-empty__title {
+  font-size:    var(--text-xl);
+  font-weight:  var(--weight-semibold);
+  color:        var(--text);
+  margin-bottom: var(--space-2);
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<section class="topics-page">
-  <div class="topics-topbar">
-    <div>
-      <a href="/chat/{{ session_id }}" class="back-btn">← Back to Chat</a>
-      <div class="topics-eyebrow">{{ progress.track_label }} · Module {{ current_week }}</div>
-      <h1>Module {{ current_week }} Topics</h1>
-      <p>{{ progress.phase_title }} · {{ progress.phase_desc }}</p>
+{#
+  ── Active topic detection ─────────────────────────────────────────────────
+  Priority: in-progress first → first not-started → last topic as fallback
+#}
+{% set ns = namespace(active=none, active_tp=none) %}
+{% for topic in topics %}
+  {% if ns.active is none %}
+    {% set _tp = progress_by_topic[topic.topic_id] %}
+    {% if _tp.completion_percent > 0 and _tp.completion_percent < 100 %}
+      {% set ns.active = topic %}
+      {% set ns.active_tp = _tp %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+{% if ns.active is none %}
+  {% for topic in topics %}
+    {% if ns.active is none %}
+      {% set _tp = progress_by_topic[topic.topic_id] %}
+      {% if _tp.completion_percent == 0 %}
+        {% set ns.active = topic %}
+        {% set ns.active_tp = _tp %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% if ns.active is none and topics %}
+  {% set ns.active = topics | last %}
+  {% set ns.active_tp = progress_by_topic[(topics | last).topic_id] %}
+{% endif %}
+
+<div class="hub">
+<div class="hub-inner">
+
+  {# ── Top nav ── #}
+  <nav class="hub-nav">
+    <a href="/chat/{{ session_id }}" class="hub-nav__back">← Chat</a>
+    <div class="hub-nav__links">
+      <a href="/dashboard"                  class="hub-nav__link">Dashboard</a>
+      <a href="/syllabus/{{ session_id }}"  class="hub-nav__link">Syllabus</a>
+      <a href="/todos/{{ session_id }}"     class="hub-nav__link">My Planner</a>
     </div>
-    <a href="/dashboard"                 class="topics-secondary-link">Back to Dashboard</a>
-    <a href="/syllabus/{{ session_id }}" class="topics-secondary-link">View Syllabus</a>
-    <a href="/todos/{{ session_id }}"    class="topics-secondary-link">My Planner</a>
+  </nav>
+
+  {# ── Page header ── #}
+  <header class="hub-header">
+    <div class="hub-eyebrow">Module {{ current_week }} &middot; {{ progress.track_label }}</div>
+    <h1 class="hub-title">{{ progress.phase_title }}</h1>
+    {% if progress.phase_desc %}
+    <p class="hub-subtitle">{{ progress.phase_desc }}</p>
+    {% endif %}
+
+    {# Module-level progress summary #}
+    {% if topics %}
+    <div class="hub-module-progress">
+      <div class="hub-module-progress__meter">
+        <div class="progress-meter {% if week_progress_summary.average_completion_percent == 100 %}progress-meter--celebrate{% endif %}">
+          <div class="progress-meter__bar">
+            <div class="progress-meter__fill" style="width: {{ week_progress_summary.average_completion_percent }}%"></div>
+          </div>
+          <span class="progress-meter__label">
+            {% if week_progress_summary.average_completion_percent == 100 %}
+              Module complete — brilliant work.
+            {% else %}
+              {{ week_progress_summary.average_completion_percent }}% of this module complete
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="hub-module-progress__stats">
+        <div class="hub-stat hub-stat--success">
+          <span class="hub-stat__num">{{ week_progress_summary.completed_topics }}</span>
+          <span class="hub-stat__label">Done</span>
+        </div>
+        <div class="hub-stat hub-stat--accent">
+          <span class="hub-stat__num">{{ week_progress_summary.in_progress_topics }}</span>
+          <span class="hub-stat__label">In progress</span>
+        </div>
+        <div class="hub-stat">
+          <span class="hub-stat__num">{{ week_progress_summary.not_started_topics }}</span>
+          <span class="hub-stat__label">Not started</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </header>
+
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  {# SPOTLIGHT — current topic                                               #}
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  {% if ns.active %}
+  {% set _steps = ns.active_tp.topic_progress %}
+  {% set _pct   = ns.active_tp.completion_percent %}
+  {% set _step_map = [
+    ("learn",              "Learn",       "/topic/" ~ session_id ~ "/" ~ ns.active.topic_id ~ "#ai-learning-content"),
+    ("quiz",               "Quiz",        "/topic/" ~ session_id ~ "/" ~ ns.active.topic_id ~ "#ai-quiz"),
+    ("portfolio_task",     "Portfolio",   "/topic/" ~ session_id ~ "/" ~ ns.active.topic_id ~ "#ai-portfolio-task"),
+    ("interview_practice", "Interview",   "/topic/" ~ session_id ~ "/" ~ ns.active.topic_id ~ "#ai-interview-practice"),
+    ("reflection",         "Reflection",  "/topic/" ~ session_id ~ "/" ~ ns.active.topic_id ~ "#topic-reflection"),
+  ] %}
+
+  <section class="hub-spotlight" aria-label="Current topic">
+    <div class="hub-spotlight__tag">
+      {% if _pct == 100 %}&#10003; Complete{% elif _pct > 0 %}&#9679; In progress{% else %}&#9675; Up next{% endif %}
+    </div>
+    <div class="hub-spotlight__meta">
+      Module {{ ns.active.week_num }} &middot; {{ ns.active.module_title }}
+    </div>
+    <h2 class="hub-spotlight__title">{{ ns.active.topic_title }}</h2>
+    <p class="hub-spotlight__desc">{{ ns.active.description }}</p>
+
+    <div class="hub-spotlight__progress">
+      <div class="progress-meter {% if _pct == 100 %}progress-meter--celebrate{% endif %}">
+        <div class="progress-meter__bar">
+          <div class="progress-meter__fill" style="width: {{ _pct | int }}%"></div>
+        </div>
+        <span class="progress-meter__label">{{ _pct | int }}% complete</span>
+      </div>
+    </div>
+
+    {# Activity entry points #}
+    <div class="hub-activities" role="list">
+      {% for step_key, step_label, step_href in _step_map %}
+        {% set _s = _steps.get(step_key, "not_started") %}
+        <a href="{{ step_href }}"
+           class="hub-activity {% if _s == 'done' %}hub-activity--done{% elif _s == 'in_progress' %}hub-activity--in-progress{% endif %}"
+           role="listitem">
+          <span class="hub-activity__dot"></span>
+          {{ step_label }}
+          {% if _s == "done" %}&nbsp;&#10003;{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+
+    {# Primary CTA #}
+    <a href="/topic/{{ session_id }}/{{ ns.active.topic_id }}{% if ns.active_tp.next_step.anchor %}#{{ ns.active_tp.next_step.anchor }}{% endif %}"
+       class="hub-cta {% if _pct == 100 %}hub-cta--review{% endif %}">
+      {% if _pct == 100 %}
+        Review topic
+      {% else %}
+        {{ ns.active_tp.next_step.label }} &rarr;
+      {% endif %}
+    </a>
+  </section>
+  {% endif %}
+
+  {# ── Quick-links row ── #}
+  <div class="hub-quicklinks">
+    <a href="/todos/{{ session_id }}"    class="hub-quicklink">&#128203; My Planner</a>
+    <a href="/syllabus/{{ session_id }}" class="hub-quicklink">&#128218; Syllabus</a>
+    <a href="/dashboard"                 class="hub-quicklink">&#127968; Dashboard</a>
   </div>
 
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  {# ALL TOPICS (secondary list)                                             #}
+  {# ════════════════════════════════════════════════════════════════════════ #}
   {% if topics %}
-  <div class="week-progress-summary">
-    <div class="week-progress-header">
-      <h2 class="week-progress-title">Module {{ current_week }} Progress</h2>
-      <span class="week-progress-avg">{{ week_progress_summary.average_completion_percent }}%</span>
-    </div>
-    <div class="week-progress-bar">
-      <div class="week-progress-fill" style="width: {{ week_progress_summary.average_completion_percent }}%"></div>
-    </div>
-    <div class="week-progress-stats">
-      <span class="week-stat-chip week-stat-completed">
-        Completed: {{ week_progress_summary.completed_topics }} / {{ week_progress_summary.total_topics }}
-      </span>
-      <span class="week-stat-chip week-stat-in-progress">
-        In progress: {{ week_progress_summary.in_progress_topics }}
-      </span>
-      <span class="week-stat-chip week-stat-not-started">
-        Not started: {{ week_progress_summary.not_started_topics }}
-      </span>
-    </div>
-  </div>
-
-  <div class="topic-card-grid">
+  <h2 class="hub-section-label">All topics this module</h2>
+  <div class="hub-topic-list">
     {% for topic in topics %}
-    {% set tp = progress_by_topic[topic.topic_id] %}
+    {% set tp  = progress_by_topic[topic.topic_id] %}
     {% set pct = tp.completion_percent %}
     {% set steps = tp.topic_progress %}
+    {% set is_active = (ns.active and topic.topic_id == ns.active.topic_id) %}
+
     {% if pct == 100 %}
-      {% set status_label = "Completed" %}
-      {% set status_cls   = "topic-card-status-completed" %}
-    {% elif pct > 0 or "in_progress" in steps.values() %}
-      {% set status_label = "In Progress" %}
-      {% set status_cls   = "topic-card-status-in-progress" %}
+      {% set row_cls = "hub-topic-row--done" %}
+    {% elif is_active %}
+      {% set row_cls = "hub-topic-row--active" %}
     {% else %}
-      {% set status_label = "Not Started" %}
-      {% set status_cls   = "topic-card-status-not-started" %}
+      {% set row_cls = "" %}
     {% endif %}
-    <article class="topic-card">
-      <div class="topic-card-meta">Module {{ topic.week_num }} · {{ topic.module_title }}</div>
-      <h2>
-        <a href="/topic/{{ session_id }}/{{ topic.topic_id }}">{{ topic.topic_title }}</a>
-      </h2>
-      <p class="topic-description">{{ topic.description }}</p>
 
-      <div class="topic-card-progress-row">
-        <span class="topic-card-status-label {{ status_cls }}">{{ status_label }}</span>
-        <span class="topic-card-pct">{{ pct | int }}%</span>
-      </div>
-      <div class="topic-card-progress">
-        <div class="topic-card-progress-fill" style="width: {{ pct | int }}%"></div>
+    <a class="hub-topic-row {{ row_cls }}"
+       href="/topic/{{ session_id }}/{{ topic.topic_id }}{% if tp.next_step.anchor %}#{{ tp.next_step.anchor }}{% endif %}">
+
+      <div class="hub-topic-row__pct">{{ pct | int }}%</div>
+
+      <div class="hub-topic-row__body">
+        <div class="hub-topic-row__title">{{ topic.topic_title }}</div>
+        <div class="hub-topic-row__meta">{{ topic.module_title }}</div>
       </div>
 
-      <div class="topic-step-chips">
-        {% set step_map = [
-          ("learn",              "Learn"),
-          ("quiz",               "Quiz"),
-          ("portfolio_task",     "Portfolio"),
-          ("interview_practice", "Interview"),
-          ("reflection",         "Reflection"),
+      {# 5 step dots #}
+      <div class="hub-topic-row__steps" aria-hidden="true">
+        {% for step_key, _ in [
+          ("learn",""), ("quiz",""), ("portfolio_task",""),
+          ("interview_practice",""), ("reflection","")
         ] %}
-        {% for step_key, step_label in step_map %}
-          {% set s = steps.get(step_key, "not_started") %}
-          {% if s == "done" %}
-            {% set chip_cls = "topic-step-chip-done" %}
-          {% elif s == "in_progress" %}
-            {% set chip_cls = "topic-step-chip-in-progress" %}
-          {% else %}
-            {% set chip_cls = "" %}
-          {% endif %}
-          <span class="topic-step-chip {{ chip_cls }}" title="{{ step_label }}: {{ s | replace('_', ' ') }}">{{ step_label }}</span>
+          {% set _s = steps.get(step_key, "not_started") %}
+          <span class="hub-step-dot {% if _s == 'done' %}hub-step-dot--done{% elif _s == 'in_progress' %}hub-step-dot--in-progress{% endif %}"></span>
         {% endfor %}
       </div>
 
-      <a class="topic-continue-btn"
-         href="/topic/{{ session_id }}/{{ topic.topic_id }}{% if tp.next_step.anchor %}#{{ tp.next_step.anchor }}{% endif %}">
-        {{ tp.next_step.label }}
-      </a>
-
-      <div class="topic-actions-label">Recommended actions</div>
-      <div class="topic-action-pills">
-        {% for action in topic.recommended_actions %}
-        <span class="topic-action-pill">{{ action | replace("_", " ") }}</span>
-        {% endfor %}
-      </div>
-
-      <div class="topic-button-row">
-        <a class="topic-action-btn topic-open-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}">Open Topic</a>
-        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}">Learn</a>
-        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}">Quiz</a>
-        <a class="topic-action-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-portfolio-task">Portfolio Task</a>
-        <a class="topic-action-btn" href="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-interview-practice">Interview Practice</a>
-      </div>
-    </article>
+      <span class="hub-topic-row__arrow" aria-hidden="true">&rsaquo;</span>
+    </a>
     {% endfor %}
   </div>
+
   {% else %}
-  <div class="topics-empty">
-    No topics were found for this learning path module.
+  {# Empty state — mentor voice #}
+  <div class="hub-empty">
+    <div class="hub-empty__icon">&#127891;</div>
+    <div class="hub-empty__title">Your topics are on their way</div>
+    <p>Nothing to show for this module just yet — try refreshing, or head back to the dashboard to check your progress.</p>
+    <br />
+    <a href="/dashboard" class="hub-cta">Go to Dashboard &rarr;</a>
   </div>
   {% endif %}
-</section>
+
+</div>{# /.hub-inner #}
+</div>{# /.hub #}
 {% endblock %}
