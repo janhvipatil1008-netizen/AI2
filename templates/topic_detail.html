@@ -303,13 +303,76 @@
     </div>
     {% if quiz_p.content %}
     <div class="td-content-card td-prose-col">
-      <pre class="ai-content-text">{{ quiz_p.content }}</pre>
+      {# Raw content — hidden, parsed by JS #}
+      <textarea id="quiz-raw-content" style="display:none">{{ quiz_p.content }}</textarea>
+      {# Answer store — hidden in interactive mode (auto-filled); shown + editable in legacy mode #}
+      <textarea id="quiz-submission-text" class="td-textarea" rows="6"
+        placeholder="Write your answers here — thinking out loud is fine."
+        style="display:none">{{ quiz_submission.answers }}</textarea>
+
+      {# ── Interactive MCQ player (JS shows this when format is parseable) ── #}
+      <div id="quiz-player" style="display:none">
+        <div class="td-quiz-progress" id="quiz-progress"></div>
+        <p class="td-quiz-question" id="quiz-question-text"></p>
+        <div class="td-quiz-options" id="quiz-options"></div>
+        <div class="td-quiz-result" id="quiz-result" style="display:none"></div>
+        <div style="margin-top:var(--space-4)">
+          <button class="td-btn-primary" id="quiz-next-btn" style="display:none" onclick="quizNextQuestion()">Next &rarr;</button>
+          <div id="quiz-final-report" style="display:none">
+            <p class="td-quiz-score" id="quiz-score-display"></p>
+            <div class="td-submission-actions">
+              <button class="td-btn-primary" id="quiz-player-submit-btn" onclick="quizSubmitAndEvaluate()">Get AI feedback</button>
+              <button class="td-btn-ghost" onclick="generatePractice('quiz',true)">&#8635; New quiz</button>
+              <span class="quiz-submission-feedback" id="quiz-player-feedback"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ── Legacy fallback (JS shows this when format is old / unparseable) ── #}
+      <div id="quiz-legacy" style="display:none">
+        <pre class="ai-content-text" id="quiz-legacy-content"></pre>
+        <h3 class="td-submission-heading" style="margin-top:var(--space-4)">Your answers</h3>
+        <div class="td-submission-actions" style="margin-top:var(--space-2)">
+          <button class="td-btn-ghost" id="quiz-save-btn" onclick="saveQuizAnswers()">Save answers</button>
+          <button class="td-btn-primary" id="quiz-evaluate-btn" onclick="evaluateQuiz(false)">Get AI feedback</button>
+          <span class="quiz-submission-feedback" id="quiz-submission-feedback"></span>
+        </div>
+      </div>
+
       <div class="td-content-actions">
         <button class="td-btn-ghost" id="practice-btn-quiz" onclick="generatePractice('quiz',true)">&#8635; Refresh</button>
         <button class="td-btn-done"  onclick="markStepFromContent(this,'quiz')">Mark done ✓</button>
         <span class="ai-content-feedback" id="practice-feedback-quiz"></span>
       </div>
     </div>
+    {% if quiz_submission.submitted_at %}<div class="td-submitted-meta td-prose-col">Submitted {{ quiz_submission.submitted_at[:10] }}</div>{% endif %}
+    {% if quiz_submission.evaluation %}
+    <div class="td-eval-block td-prose-col">
+      <div class="td-eval-heading">
+        <span class="td-eval-label">Your feedback</span>
+        {% if quiz_submission.score is not none %}<span class="td-score-chip">{{ quiz_submission.score }}/10</span>{% endif %}
+        {% if quiz_submission.evaluated_at %}<span class="td-eval-meta">{{ quiz_submission.evaluated_at[:10] }}</span>{% endif %}
+      </div>
+      <pre class="quiz-evaluation-text">{{ quiz_submission.evaluation }}</pre>
+      <div class="td-eval-actions">
+        <button class="td-btn-ghost" onclick="evaluateQuiz(true)">&#8635; Refresh feedback</button>
+      </div>
+      <form class="beta-feedback-form" method="post" action="/feedback/beta">
+        <h4>How useful was this feedback?</h4>
+        <input type="hidden" name="session_id" value="{{ session_id }}">
+        <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
+        <input type="hidden" name="feedback_context" value="quiz_feedback">
+        <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-quiz">
+        <label class="reflection-label">Usefulness<select name="usefulness_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+        <label class="reflection-label">Clarity<select name="clarity_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+        <label class="reflection-label">What confused you?<textarea name="confusion" class="reflection-textarea" rows="2"></textarea></label>
+        <label class="reflection-label">What would make this better?<textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea></label>
+        <label class="reflection-label">Would you pay for this after the free trial?<textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea></label>
+        <button class="reflection-save-btn" type="submit">Send feedback</button>
+      </form>
+    </div>
+    {% endif %}
     {% else %}
     <div class="td-generate-card td-prose-col">
       <div class="td-generate-card__title">Generate some practice questions</div>
@@ -318,42 +381,6 @@
       <span class="ai-content-feedback" id="practice-feedback-quiz" style="display:block;margin-top:var(--space-3)"></span>
     </div>
     {% endif %}
-    <div class="td-submission td-prose-col">
-      <h3 class="td-submission-heading">Your answers</h3>
-      <textarea id="quiz-submission-text" class="td-textarea" rows="6" placeholder="Write your answers here — thinking out loud is fine.">{{ quiz_submission.answers }}</textarea>
-      <div class="td-submission-actions">
-        <button class="td-btn-ghost"    id="quiz-save-btn"     onclick="saveQuizAnswers()">Save answers</button>
-        <button class="td-btn-primary"  id="quiz-evaluate-btn" onclick="evaluateQuiz(false)">Get AI feedback</button>
-        <span class="quiz-submission-feedback" id="quiz-submission-feedback"></span>
-      </div>
-      {% if quiz_submission.submitted_at %}<div class="td-submitted-meta">Submitted {{ quiz_submission.submitted_at[:10] }}</div>{% endif %}
-      {% if quiz_submission.evaluation %}
-      <div class="td-eval-block">
-        <div class="td-eval-heading">
-          <span class="td-eval-label">Your feedback</span>
-          {% if quiz_submission.score is not none %}<span class="td-score-chip">{{ quiz_submission.score }}/10</span>{% endif %}
-          {% if quiz_submission.evaluated_at %}<span class="td-eval-meta">{{ quiz_submission.evaluated_at[:10] }}</span>{% endif %}
-        </div>
-        <pre class="quiz-evaluation-text">{{ quiz_submission.evaluation }}</pre>
-        <div class="td-eval-actions">
-          <button class="td-btn-ghost" onclick="evaluateQuiz(true)">&#8635; Refresh</button>
-        </div>
-        <form class="beta-feedback-form" method="post" action="/feedback/beta">
-          <h4>How useful was this feedback?</h4>
-          <input type="hidden" name="session_id" value="{{ session_id }}">
-          <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
-          <input type="hidden" name="feedback_context" value="quiz_feedback">
-          <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-quiz">
-          <label class="reflection-label">Usefulness<select name="usefulness_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
-          <label class="reflection-label">Clarity<select name="clarity_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
-          <label class="reflection-label">What confused you?<textarea name="confusion" class="reflection-textarea" rows="2"></textarea></label>
-          <label class="reflection-label">What would make this better?<textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea></label>
-          <label class="reflection-label">Would you pay for this after the free trial?<textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea></label>
-          <button class="reflection-save-btn" type="submit">Send feedback</button>
-        </form>
-      </div>
-      {% endif %}
-    </div>
   </section>
 
   {# ══ Screen 4 — Portfolio ══ #}

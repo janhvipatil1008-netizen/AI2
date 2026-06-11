@@ -406,6 +406,187 @@
     }
   }
 
+  // ── Interactive MCQ quiz player ───────────────────────────────────────────
+
+  var _quiz = { questions: [], idx: 0, answers: [] };
+
+  function _parseQuizContent(text) {
+    var questions = [];
+    var parts = text.split(/(?=Q\d+\.)/);
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i].trim();
+      var qMatch = part.match(/^Q\d+\.\s*([\s\S]+?)(?=\nA\))/);
+      if (!qMatch) continue;
+      var questionText = qMatch[1].trim();
+      var optA = (part.match(/^A\)\s*(.+)$/m) || [])[1];
+      var optB = (part.match(/^B\)\s*(.+)$/m) || [])[1];
+      var optC = (part.match(/^C\)\s*(.+)$/m) || [])[1];
+      var optD = (part.match(/^D\)\s*(.+)$/m) || [])[1];
+      var answerMatch = part.match(/^ANSWER:\s*([A-D])/im);
+      var explanationMatch = part.match(/^EXPLANATION:\s*(.+)$/im);
+      if (!optA || !optB || !answerMatch) continue;
+      questions.push({
+        text:        questionText,
+        options:     { A: optA.trim(), B: optB.trim(), C: optC ? optC.trim() : '', D: optD ? optD.trim() : '' },
+        answer:      answerMatch[1].toUpperCase(),
+        explanation: explanationMatch ? explanationMatch[1].trim() : '',
+      });
+    }
+    return questions;
+  }
+
+  function _renderQuizQuestion(idx) {
+    var q        = _quiz.questions[idx];
+    var total    = _quiz.questions.length;
+    var progress = document.getElementById('quiz-progress');
+    var qText    = document.getElementById('quiz-question-text');
+    var options  = document.getElementById('quiz-options');
+    var result   = document.getElementById('quiz-result');
+    var nextBtn  = document.getElementById('quiz-next-btn');
+    var finalDiv = document.getElementById('quiz-final-report');
+
+    progress.textContent = 'Question ' + (idx + 1) + ' of ' + total;
+    qText.textContent    = q.text;
+    result.style.display = 'none';
+    result.className     = 'td-quiz-result';
+    result.textContent   = '';
+    if (nextBtn)  nextBtn.style.display  = 'none';
+    if (finalDiv) finalDiv.style.display = 'none';
+
+    options.innerHTML = '';
+    var letters = ['A', 'B', 'C', 'D'];
+    for (var j = 0; j < letters.length; j++) {
+      var letter = letters[j];
+      var text   = q.options[letter];
+      if (!text) continue;
+      var btn = document.createElement('button');
+      btn.className = 'td-quiz-opt';
+      btn.textContent = letter + ')  ' + text;
+      btn.dataset.letter = letter;
+      btn.onclick = (function (l) { return function () { quizSelectOption(l); }; })(letter);
+      options.appendChild(btn);
+    }
+  }
+
+  function quizSelectOption(letter) {
+    var q       = _quiz.questions[_quiz.idx];
+    var correct = letter === q.answer;
+    _quiz.answers.push({ idx: _quiz.idx, chosen: letter, correct: correct });
+
+    // Highlight option buttons
+    var opts = document.querySelectorAll('#quiz-options .td-quiz-opt');
+    for (var i = 0; i < opts.length; i++) {
+      opts[i].disabled = true;
+      if (opts[i].dataset.letter === q.answer) opts[i].classList.add('td-quiz-opt--correct');
+      else if (opts[i].dataset.letter === letter && !correct) opts[i].classList.add('td-quiz-opt--wrong');
+    }
+
+    // Show result
+    var result = document.getElementById('quiz-result');
+    result.className   = 'td-quiz-result ' + (correct ? 'td-quiz-result--correct' : 'td-quiz-result--wrong');
+    result.textContent = (correct ? 'Correct. ' : 'Not quite — the answer is ' + q.answer + '. ') + q.explanation;
+    result.style.display = 'block';
+
+    // Show next/finish
+    var isLast = _quiz.idx + 1 >= _quiz.questions.length;
+    if (isLast) {
+      var finalDiv = document.getElementById('quiz-final-report');
+      if (finalDiv) {
+        var score   = _quiz.answers.filter(function (a) { return a.correct; }).length;
+        var scoreEl = document.getElementById('quiz-score-display');
+        if (scoreEl) scoreEl.textContent = 'You got ' + score + ' of ' + _quiz.questions.length + ' correct.';
+        finalDiv.style.display = 'block';
+      }
+    } else {
+      var nextBtn = document.getElementById('quiz-next-btn');
+      if (nextBtn) nextBtn.style.display = 'inline-block';
+    }
+  }
+
+  function quizNextQuestion() {
+    _quiz.idx += 1;
+    _renderQuizQuestion(_quiz.idx);
+  }
+
+  function _buildQuizAnswersText() {
+    var lines = [];
+    for (var i = 0; i < _quiz.answers.length; i++) {
+      var a = _quiz.answers[i];
+      var q = _quiz.questions[a.idx];
+      lines.push('Q' + (a.idx + 1) + ': ' + a.chosen + (a.correct ? ' (correct)' : ' — correct: ' + q.answer));
+    }
+    return lines.join('\n');
+  }
+
+  async function quizSubmitAndEvaluate() {
+    var btn      = document.getElementById('quiz-player-submit-btn');
+    var feedback = document.getElementById('quiz-player-feedback');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    var answersText = _buildQuizAnswersText();
+    document.getElementById('quiz-submission-text').value = answersText;
+
+    try {
+      await fetch(_cfg.quizSubmitUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: _sessionId, topic_id: _topicId, answers: answersText}),
+      });
+    } catch (e) { console.warn('quiz save error:', e); }
+
+    if (btn) btn.textContent = 'Evaluating…';
+    try {
+      var res = await fetch(_cfg.quizEvaluateUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: _sessionId, topic_id: _topicId, refresh: false}),
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        var data = await res.json().catch(function () { return {}; });
+        if (feedback) {
+          feedback.textContent = data.detail || 'Evaluation failed. Please try again.';
+          feedback.className   = 'quiz-submission-feedback quiz-feedback-err';
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Get AI feedback'; }
+      }
+    } catch (e) {
+      console.warn('quiz evaluate error:', e);
+      if (feedback) {
+        feedback.textContent = 'Network error. Please try again.';
+        feedback.className   = 'quiz-submission-feedback quiz-feedback-err';
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Get AI feedback'; }
+    }
+  }
+
+  function initInteractiveQuiz() {
+    var rawEl = document.getElementById('quiz-raw-content');
+    if (!rawEl) return;
+    var questions = _parseQuizContent(rawEl.value);
+    if (questions.length < 2) {
+      // Old format — show legacy display
+      var legacyEl = document.getElementById('quiz-legacy');
+      var legacyContent = document.getElementById('quiz-legacy-content');
+      var submissionTa = document.getElementById('quiz-submission-text');
+      if (legacyEl)      legacyEl.style.display      = 'block';
+      if (legacyContent) legacyContent.textContent    = rawEl.value;
+      if (submissionTa)  submissionTa.style.display   = '';
+      return;
+    }
+    _quiz.questions = questions;
+    _quiz.idx       = 0;
+    _quiz.answers   = [];
+    var playerEl = document.getElementById('quiz-player');
+    if (playerEl) playerEl.style.display = 'block';
+    _renderQuizQuestion(0);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('quiz-raw-content')) initInteractiveQuiz();
+  });
+
   // One-click suggested plan: Learn + Quiz as daily, Portfolio Task + Interview Practice as weekly.
   async function addSuggestedPlan(btn) {
     const origText   = btn.textContent;
@@ -430,6 +611,10 @@
   window.saveReflection          = saveReflection;
   window.saveQuizAnswers         = saveQuizAnswers;
   window.evaluateQuiz            = evaluateQuiz;
+  window.quizSelectOption        = quizSelectOption;
+  window.quizNextQuestion        = quizNextQuestion;
+  window.quizSubmitAndEvaluate   = quizSubmitAndEvaluate;
+  window.initInteractiveQuiz     = initInteractiveQuiz;
   window.savePortfolioSubmission = savePortfolioSubmission;
   window.getPortfolioFeedback    = getPortfolioFeedback;
   window.saveInterviewAnswer     = saveInterviewAnswer;

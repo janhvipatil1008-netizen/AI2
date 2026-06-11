@@ -6,13 +6,16 @@ from harness.rubrics import get_rubric
 
 _PRACTICE_PROMPTS = {
     "quiz": (
-        "Generate a structured quiz with exactly this format:\n\n"
-        "Title:\n"
-        "Instructions:\n"
-        "5 Questions:\n"
-        "Answer Key:\n"
-        "Explanation:\n\n"
-        "Keep it practical and beginner-friendly."
+        "Generate a 5-question multiple-choice quiz. "
+        "Use exactly this format for every question — no other sections:\n\n"
+        "Q1. [question text]\n"
+        "A) [option]\n"
+        "B) [option]\n"
+        "C) [option]\n"
+        "D) [option]\n"
+        "ANSWER: [A, B, C, or D]\n"
+        "EXPLANATION: [one sentence explaining why that answer is correct]\n\n"
+        "Repeat for Q2 through Q5. Keep it beginner-friendly."
     ),
     "portfolio_task": (
         "Generate a hands-on portfolio task with exactly this format:\n\n"

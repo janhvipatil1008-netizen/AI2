@@ -182,26 +182,20 @@ def _load_session_from_db(session_id: str) -> Optional[SessionContext]:
 
 
 def _startup_db() -> None:
-    """Run schema.sql against PostgreSQL if tables don't yet exist. No-op in TEST_MODE."""
+    """Apply schema.sql on every startup. All statements use CREATE TABLE IF NOT EXISTS so this is safe to re-run."""
     if TEST_MODE:
         return
     schema_path = os.path.join(os.path.dirname(__file__), "database", "schema.sql")
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT EXISTS (SELECT FROM information_schema.tables "
-                    "WHERE table_schema = 'public' AND table_name = 'users')"
-                )
-                tables_exist = cur.fetchone()[0]
-                if not tables_exist:
-                    with open(schema_path) as f:
-                        schema_sql = f.read()
-                    for stmt in schema_sql.split(";"):
-                        s = stmt.strip()
-                        if s:
-                            cur.execute(s)
-                    logger.info("First-deploy: created schema from database/schema.sql")
+                with open(schema_path) as f:
+                    schema_sql = f.read()
+                for stmt in schema_sql.split(";"):
+                    s = stmt.strip()
+                    if s:
+                        cur.execute(s)
+                logger.info("startup_db: schema verified")
     except Exception as exc:
         logger.warning(f"_startup_db skipped: {exc}")
 
