@@ -1,206 +1,342 @@
 {% extends "base.html" %}
-{% block title %}AI² - {{ topic.topic_title }}{% endblock %}
+{% block title %}AI² — {{ topic.topic_title }}{% endblock %}
+
+{% block head %}
+<style>
+/* ══ Topic Detail — Screens 2-6 ════════════════════════════════════════════ */
+.td-page { font-family:var(--font-body); font-size:var(--text-base); line-height:var(--lh-body); color:var(--text); background:var(--bg); min-height:100vh; padding-bottom:var(--space-8); }
+.td-inner { max-width:var(--page-max); margin:0 auto; padding:0 var(--page-px); }
+.td-prose-col { max-width:var(--content-max); }
+
+/* breadcrumb */
+.td-breadcrumb { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-4) 0; font-size:var(--text-sm); color:var(--text-muted); flex-wrap:wrap; }
+.td-breadcrumb a { color:var(--text-muted); text-decoration:none; transition:color var(--duration-fast) var(--ease-out); }
+.td-breadcrumb a:hover { color:var(--accent); }
+.td-breadcrumb__sep { color:var(--border); }
+.td-breadcrumb__current { color:var(--text); font-weight:var(--weight-medium); }
+
+/* header */
+.td-header { padding:var(--space-5) 0 var(--space-4); border-bottom:1px solid var(--border); margin-bottom:var(--space-5); }
+.td-eyebrow { font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:var(--space-2); }
+.td-title { font-family:var(--font-display); font-size:var(--text-3xl); font-weight:var(--weight-bold); color:var(--text); line-height:var(--leading-tight); margin-bottom:var(--space-3); }
+.td-desc { font-size:var(--text-base); color:var(--text-muted); line-height:var(--lh-body); max-width:var(--content-max); margin-bottom:var(--space-4); }
+.td-chips { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+.td-chip { font-size:var(--text-xs); font-weight:var(--weight-medium); padding:3px var(--space-3); border-radius:var(--radius-pill); background:var(--surface-2); color:var(--text-muted); border:1px solid var(--border); }
+
+/* progress */
+.td-progress { margin-bottom:var(--space-5); }
+.td-progress-label { font-size:var(--text-sm); color:var(--text-muted); margin-bottom:var(--space-2); }
+.topic-progress-track { height:6px; background:var(--surface-2); border-radius:var(--radius-pill); overflow:hidden; }
+.topic-progress-fill { height:100%; background:var(--accent); border-radius:var(--radius-pill); transition:width var(--duration-slow) var(--ease-out); min-width:3px; }
+
+/* step nav */
+.td-step-nav { display:flex; gap:var(--space-2); flex-wrap:wrap; padding:var(--space-3) 0; margin-bottom:var(--space-6); border-bottom:1px solid var(--border); }
+.td-step-pill { display:inline-flex; align-items:center; gap:var(--space-1); font-size:var(--text-sm); font-weight:var(--weight-medium); padding:var(--space-2) var(--space-3); border-radius:var(--radius-pill); text-decoration:none; background:var(--surface); border:1px solid var(--border); color:var(--text-muted); transition:all var(--duration-fast) var(--ease-out); }
+.td-step-pill:hover { background:var(--surface-2); color:var(--text); text-decoration:none; }
+.td-step-pill--done        { background:var(--success-soft); color:var(--success); border-color:var(--success); }
+.td-step-pill--in-progress { background:var(--accent-soft);  color:var(--accent);  border-color:var(--accent);  }
+.td-step-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+
+/* section */
+.td-section { margin-bottom:var(--space-8); scroll-margin-top:var(--space-6); }
+.td-section-label { font-size:var(--text-xs); font-weight:var(--weight-semibold); text-transform:uppercase; letter-spacing:.08em; color:var(--accent); margin-bottom:var(--space-2); }
+.td-section-title { font-family:var(--font-display); font-size:var(--text-2xl); font-weight:var(--weight-bold); color:var(--text); line-height:var(--leading-tight); margin-bottom:var(--space-2); }
+.td-section-framing { font-size:var(--text-base); color:var(--text-muted); margin-bottom:var(--space-4); max-width:var(--content-max); }
+.td-section-meta { display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-xs); color:var(--text-muted); flex-wrap:wrap; margin-bottom:var(--space-3); }
+
+/* status badges */
+.step-status-badge { display:inline-flex; align-items:center; font-size:var(--text-xs); font-weight:var(--weight-semibold); padding:3px var(--space-3); border-radius:var(--radius-pill); background:var(--surface-2); color:var(--text-muted); }
+.step-status-done          { background:var(--success-soft); color:var(--success); }
+.step-status-in-progress   { background:var(--accent-soft);  color:var(--accent);  }
+.step-status-not-started   { background:var(--surface-2);    color:var(--text-muted); }
+
+/* generate card (empty state) */
+.td-generate-card { background:var(--surface); border:1.5px dashed var(--border); border-radius:var(--radius-lg); padding:var(--space-7) var(--space-6); text-align:center; max-width:var(--content-max); }
+.td-generate-card__title { font-size:var(--text-lg); font-weight:var(--weight-semibold); color:var(--text); margin-bottom:var(--space-2); }
+.td-generate-card__desc { font-size:var(--text-base); color:var(--text-muted); margin-bottom:var(--space-5); line-height:var(--lh-body); }
+
+/* buttons */
+.td-btn-primary { display:inline-flex; align-items:center; gap:var(--space-2); font-family:var(--font-body); font-size:var(--text-base); font-weight:var(--weight-semibold); color:var(--text-on-accent); background:var(--accent); border:none; border-radius:var(--radius-pill); padding:var(--space-3) var(--space-6); cursor:pointer; transition:background var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), transform var(--duration-fast) var(--ease-out); box-shadow:0 2px 8px rgba(232,93,38,.25); text-decoration:none; }
+.td-btn-primary:hover { background:var(--accent-hover); box-shadow:0 4px 16px rgba(232,93,38,.35); transform:translateY(-1px); color:var(--text-on-accent); text-decoration:none; }
+.td-btn-primary:active { transform:translateY(0); }
+.td-btn-primary:disabled { opacity:.55; cursor:default; transform:none; box-shadow:none; }
+
+.td-btn-ghost { display:inline-flex; align-items:center; gap:var(--space-1); font-family:var(--font-body); font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--text-muted); background:transparent; border:1px solid var(--border); border-radius:var(--radius-pill); padding:var(--space-2) var(--space-4); cursor:pointer; transition:all var(--duration-fast) var(--ease-out); text-decoration:none; }
+.td-btn-ghost:hover { color:var(--text); border-color:var(--text-muted); background:var(--surface-2); text-decoration:none; }
+
+.td-btn-done { display:inline-flex; align-items:center; gap:var(--space-1); font-family:var(--font-body); font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--success); background:var(--success-soft); border:1px solid var(--success); border-radius:var(--radius-pill); padding:var(--space-2) var(--space-4); cursor:pointer; transition:all var(--duration-fast) var(--ease-out); }
+.td-btn-done:hover { background:var(--success); color:#fff; }
+
+/* content card */
+.td-content-card { background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); margin-bottom:var(--space-4); max-width:var(--content-max); }
+.td-content-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; padding-top:var(--space-3); border-top:1px solid var(--border); margin-top:var(--space-4); }
+
+/* prose — key override for <pre> readability */
+.ai-content-text,
+.quiz-evaluation-text,
+.portfolio-feedback-text,
+.interview-feedback-text {
+  font-family:var(--font-body);
+  font-size:var(--text-base);
+  line-height:var(--leading-relaxed);
+  white-space:pre-wrap;
+  word-break:break-word;
+  color:var(--text);
+  background:transparent;
+  border:none;
+  padding:0;
+  margin:0;
+  max-width:100%;
+}
+
+/* inline feedback */
+.ai-content-feedback, .quiz-submission-feedback, .portfolio-submission-feedback, .interview-submission-feedback, .reflection-feedback { font-size:var(--text-sm); }
+.ai-content-feedback-err, .quiz-feedback-err, .portfolio-feedback-err, .interview-feedback-err, .reflection-feedback-err { color:var(--danger-muted); }
+.quiz-feedback-ok, .portfolio-feedback-ok, .interview-feedback-ok, .reflection-feedback-ok { color:var(--success); }
+
+/* submission */
+.td-submission { margin-top:var(--space-5); max-width:var(--content-max); }
+.td-submission-heading { font-size:var(--text-lg); font-weight:var(--weight-semibold); color:var(--text); margin-bottom:var(--space-3); }
+.td-textarea { font-family:var(--font-body); font-size:var(--text-base); line-height:var(--lh-body); color:var(--text); background:var(--surface-raised); border:1.5px solid var(--border); border-radius:var(--radius-md); padding:var(--space-4); width:100%; resize:vertical; transition:border-color var(--duration-fast) var(--ease-out); box-sizing:border-box; }
+.td-textarea:focus { outline:none; border-color:var(--border-focus); box-shadow:0 0 0 3px rgba(232,93,38,.12); }
+.td-textarea::placeholder { color:var(--text-muted); }
+.td-submission-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; margin-top:var(--space-3); }
+.td-submitted-meta { font-size:var(--text-xs); color:var(--text-muted); margin-top:var(--space-2); }
+
+/* eval block */
+.td-eval-block { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-5); margin-top:var(--space-4); max-width:var(--content-max); }
+.td-eval-heading { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-4); padding-bottom:var(--space-3); border-bottom:1px solid var(--border); }
+.td-eval-label { font-size:var(--text-base); font-weight:var(--weight-semibold); color:var(--text); }
+.td-score-chip { font-size:var(--text-sm); font-weight:var(--weight-bold); padding:3px var(--space-3); border-radius:var(--radius-pill); background:var(--accent-soft); color:var(--accent); }
+.td-eval-meta { font-size:var(--text-xs); color:var(--text-muted); margin-left:auto; }
+.td-eval-actions { display:flex; gap:var(--space-3); margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--border); }
+
+/* beta feedback form */
+.beta-feedback-form { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:var(--space-4); margin-top:var(--space-5); }
+.beta-feedback-form h4 { font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--text-muted); margin-bottom:var(--space-3); }
+
+/* reflection labels + textareas */
+.reflection-label { display:flex; flex-direction:column; gap:var(--space-2); font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--text-muted); margin-bottom:var(--space-4); }
+.reflection-textarea { font-family:var(--font-body); font-size:var(--text-base); line-height:var(--lh-body); color:var(--text); background:var(--surface-raised); border:1.5px solid var(--border); border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); resize:vertical; width:100%; transition:border-color var(--duration-fast) var(--ease-out); }
+.reflection-textarea:focus { outline:none; border-color:var(--border-focus); box-shadow:0 0 0 3px rgba(232,93,38,.12); }
+.reflection-textarea::placeholder { color:var(--text-muted); }
+.reflection-save-btn { font-family:var(--font-body); font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--text-on-accent); background:var(--accent); border:none; border-radius:var(--radius-pill); padding:var(--space-2) var(--space-5); cursor:pointer; transition:background var(--duration-fast) var(--ease-out); }
+.reflection-save-btn:hover { background:var(--accent-hover); }
+
+/* journey */
+.td-journey-header { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap; margin-bottom:var(--space-5); }
+.td-journey-actions { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+.journey-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:var(--space-4); }
+.journey-step-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-5); display:flex; flex-direction:column; gap:var(--space-3); box-shadow:var(--shadow-sm); }
+.journey-step-num { width:28px; height:28px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:var(--text-sm); font-weight:var(--weight-bold); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.journey-step-card h3 { font-size:var(--text-base); font-weight:var(--weight-semibold); color:var(--text); margin:0; }
+.journey-step-card p  { font-size:var(--text-sm); color:var(--text-muted); margin:0; line-height:var(--lh-body); }
+.topic-action-btn { display:inline-flex; align-items:center; font-family:var(--font-body); font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--radius-pill); padding:var(--space-2) var(--space-4); cursor:pointer; text-decoration:none; transition:all var(--duration-fast) var(--ease-out); }
+.topic-action-btn:hover { background:var(--accent); color:var(--text-on-accent); text-decoration:none; }
+.step-mark-controls { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+.step-mark-btn { font-family:var(--font-body); font-size:var(--text-xs); font-weight:var(--weight-medium); color:var(--text-muted); background:transparent; border:1px solid var(--border); border-radius:var(--radius-pill); padding:3px var(--space-3); cursor:pointer; transition:all var(--duration-fast) var(--ease-out); }
+.step-mark-btn:hover { border-color:var(--text-muted); color:var(--text); }
+.step-mark-done:hover { background:var(--success-soft); border-color:var(--success); color:var(--success); }
+.step-planner-controls { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+.step-planner-btn { font-family:var(--font-body); font-size:var(--text-xs); color:var(--text-muted); background:transparent; border:none; cursor:pointer; text-decoration:underline; padding:0; transition:color var(--duration-fast) var(--ease-out); }
+.step-planner-btn:hover { color:var(--accent); }
+
+/* outcome section */
+.td-outcome-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-6); max-width:var(--content-max); }
+.td-outcome-meta { display:flex; flex-wrap:wrap; gap:var(--space-3); font-size:var(--text-xs); color:var(--text-muted); margin-bottom:var(--space-4); }
+
+.add-suggested-plan-btn { font-family:var(--font-body); font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--radius-pill); padding:var(--space-2) var(--space-4); cursor:pointer; transition:all var(--duration-fast) var(--ease-out); }
+.add-suggested-plan-btn:hover { background:var(--accent); color:var(--text-on-accent); }
+.open-planner-link { font-size:var(--text-sm); color:var(--text-muted); text-decoration:none; transition:color var(--duration-fast) var(--ease-out); }
+.open-planner-link:hover { color:var(--accent); }
+</style>
+{% endblock %}
 
 {% block content %}
-<section class="topic-detail-page" data-session-id="{{ session_id }}" data-topic-id="{{ topic.topic_id }}">
-  <nav class="topic-breadcrumb" aria-label="Breadcrumb">
+<div class="td-page" data-session-id="{{ session_id }}" data-topic-id="{{ topic.topic_id }}">
+<div class="td-inner">
+
+  {# breadcrumb #}
+  <nav class="td-breadcrumb" aria-label="Breadcrumb">
     <a href="/dashboard">Dashboard</a>
-    <span>→</span>
-    <a href="/topics/{{ session_id }}">Module Topics</a>
-    <span>→</span>
-    <span>{{ topic.topic_title }}</span>
+    <span class="td-breadcrumb__sep">›</span>
+    <a href="/topics/{{ session_id }}">Module {{ topic.week_num }}</a>
+    <span class="td-breadcrumb__sep">›</span>
+    <span class="td-breadcrumb__current">{{ topic.topic_title }}</span>
   </nav>
 
-  <header class="topic-detail-header">
-    <div class="topics-eyebrow">{{ progress.track_label }} · Module {{ topic.week_num }}</div>
-    <h1>{{ topic.topic_title }}</h1>
-    <div class="topic-detail-meta">{{ topic.module_title }}</div>
-    <p>{{ topic.description }}</p>
-    <div class="topic-freshness-info">
-      <span class="topic-freshness-chip">Freshness: {{ topic_freshness_label }}</span>
-      <span class="topic-freshness-guidance">{{ topic_freshness_guidance }}</span>
+  {# header #}
+  <header class="td-header">
+    <div class="td-eyebrow">{{ progress.track_label }} · Module {{ topic.week_num }}</div>
+    <h1 class="td-title">{{ topic.topic_title }}</h1>
+    <p class="td-desc">{{ topic.description }}</p>
+    <div class="td-chips">
+      <span class="td-chip">{{ topic_freshness_label }}</span>
+      <span class="td-chip">{{ topic.module_title }}</span>
+      {% if modular_topic_context and modular_topic_context.skills %}
+        {% for skill in modular_topic_context.skills[:4] %}
+        <span class="td-chip">{{ skill.label }}</span>
+        {% endfor %}
+      {% endif %}
     </div>
-    {% if modular_topic_context and (modular_topic_context.skills or modular_topic_context.activities) %}
-    <div class="topic-freshness-info">
-      {% for skill in modular_topic_context.skills %}
-      <span class="topic-freshness-chip">{{ skill.label }}</span>
-      {% endfor %}
-      {% for activity in modular_topic_context.activities %}
-      <span class="topic-freshness-chip">{{ activity.title }}</span>
-      {% endfor %}
-    </div>
-    {% endif %}
   </header>
 
-  <div class="topic-completion-bar">
-    <div class="topic-completion-label">
-      Topic Progress: <strong id="completion-percent">{{ completion_percent }}%</strong>
+  {# progress bar #}
+  <div class="td-progress">
+    <div class="td-progress-label">
+      Topic progress: <strong id="completion-percent">{{ completion_percent }}%</strong>
     </div>
     <div class="topic-progress-track">
-      <div class="topic-progress-fill" id="completion-fill" style="width: {{ completion_percent }}%"></div>
+      <div class="topic-progress-fill" id="completion-fill" style="width:{{ completion_percent }}%"></div>
     </div>
   </div>
 
-  <section class="topic-ai-content-section" id="learning-outcome">
-    <div class="topic-ai-content-heading">
-      <h2>Check your learning improvement</h2>
-    </div>
+  {# step nav #}
+  {% set _snav = [
+    ("learn","Learn","#ai-learning-content"),
+    ("quiz","Quiz","#ai-quiz"),
+    ("portfolio_task","Portfolio","#ai-portfolio-task"),
+    ("interview_practice","Interview","#ai-interview-practice"),
+    ("reflection","Reflect","#td-reflection"),
+  ] %}
+  <nav class="td-step-nav" aria-label="Topic sections">
+    {% for sk, sl, sh in _snav %}
+      {% set _s = topic_progress.get(sk,'not_started') %}
+      <a href="{{ sh }}" class="td-step-pill {% if _s=='done' %}td-step-pill--done{% elif _s=='in_progress' %}td-step-pill--in-progress{% endif %}">
+        <span class="td-step-dot"></span>{{ sl }}
+      </a>
+    {% endfor %}
+  </nav>
 
+  {# ── Learning outcome check-in ── #}
+  <section class="td-section td-outcome-card" id="learning-outcome">
+    <div class="td-section-label">Track your growth</div>
+    <h2 class="td-section-title" style="font-size:var(--text-xl)">How is your understanding improving?</h2>
+    <p class="td-section-framing">Score yourself before and after — a quiet signal for you, not a grade.</p>
     {% set outcome = learning_outcome_summary %}
-    <div class="topic-ai-content-empty">
-      <p>Use a quick self-score before and after this topic to track whether your understanding improved.</p>
-      {% if learning_outcome_unavailable %}
-      <p>Learning outcome summary is temporarily unavailable.</p>
-      {% endif %}
-      <div class="topic-ai-content-meta">
-        <span>Baseline saved: {{ "Yes" if outcome.has_baseline else "No" }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>Post-topic saved: {{ "Yes" if outcome.has_post else "No" }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>Baseline score: {{ outcome.baseline_score if outcome.baseline_score is not none else "Not set" }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>Post score: {{ outcome.post_score if outcome.post_score is not none else "Not set" }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>Improvement delta: {{ outcome.improvement_delta if outcome.improvement_delta is not none else "Not set" }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>Status: {{ outcome.status if outcome.status else "Not started" }}</span>
-      </div>
+    <div class="td-outcome-meta">
+      <span>Baseline: {{ "Saved ✓" if outcome.has_baseline else "Not yet" }}</span>
+      <span>·</span>
+      <span>Post-topic: {{ "Saved ✓" if outcome.has_post else "Not yet" }}</span>
+      {% if outcome.baseline_score is not none %}<span>· Start: {{ outcome.baseline_score }}/10</span>{% endif %}
+      {% if outcome.post_score is not none %}<span>· After: {{ outcome.post_score }}/10</span>{% endif %}
+      {% if outcome.improvement_delta is not none %}<span>· +{{ outcome.improvement_delta }} pts</span>{% endif %}
+      {% if learning_outcome_unavailable %}<span>· (temporarily unavailable)</span>{% endif %}
     </div>
-
-    <div class="journey-grid">
+    <div class="journey-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
       <form class="journey-step-card" method="post" action="/topic/outcome/baseline">
-        <h3>Baseline</h3>
+        <h3>Before you begin</h3>
         <input type="hidden" name="session_id" value="{{ session_id }}">
-        <input type="hidden" name="topic_id" value="{{ topic.topic_id }}">
-        <input type="hidden" name="return_to" value="topic_detail">
-        <label class="reflection-label">What do you know right now?
-          <textarea name="baseline_answer" class="reflection-textarea" rows="3"
-                    placeholder="Write a short baseline answer before learning."></textarea>
+        <input type="hidden" name="topic_id"   value="{{ topic.topic_id }}">
+        <input type="hidden" name="return_to"  value="topic_detail">
+        <label class="reflection-label">What do you already know?
+          <textarea name="baseline_answer" class="reflection-textarea" rows="3" placeholder="A few honest sentences — no polish needed."></textarea>
         </label>
-        <label class="reflection-label">Self-score
+        <label class="reflection-label">Self-score (0–10)
           <select name="baseline_score" class="reflection-textarea">
             <option value="">No score</option>
-            {% for score in range(0, 11) %}
-            <option value="{{ score }}">{{ score }}/10</option>
-            {% endfor %}
+            {% for s in range(0,11) %}<option value="{{ s }}">{{ s }}/10</option>{% endfor %}
           </select>
         </label>
-        <button class="reflection-save-btn" type="submit">Save Baseline</button>
+        <button class="reflection-save-btn" type="submit">Save baseline</button>
       </form>
-
       <form class="journey-step-card" method="post" action="/topic/outcome/post">
-        <h3>Post-topic</h3>
+        <h3>After you finish</h3>
         <input type="hidden" name="session_id" value="{{ session_id }}">
-        <input type="hidden" name="topic_id" value="{{ topic.topic_id }}">
-        <input type="hidden" name="return_to" value="topic_detail">
-        <label class="reflection-label">What can you explain after learning?
-          <textarea name="post_answer" class="reflection-textarea" rows="3"
-                    placeholder="Write a short post-topic answer after learning."></textarea>
+        <input type="hidden" name="topic_id"   value="{{ topic.topic_id }}">
+        <input type="hidden" name="return_to"  value="topic_detail">
+        <label class="reflection-label">What can you explain now?
+          <textarea name="post_answer" class="reflection-textarea" rows="3" placeholder="Explain it like you're teaching a colleague."></textarea>
         </label>
-        <label class="reflection-label">Self-score
+        <label class="reflection-label">Self-score (0–10)
           <select name="post_score" class="reflection-textarea">
             <option value="">No score</option>
-            {% for score in range(0, 11) %}
-            <option value="{{ score }}">{{ score }}/10</option>
-            {% endfor %}
+            {% for s in range(0,11) %}<option value="{{ s }}">{{ s }}/10</option>{% endfor %}
           </select>
         </label>
-        <button class="reflection-save-btn" type="submit">Save Post-topic Outcome</button>
+        <button class="reflection-save-btn" type="submit">Save post-topic score</button>
       </form>
     </div>
   </section>
 
-  <section class="topic-ai-content-section" id="ai-learning-content">
-    <div class="topic-ai-content-heading">
-      <h2>AI Learning Content</h2>
+  {# ══ Screen 2 — Learn ══ #}
+  <section class="td-section" id="ai-learning-content">
+    <div class="td-section-label">Step 1 · Learn</div>
+    <h2 class="td-section-title">Understanding {{ topic.topic_title }}</h2>
+    <div class="td-section-meta">
       {% if generated_topic_content.content %}
-      <div class="topic-ai-content-meta">
-        <span class="ai-freshness-label">{{ generated_topic_content.freshness_label }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>{% if generated_topic_content.generated_at %}{{ generated_topic_content.generated_at[:10] }}{% endif %}</span>
-        <span class="ai-meta-sep">·</span>
+        <span>{{ generated_topic_content.generated_at[:10] if generated_topic_content.generated_at else '' }}</span>
         <span>v{{ generated_topic_content.version }}</span>
-      </div>
+        {% if generated_topic_content.freshness_label %}<span class="td-chip">{{ generated_topic_content.freshness_label }}</span>{% endif %}
       {% endif %}
     </div>
     {% if generated_topic_content.content %}
-    <div class="topic-ai-content-body">
+    <div class="td-content-card td-prose-col">
       <pre class="ai-content-text">{{ generated_topic_content.content }}</pre>
-    </div>
-    <div class="topic-ai-content-actions">
-      <button class="topic-ai-action-btn" id="ai-content-btn" onclick="generateContent(true)">Refresh Content</button>
-      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'learn')">Mark Learn Done</button>
-      <span class="ai-content-feedback" id="ai-content-feedback"></span>
+      <div class="td-content-actions">
+        <button class="td-btn-ghost" id="ai-content-btn" onclick="generateContent(true)">&#8635; Refresh</button>
+        <button class="td-btn-done"  onclick="markStepFromContent(this,'learn')">Mark done ✓</button>
+        <span class="ai-content-feedback" id="ai-content-feedback"></span>
+      </div>
     </div>
     {% else %}
-    <div class="topic-ai-content-empty">
-      <p>Generate a structured AI explanation for this topic.</p>
-      <button class="topic-ai-action-btn" id="ai-content-btn" onclick="generateContent(false)">Generate Learning Content</button>
-      <span class="ai-content-feedback" id="ai-content-feedback"></span>
+    <div class="td-generate-card td-prose-col">
+      <div class="td-generate-card__title">Ready when you are</div>
+      <p class="td-generate-card__desc">Your mentor will walk you through {{ topic.topic_title }} step by step — clear explanations, real examples, and the context you need to actually use this.</p>
+      <button class="td-btn-primary" id="ai-content-btn" onclick="generateContent(false)">Start learning &rarr;</button>
+      <span class="ai-content-feedback" id="ai-content-feedback" style="display:block;margin-top:var(--space-3)"></span>
     </div>
     {% endif %}
   </section>
 
-  {% set quiz_p      = generated_topic_practice.quiz %}
-  {% set portfolio_p = generated_topic_practice.portfolio_task %}
-  {% set interview_p = generated_topic_practice.interview_practice %}
-
-  <section class="topic-ai-content-section" id="ai-quiz">
-    <div class="topic-ai-content-heading">
-      <h2>AI Quiz</h2>
+  {# ══ Screen 3 — Quiz ══ #}
+  {% set quiz_p = generated_topic_practice.quiz %}
+  <section class="td-section" id="ai-quiz">
+    <div class="td-section-label">Step 2 · Quiz</div>
+    <h2 class="td-section-title">Test your understanding</h2>
+    <p class="td-section-framing">Mistakes are how you learn — there's no penalty here, only signal.</p>
+    <div class="td-section-meta">
       {% if quiz_p.content %}
-      <div class="topic-ai-content-meta">
-        <span class="ai-freshness-label">{{ quiz_p.freshness_label }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>{% if quiz_p.generated_at %}{{ quiz_p.generated_at[:10] }}{% endif %}</span>
-        <span class="ai-meta-sep">·</span>
+        <span>{{ quiz_p.generated_at[:10] if quiz_p.generated_at else '' }}</span>
         <span>v{{ quiz_p.version }}</span>
-      </div>
       {% endif %}
     </div>
     {% if quiz_p.content %}
-    <div class="topic-ai-content-body">
+    <div class="td-content-card td-prose-col">
       <pre class="ai-content-text">{{ quiz_p.content }}</pre>
-    </div>
-    <div class="topic-ai-content-actions">
-      <button class="topic-ai-action-btn" id="practice-btn-quiz" onclick="generatePractice('quiz', true)">Refresh Quiz</button>
-      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'quiz')">Mark Quiz Done</button>
-      <span class="ai-content-feedback" id="practice-feedback-quiz"></span>
+      <div class="td-content-actions">
+        <button class="td-btn-ghost" id="practice-btn-quiz" onclick="generatePractice('quiz',true)">&#8635; Refresh</button>
+        <button class="td-btn-done"  onclick="markStepFromContent(this,'quiz')">Mark done ✓</button>
+        <span class="ai-content-feedback" id="practice-feedback-quiz"></span>
+      </div>
     </div>
     {% else %}
-    <div class="topic-ai-content-empty">
-      <p>Generate a structured quiz for this topic.</p>
-      <button class="topic-ai-action-btn" id="practice-btn-quiz" onclick="generatePractice('quiz', false)">Generate Quiz</button>
-      <span class="ai-content-feedback" id="practice-feedback-quiz"></span>
+    <div class="td-generate-card td-prose-col">
+      <div class="td-generate-card__title">Generate some practice questions</div>
+      <p class="td-generate-card__desc">Questions built around what you just learned — work through them at your own pace.</p>
+      <button class="td-btn-primary" id="practice-btn-quiz" onclick="generatePractice('quiz',false)">Generate quiz &rarr;</button>
+      <span class="ai-content-feedback" id="practice-feedback-quiz" style="display:block;margin-top:var(--space-3)"></span>
     </div>
     {% endif %}
-
-    <div class="quiz-submission-area">
-      <h3 class="quiz-submission-heading">Your Answers</h3>
-      <textarea id="quiz-submission-text" class="quiz-submission-textarea" rows="5"
-                placeholder="Write your quiz answers here...">{{ quiz_submission.answers }}</textarea>
-      <div class="quiz-submission-actions">
-        <button class="quiz-action-btn" id="quiz-save-btn" onclick="saveQuizAnswers()">Save Answers</button>
-        <button class="quiz-action-btn quiz-evaluate-btn" id="quiz-evaluate-btn" onclick="evaluateQuiz(false)">Evaluate Answers</button>
+    <div class="td-submission td-prose-col">
+      <h3 class="td-submission-heading">Your answers</h3>
+      <textarea id="quiz-submission-text" class="td-textarea" rows="6" placeholder="Write your answers here — thinking out loud is fine.">{{ quiz_submission.answers }}</textarea>
+      <div class="td-submission-actions">
+        <button class="td-btn-ghost"    id="quiz-save-btn"     onclick="saveQuizAnswers()">Save answers</button>
+        <button class="td-btn-primary"  id="quiz-evaluate-btn" onclick="evaluateQuiz(false)">Get AI feedback</button>
         <span class="quiz-submission-feedback" id="quiz-submission-feedback"></span>
       </div>
-      {% if quiz_submission.submitted_at %}
-      <div class="quiz-submitted-meta">Submitted: {{ quiz_submission.submitted_at[:10] }}</div>
-      {% endif %}
+      {% if quiz_submission.submitted_at %}<div class="td-submitted-meta">Submitted {{ quiz_submission.submitted_at[:10] }}</div>{% endif %}
       {% if quiz_submission.evaluation %}
-      <div class="quiz-evaluation-block">
-        <div class="quiz-evaluation-heading">
-          <span>AI Evaluation</span>
-          {% if quiz_submission.score is not none %}
-          <span class="quiz-score-chip">Score: {{ quiz_submission.score }}/10</span>
-          {% endif %}
-          {% if quiz_submission.evaluated_at %}
-          <span class="quiz-evaluated-meta">Evaluated: {{ quiz_submission.evaluated_at[:10] }}</span>
-          {% endif %}
+      <div class="td-eval-block">
+        <div class="td-eval-heading">
+          <span class="td-eval-label">Your feedback</span>
+          {% if quiz_submission.score is not none %}<span class="td-score-chip">{{ quiz_submission.score }}/10</span>{% endif %}
+          {% if quiz_submission.evaluated_at %}<span class="td-eval-meta">{{ quiz_submission.evaluated_at[:10] }}</span>{% endif %}
         </div>
         <pre class="quiz-evaluation-text">{{ quiz_submission.evaluation }}</pre>
-        <div class="quiz-evaluation-actions">
-          <button class="quiz-action-btn" onclick="evaluateQuiz(true)">Refresh Evaluation</button>
+        <div class="td-eval-actions">
+          <button class="td-btn-ghost" onclick="evaluateQuiz(true)">&#8635; Refresh</button>
         </div>
         <form class="beta-feedback-form" method="post" action="/feedback/beta">
           <h4>How useful was this feedback?</h4>
@@ -208,401 +344,260 @@
           <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
           <input type="hidden" name="feedback_context" value="quiz_feedback">
           <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-quiz">
-          <label class="reflection-label">Usefulness
-            <select name="usefulness_score" class="reflection-textarea">
-              <option value="">Select 1-5</option>
-              {% for score in range(1, 6) %}
-              <option value="{{ score }}">{{ score }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="reflection-label">Clarity
-            <select name="clarity_score" class="reflection-textarea">
-              <option value="">Select 1-5</option>
-              {% for score in range(1, 6) %}
-              <option value="{{ score }}">{{ score }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="reflection-label">What confused you?
-            <textarea name="confusion" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <label class="reflection-label">What would make this better?
-            <textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <label class="reflection-label">Would you pay for this after the free trial?
-            <textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <button class="reflection-save-btn" type="submit">Send Feedback</button>
+          <label class="reflection-label">Usefulness<select name="usefulness_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+          <label class="reflection-label">Clarity<select name="clarity_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+          <label class="reflection-label">What confused you?<textarea name="confusion" class="reflection-textarea" rows="2"></textarea></label>
+          <label class="reflection-label">What would make this better?<textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea></label>
+          <label class="reflection-label">Would you pay for this after the free trial?<textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea></label>
+          <button class="reflection-save-btn" type="submit">Send feedback</button>
         </form>
       </div>
       {% endif %}
     </div>
   </section>
 
-  <section class="topic-ai-content-section" id="ai-portfolio-task">
-    <div class="topic-ai-content-heading">
-      <h2>AI Portfolio Task</h2>
+  {# ══ Screen 4 — Portfolio ══ #}
+  {% set portfolio_p = generated_topic_practice.portfolio_task %}
+  <section class="td-section" id="ai-portfolio-task">
+    <div class="td-section-label">Step 3 · Portfolio</div>
+    <h2 class="td-section-title">Turn this into something real</h2>
+    <p class="td-section-framing">A short hands-on task that puts this topic to work — your submission will be reviewed seriously.</p>
+    <div class="td-section-meta">
       {% if portfolio_p.content %}
-      <div class="topic-ai-content-meta">
-        <span class="ai-freshness-label">{{ portfolio_p.freshness_label }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>{% if portfolio_p.generated_at %}{{ portfolio_p.generated_at[:10] }}{% endif %}</span>
-        <span class="ai-meta-sep">·</span>
+        <span>{{ portfolio_p.generated_at[:10] if portfolio_p.generated_at else '' }}</span>
         <span>v{{ portfolio_p.version }}</span>
-      </div>
       {% endif %}
     </div>
     {% if portfolio_p.content %}
-    <div class="topic-ai-content-body">
+    <div class="td-content-card td-prose-col">
       <pre class="ai-content-text">{{ portfolio_p.content }}</pre>
-    </div>
-    <div class="topic-ai-content-actions">
-      <button class="topic-ai-action-btn" id="practice-btn-portfolio_task" onclick="generatePractice('portfolio_task', true)">Refresh Portfolio Task</button>
-      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'portfolio_task')">Mark Portfolio Task Done</button>
-      <span class="ai-content-feedback" id="practice-feedback-portfolio_task"></span>
+      <div class="td-content-actions">
+        <button class="td-btn-ghost" id="practice-btn-portfolio_task" onclick="generatePractice('portfolio_task',true)">&#8635; Refresh</button>
+        <button class="td-btn-done"  onclick="markStepFromContent(this,'portfolio_task')">Mark done ✓</button>
+        <span class="ai-content-feedback" id="practice-feedback-portfolio_task"></span>
+      </div>
     </div>
     {% else %}
-    <div class="topic-ai-content-empty">
-      <p>Generate a hands-on portfolio task for this topic.</p>
-      <button class="topic-ai-action-btn" id="practice-btn-portfolio_task" onclick="generatePractice('portfolio_task', false)">Generate Portfolio Task</button>
-      <span class="ai-content-feedback" id="practice-feedback-portfolio_task"></span>
+    <div class="td-generate-card td-prose-col">
+      <div class="td-generate-card__title">Ready for a task?</div>
+      <p class="td-generate-card__desc">A short, practical challenge built around {{ topic.topic_title }} — something you can actually add to your portfolio.</p>
+      <button class="td-btn-primary" id="practice-btn-portfolio_task" onclick="markStep('portfolio_task','in_progress');generatePractice('portfolio_task',false)">Generate task &rarr;</button>
+      <span class="ai-content-feedback" id="practice-feedback-portfolio_task" style="display:block;margin-top:var(--space-3)"></span>
     </div>
     {% endif %}
-
-    <div class="portfolio-submission-area">
-      <h3 class="portfolio-submission-heading">Your Submission</h3>
-      <textarea id="portfolio-submission-text" class="portfolio-submission-textarea" rows="5"
-                placeholder="Write your portfolio task response here...">{{ portfolio_submission.submission }}</textarea>
-      <div class="portfolio-submission-actions">
-        <button class="portfolio-action-btn" id="portfolio-save-btn" onclick="savePortfolioSubmission()">Save Submission</button>
-        <button class="portfolio-action-btn portfolio-feedback-btn" id="portfolio-feedback-btn" onclick="getPortfolioFeedback(false)">Get AI Feedback</button>
+    <div class="td-submission td-prose-col">
+      <h3 class="td-submission-heading">Your submission</h3>
+      <textarea id="portfolio-submission-text" class="td-textarea" rows="7" placeholder="Quality over brevity — show your thinking.">{{ portfolio_submission.submission }}</textarea>
+      <div class="td-submission-actions">
+        <button class="td-btn-ghost"   id="portfolio-save-btn"     onclick="savePortfolioSubmission()">Save</button>
+        <button class="td-btn-primary" id="portfolio-feedback-btn" onclick="getPortfolioFeedback(false)">Get AI feedback</button>
         <span class="portfolio-submission-feedback" id="portfolio-submission-feedback"></span>
       </div>
-      {% if portfolio_submission.submitted_at %}
-      <div class="portfolio-submitted-meta">Submitted: {{ portfolio_submission.submitted_at[:10] }}</div>
-      {% endif %}
+      {% if portfolio_submission.submitted_at %}<div class="td-submitted-meta">Submitted {{ portfolio_submission.submitted_at[:10] }}</div>{% endif %}
       {% if portfolio_submission.feedback %}
-      <div class="portfolio-feedback-block">
-        <div class="portfolio-feedback-heading">
-          <span>AI Feedback</span>
-          {% if portfolio_submission.score is not none %}
-          <span class="portfolio-score-chip">Score: {{ portfolio_submission.score }}/10</span>
-          {% endif %}
-          {% if portfolio_submission.reviewed_at %}
-          <span class="portfolio-reviewed-meta">Reviewed: {{ portfolio_submission.reviewed_at[:10] }}</span>
-          {% endif %}
+      <div class="td-eval-block">
+        <div class="td-eval-heading">
+          <span class="td-eval-label">AI feedback on your work</span>
+          {% if portfolio_submission.score is not none %}<span class="td-score-chip">{{ portfolio_submission.score }}/10</span>{% endif %}
+          {% if portfolio_submission.reviewed_at %}<span class="td-eval-meta">{{ portfolio_submission.reviewed_at[:10] }}</span>{% endif %}
         </div>
         <pre class="portfolio-feedback-text">{{ portfolio_submission.feedback }}</pre>
-        <div class="portfolio-feedback-actions">
-          <button class="portfolio-action-btn" onclick="getPortfolioFeedback(true)">Refresh Feedback</button>
-        </div>
+        <div class="td-eval-actions"><button class="td-btn-ghost" onclick="getPortfolioFeedback(true)">&#8635; Refresh</button></div>
         <form class="beta-feedback-form" method="post" action="/feedback/beta">
           <h4>How useful was this feedback?</h4>
           <input type="hidden" name="session_id" value="{{ session_id }}">
           <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
           <input type="hidden" name="feedback_context" value="portfolio_feedback">
           <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-portfolio-task">
-          <label class="reflection-label">Usefulness
-            <select name="usefulness_score" class="reflection-textarea">
-              <option value="">Select 1-5</option>
-              {% for score in range(1, 6) %}
-              <option value="{{ score }}">{{ score }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="reflection-label">Clarity
-            <select name="clarity_score" class="reflection-textarea">
-              <option value="">Select 1-5</option>
-              {% for score in range(1, 6) %}
-              <option value="{{ score }}">{{ score }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="reflection-label">What confused you?
-            <textarea name="confusion" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <label class="reflection-label">What would make this better?
-            <textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <label class="reflection-label">Would you pay for this after the free trial?
-            <textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <button class="reflection-save-btn" type="submit">Send Feedback</button>
+          <label class="reflection-label">Usefulness<select name="usefulness_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+          <label class="reflection-label">Clarity<select name="clarity_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+          <label class="reflection-label">What confused you?<textarea name="confusion" class="reflection-textarea" rows="2"></textarea></label>
+          <label class="reflection-label">What would make this better?<textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea></label>
+          <label class="reflection-label">Would you pay for this after the free trial?<textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea></label>
+          <button class="reflection-save-btn" type="submit">Send feedback</button>
         </form>
       </div>
       {% endif %}
     </div>
   </section>
 
-  <section class="topic-ai-content-section" id="ai-interview-practice">
-    <div class="topic-ai-content-heading">
-      <h2>AI Interview Practice</h2>
+  {# ══ Screen 5 — Interview ══ #}
+  {% set interview_p = generated_topic_practice.interview_practice %}
+  <section class="td-section" id="ai-interview-practice">
+    <div class="td-section-label">Step 4 · Interview</div>
+    <h2 class="td-section-title">Practice, not a verdict</h2>
+    <p class="td-section-framing">These questions are your rehearsal space — stumbling here is the point, not a failure.</p>
+    <div class="td-section-meta">
       {% if interview_p.content %}
-      <div class="topic-ai-content-meta">
-        <span class="ai-freshness-label">{{ interview_p.freshness_label }}</span>
-        <span class="ai-meta-sep">·</span>
-        <span>{% if interview_p.generated_at %}{{ interview_p.generated_at[:10] }}{% endif %}</span>
-        <span class="ai-meta-sep">·</span>
+        <span>{{ interview_p.generated_at[:10] if interview_p.generated_at else '' }}</span>
         <span>v{{ interview_p.version }}</span>
-      </div>
       {% endif %}
     </div>
     {% if interview_p.content %}
-    <div class="topic-ai-content-body">
+    <div class="td-content-card td-prose-col">
       <pre class="ai-content-text">{{ interview_p.content }}</pre>
-    </div>
-    <div class="topic-ai-content-actions">
-      <button class="topic-ai-action-btn" id="practice-btn-interview_practice" onclick="generatePractice('interview_practice', true)">Refresh Interview Practice</button>
-      <button class="topic-ai-mark-done-btn" onclick="markStepFromContent(this, 'interview_practice')">Mark Interview Practice Done</button>
-      <span class="ai-content-feedback" id="practice-feedback-interview_practice"></span>
+      <div class="td-content-actions">
+        <button class="td-btn-ghost" id="practice-btn-interview_practice" onclick="generatePractice('interview_practice',true)">&#8635; Refresh</button>
+        <button class="td-btn-done"  onclick="markStepFromContent(this,'interview_practice')">Mark done ✓</button>
+        <span class="ai-content-feedback" id="practice-feedback-interview_practice"></span>
+      </div>
     </div>
     {% else %}
-    <div class="topic-ai-content-empty">
-      <p>Generate structured interview practice questions for this topic.</p>
-      <button class="topic-ai-action-btn" id="practice-btn-interview_practice" onclick="generatePractice('interview_practice', false)">Generate Interview Practice</button>
-      <span class="ai-content-feedback" id="practice-feedback-interview_practice"></span>
+    <div class="td-generate-card td-prose-col">
+      <div class="td-generate-card__title">Ready to rehearse?</div>
+      <p class="td-generate-card__desc">Interview questions around {{ topic.topic_title }} — answering in writing is the fastest way to find your gaps.</p>
+      <button class="td-btn-primary" id="practice-btn-interview_practice" onclick="markStep('interview_practice','in_progress');generatePractice('interview_practice',false)">Generate practice &rarr;</button>
+      <span class="ai-content-feedback" id="practice-feedback-interview_practice" style="display:block;margin-top:var(--space-3)"></span>
     </div>
     {% endif %}
-
-    <div class="interview-submission-area">
-      <h3 class="interview-submission-heading">Your Interview Answer</h3>
-      <textarea id="interview-submission-text" class="interview-submission-textarea" rows="5"
-                placeholder="Write your interview answer here...">{{ interview_submission.answer }}</textarea>
-      <div class="interview-submission-actions">
-        <button class="interview-action-btn" id="interview-save-btn" onclick="saveInterviewAnswer()">Save Answer</button>
-        <button class="interview-action-btn interview-feedback-btn" id="interview-feedback-btn" onclick="getInterviewFeedback(false)">Get AI Feedback</button>
+    <div class="td-submission td-prose-col">
+      <h3 class="td-submission-heading">Your answer</h3>
+      <textarea id="interview-submission-text" class="td-textarea" rows="6" placeholder="Answer as if you're in a real interview — structure your thoughts, be direct.">{{ interview_submission.answer }}</textarea>
+      <div class="td-submission-actions">
+        <button class="td-btn-ghost"   id="interview-save-btn"     onclick="saveInterviewAnswer()">Save</button>
+        <button class="td-btn-primary" id="interview-feedback-btn" onclick="getInterviewFeedback(false)">Get AI feedback</button>
         <span class="interview-submission-feedback" id="interview-submission-feedback"></span>
       </div>
-      {% if interview_submission.submitted_at %}
-      <div class="interview-submitted-meta">Submitted: {{ interview_submission.submitted_at[:10] }}</div>
-      {% endif %}
+      {% if interview_submission.submitted_at %}<div class="td-submitted-meta">Submitted {{ interview_submission.submitted_at[:10] }}</div>{% endif %}
       {% if interview_submission.feedback %}
-      <div class="interview-feedback-block">
-        <div class="interview-feedback-heading">
-          <span>AI Feedback</span>
-          {% if interview_submission.score is not none %}
-          <span class="interview-score-chip">Score: {{ interview_submission.score }}/10</span>
-          {% endif %}
-          {% if interview_submission.reviewed_at %}
-          <span class="interview-reviewed-meta">Reviewed: {{ interview_submission.reviewed_at[:10] }}</span>
-          {% endif %}
+      <div class="td-eval-block">
+        <div class="td-eval-heading">
+          <span class="td-eval-label">Coaching feedback</span>
+          {% if interview_submission.score is not none %}<span class="td-score-chip">{{ interview_submission.score }}/10</span>{% endif %}
+          {% if interview_submission.reviewed_at %}<span class="td-eval-meta">{{ interview_submission.reviewed_at[:10] }}</span>{% endif %}
         </div>
         <pre class="interview-feedback-text">{{ interview_submission.feedback }}</pre>
-        <div class="interview-feedback-actions">
-          <button class="interview-action-btn" onclick="getInterviewFeedback(true)">Refresh Feedback</button>
-        </div>
+        <div class="td-eval-actions"><button class="td-btn-ghost" onclick="getInterviewFeedback(true)">&#8635; Refresh</button></div>
         <form class="beta-feedback-form" method="post" action="/feedback/beta">
           <h4>How useful was this feedback?</h4>
           <input type="hidden" name="session_id" value="{{ session_id }}">
           <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
           <input type="hidden" name="feedback_context" value="interview_feedback">
           <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-interview-practice">
-          <label class="reflection-label">Usefulness
-            <select name="usefulness_score" class="reflection-textarea">
-              <option value="">Select 1-5</option>
-              {% for score in range(1, 6) %}
-              <option value="{{ score }}">{{ score }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="reflection-label">Clarity
-            <select name="clarity_score" class="reflection-textarea">
-              <option value="">Select 1-5</option>
-              {% for score in range(1, 6) %}
-              <option value="{{ score }}">{{ score }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="reflection-label">What confused you?
-            <textarea name="confusion" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <label class="reflection-label">What would make this better?
-            <textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <label class="reflection-label">Would you pay for this after the free trial?
-            <textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea>
-          </label>
-          <button class="reflection-save-btn" type="submit">Send Feedback</button>
+          <label class="reflection-label">Usefulness<select name="usefulness_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+          <label class="reflection-label">Clarity<select name="clarity_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
+          <label class="reflection-label">What confused you?<textarea name="confusion" class="reflection-textarea" rows="2"></textarea></label>
+          <label class="reflection-label">What would make this better?<textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea></label>
+          <label class="reflection-label">Would you pay for this after the free trial?<textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea></label>
+          <button class="reflection-save-btn" type="submit">Send feedback</button>
         </form>
       </div>
       {% endif %}
     </div>
   </section>
 
-  <section class="topic-journey-section">
-    <div class="topic-journey-heading">
-      <div class="topic-journey-heading-row">
-        <h2>Topic Journey</h2>
-        <div class="topic-journey-heading-actions">
-          <button class="add-suggested-plan-btn"
-                  data-topic-title="{{ topic.topic_title }}"
-                  onclick="addSuggestedPlan(this)">Add Suggested Plan for This Topic</button>
-          <a href="/todos/{{ session_id }}"    class="open-planner-link">Open My Planner</a>
-          <a href="/syllabus/{{ session_id }}" class="open-planner-link">View Syllabus</a>
-        </div>
+  {# ══ Topic Journey cards ══ #}
+  <section class="td-section">
+    <div class="td-journey-header">
+      <div>
+        <div class="td-section-label">Roadmap</div>
+        <h2 class="td-section-title" style="font-size:var(--text-xl)">Your learning path</h2>
       </div>
-      <p>Work through this topic using the existing AI² chat flow.</p>
+      <div class="td-journey-actions">
+        <button class="add-suggested-plan-btn" data-topic-title="{{ topic.topic_title }}" onclick="addSuggestedPlan(this)">Add suggested plan</button>
+        <a href="/todos/{{ session_id }}"    class="open-planner-link">My Planner</a>
+        <a href="/syllabus/{{ session_id }}" class="open-planner-link">Syllabus</a>
+      </div>
     </div>
-
     <div class="journey-grid">
       <article class="journey-step-card">
         <div class="journey-step-num">1</div>
         <h3>Learn</h3>
-        <span class="step-status-badge step-status-{{ topic_progress['learn'] | replace('_', '-') }}" id="status-learn">
-          {{ topic_progress['learn'] | replace('_', ' ') | title }}
-        </span>
+        <span class="step-status-badge step-status-{{ topic_progress['learn'] | replace('_','-') }}" id="status-learn">{{ topic_progress['learn'] | replace('_',' ') | title }}</span>
         <p>Get a structured explanation before practicing.</p>
-        <a class="topic-action-btn"
-           href="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}"
-           data-topic-action
-           data-step="learn"
-           data-status="in_progress"
-           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}">
-          Start Learning
-        </a>
+        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}" data-topic-action data-step="learn" data-status="in_progress" data-chat-url="/chat/{{ session_id }}?prompt={{ topic.learn_prompt | urlencode }}">Start learning</a>
         <div class="step-mark-controls">
-          <button class="step-mark-btn" onclick="markStep('learn', 'in_progress')">Mark In Progress</button>
-          <button class="step-mark-btn step-mark-done" onclick="markStep('learn', 'done')">Mark Done</button>
+          <button class="step-mark-btn" onclick="markStep('learn','in_progress')">In progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('learn','done')">Done ✓</button>
         </div>
         <div class="step-planner-controls">
-          <button class="step-planner-btn"
-                  data-todo-title="Learn: {{ topic.topic_title }}"
-                  data-todo-type="daily"
-                  data-due-label="Today"
-                  onclick="addToPlanner(this)">Add to Today</button>
-          <button class="step-planner-btn"
-                  data-todo-title="Learn: {{ topic.topic_title }}"
-                  data-todo-type="weekly"
-                  data-due-label="Module Plan"
-                  onclick="addToPlanner(this)">Add to Module Plan</button>
+          <button class="step-planner-btn" data-todo-title="Learn: {{ topic.topic_title }}" data-todo-type="daily" data-due-label="Today" onclick="addToPlanner(this)">+ Today</button>
+          <button class="step-planner-btn" data-todo-title="Learn: {{ topic.topic_title }}" data-todo-type="weekly" data-due-label="Module Plan" onclick="addToPlanner(this)">+ Module plan</button>
         </div>
       </article>
-
       <article class="journey-step-card">
         <div class="journey-step-num">2</div>
         <h3>Quiz</h3>
-        <span class="step-status-badge step-status-{{ topic_progress['quiz'] | replace('_', '-') }}" id="status-quiz">
-          {{ topic_progress['quiz'] | replace('_', ' ') | title }}
-        </span>
+        <span class="step-status-badge step-status-{{ topic_progress['quiz'] | replace('_','-') }}" id="status-quiz">{{ topic_progress['quiz'] | replace('_',' ') | title }}</span>
         <p>Test your understanding with practice questions.</p>
-        <a class="topic-action-btn"
-           href="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}"
-           data-topic-action
-           data-step="quiz"
-           data-status="in_progress"
-           data-chat-url="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}">
-          Take Quiz
-        </a>
+        <a class="topic-action-btn" href="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}" data-topic-action data-step="quiz" data-status="in_progress" data-chat-url="/chat/{{ session_id }}?prompt={{ topic.quiz_prompt | urlencode }}">Take quiz</a>
         <div class="step-mark-controls">
-          <button class="step-mark-btn" onclick="markStep('quiz', 'in_progress')">Mark In Progress</button>
-          <button class="step-mark-btn step-mark-done" onclick="markStep('quiz', 'done')">Mark Done</button>
+          <button class="step-mark-btn" onclick="markStep('quiz','in_progress')">In progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('quiz','done')">Done ✓</button>
         </div>
         <div class="step-planner-controls">
-          <button class="step-planner-btn"
-                  data-todo-title="Quiz: {{ topic.topic_title }}"
-                  data-todo-type="daily"
-                  data-due-label="Today"
-                  onclick="addToPlanner(this)">Add to Today</button>
-          <button class="step-planner-btn"
-                  data-todo-title="Quiz: {{ topic.topic_title }}"
-                  data-todo-type="weekly"
-                  data-due-label="Module Plan"
-                  onclick="addToPlanner(this)">Add to Module Plan</button>
+          <button class="step-planner-btn" data-todo-title="Quiz: {{ topic.topic_title }}" data-todo-type="daily" data-due-label="Today" onclick="addToPlanner(this)">+ Today</button>
+          <button class="step-planner-btn" data-todo-title="Quiz: {{ topic.topic_title }}" data-todo-type="weekly" data-due-label="Module Plan" onclick="addToPlanner(this)">+ Module plan</button>
         </div>
       </article>
-
       <article class="journey-step-card">
         <div class="journey-step-num">3</div>
         <h3>Portfolio Task</h3>
-        <span class="step-status-badge step-status-{{ topic_progress['portfolio_task'] | replace('_', '-') }}" id="status-portfolio_task">
-          {{ topic_progress['portfolio_task'] | replace('_', ' ') | title }}
-        </span>
+        <span class="step-status-badge step-status-{{ topic_progress['portfolio_task'] | replace('_','-') }}" id="status-portfolio_task">{{ topic_progress['portfolio_task'] | replace('_',' ') | title }}</span>
         <p>Turn the concept into a small hands-on artifact.</p>
-        <button type="button" class="topic-action-btn"
-                onclick="markStep('portfolio_task', 'in_progress'); generatePractice('portfolio_task', false)">
-          Portfolio Task
-        </button>
+        <button type="button" class="topic-action-btn" onclick="markStep('portfolio_task','in_progress');generatePractice('portfolio_task',false)">Portfolio task</button>
         <div class="step-mark-controls">
-          <button class="step-mark-btn" onclick="markStep('portfolio_task', 'in_progress')">Mark In Progress</button>
-          <button class="step-mark-btn step-mark-done" onclick="markStep('portfolio_task', 'done')">Mark Done</button>
+          <button class="step-mark-btn" onclick="markStep('portfolio_task','in_progress')">In progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('portfolio_task','done')">Done ✓</button>
         </div>
         <div class="step-planner-controls">
-          <button class="step-planner-btn"
-                  data-todo-title="Portfolio Task: {{ topic.topic_title }}"
-                  data-todo-type="daily"
-                  data-due-label="Today"
-                  onclick="addToPlanner(this)">Add to Today</button>
-          <button class="step-planner-btn"
-                  data-todo-title="Portfolio Task: {{ topic.topic_title }}"
-                  data-todo-type="weekly"
-                  data-due-label="Module Plan"
-                  onclick="addToPlanner(this)">Add to Module Plan</button>
+          <button class="step-planner-btn" data-todo-title="Portfolio Task: {{ topic.topic_title }}" data-todo-type="daily" data-due-label="Today" onclick="addToPlanner(this)">+ Today</button>
+          <button class="step-planner-btn" data-todo-title="Portfolio Task: {{ topic.topic_title }}" data-todo-type="weekly" data-due-label="Module Plan" onclick="addToPlanner(this)">+ Module plan</button>
         </div>
       </article>
-
       <article class="journey-step-card">
         <div class="journey-step-num">4</div>
         <h3>Interview Practice</h3>
-        <span class="step-status-badge step-status-{{ topic_progress['interview_practice'] | replace('_', '-') }}" id="status-interview_practice">
-          {{ topic_progress['interview_practice'] | replace('_', ' ') | title }}
-        </span>
+        <span class="step-status-badge step-status-{{ topic_progress['interview_practice'] | replace('_','-') }}" id="status-interview_practice">{{ topic_progress['interview_practice'] | replace('_',' ') | title }}</span>
         <p>Practice explaining this topic in an interview setting.</p>
-        <button type="button" class="topic-action-btn"
-                onclick="markStep('interview_practice', 'in_progress'); generatePractice('interview_practice', false)">
-          Interview Practice
-        </button>
+        <button type="button" class="topic-action-btn" onclick="markStep('interview_practice','in_progress');generatePractice('interview_practice',false)">Interview practice</button>
         <div class="step-mark-controls">
-          <button class="step-mark-btn" onclick="markStep('interview_practice', 'in_progress')">Mark In Progress</button>
-          <button class="step-mark-btn step-mark-done" onclick="markStep('interview_practice', 'done')">Mark Done</button>
+          <button class="step-mark-btn" onclick="markStep('interview_practice','in_progress')">In progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('interview_practice','done')">Done ✓</button>
         </div>
         <div class="step-planner-controls">
-          <button class="step-planner-btn"
-                  data-todo-title="Interview Practice: {{ topic.topic_title }}"
-                  data-todo-type="daily"
-                  data-due-label="Today"
-                  onclick="addToPlanner(this)">Add to Today</button>
-          <button class="step-planner-btn"
-                  data-todo-title="Interview Practice: {{ topic.topic_title }}"
-                  data-todo-type="weekly"
-                  data-due-label="Module Plan"
-                  onclick="addToPlanner(this)">Add to Module Plan</button>
+          <button class="step-planner-btn" data-todo-title="Interview Practice: {{ topic.topic_title }}" data-todo-type="daily" data-due-label="Today" onclick="addToPlanner(this)">+ Today</button>
+          <button class="step-planner-btn" data-todo-title="Interview Practice: {{ topic.topic_title }}" data-todo-type="weekly" data-due-label="Module Plan" onclick="addToPlanner(this)">+ Module plan</button>
         </div>
       </article>
-
       <article class="journey-step-card" id="topic-reflection">
         <div class="journey-step-num">5</div>
-        <h3>Reflection / Notes</h3>
-        <span class="step-status-badge step-status-{{ topic_progress['reflection'] | replace('_', '-') }}" id="status-reflection">
-          {{ topic_progress['reflection'] | replace('_', ' ') | title }}
-        </span>
-        <p>Record what you learned, what confused you, and how you can apply it.</p>
-        <div class="reflection-form">
-          <label class="reflection-label">What did you understand?
-            <textarea id="reflection-text" class="reflection-textarea" rows="3"
-                      placeholder="Key concepts, aha moments…">{{ topic_notes.reflection }}</textarea>
-          </label>
-          <label class="reflection-label">What is still confusing?
-            <textarea id="confusions-text" class="reflection-textarea" rows="2"
-                      placeholder="Open questions, gaps…">{{ topic_notes.confusions }}</textarea>
-          </label>
-          <label class="reflection-label">Where can you apply this?
-            <textarea id="application-text" class="reflection-textarea" rows="2"
-                      placeholder="Project, use case, idea…">{{ topic_notes.application_idea }}</textarea>
-          </label>
-          <div class="reflection-actions">
-            <button class="reflection-save-btn" id="reflection-save-btn" onclick="saveReflection()">Save Reflection</button>
-            <span class="reflection-feedback" id="reflection-feedback"></span>
-          </div>
-        </div>
+        <h3>Reflection</h3>
+        <span class="step-status-badge step-status-{{ topic_progress['reflection'] | replace('_','-') }}" id="status-reflection">{{ topic_progress['reflection'] | replace('_',' ') | title }}</span>
+        <p>A quiet space to cement what you've learned.</p>
+        <a href="#td-reflection" class="topic-action-btn">Write reflection</a>
         <div class="step-mark-controls">
-          <button class="step-mark-btn" onclick="markStep('reflection', 'in_progress')">Mark In Progress</button>
-          <button class="step-mark-btn step-mark-done" onclick="markStep('reflection', 'done')">Mark Done</button>
+          <button class="step-mark-btn" onclick="markStep('reflection','in_progress')">In progress</button>
+          <button class="step-mark-btn step-mark-done" onclick="markStep('reflection','done')">Done ✓</button>
         </div>
       </article>
     </div>
   </section>
-</section>
+
+  {# ══ Screen 6 — Reflection ══ #}
+  <section class="td-section td-prose-col" id="td-reflection" style="scroll-margin-top:var(--space-6)">
+    <div class="td-section-label">Step 5 · Reflect</div>
+    <h2 class="td-section-title">Your space to think</h2>
+    <p class="td-section-framing">No right answers here — just your honest thoughts on what clicked, what didn't, and where you'll take this.</p>
+    <div style="background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-6);box-shadow:var(--shadow-sm)">
+      <label class="reflection-label">What did you understand?
+        <textarea id="reflection-text" class="reflection-textarea" rows="4" placeholder="Key concepts, aha moments, anything that landed…">{{ topic_notes.reflection }}</textarea>
+      </label>
+      <label class="reflection-label">What is still confusing?
+        <textarea id="confusions-text" class="reflection-textarea" rows="3" placeholder="Open questions, gaps — these are your next learning targets.">{{ topic_notes.confusions }}</textarea>
+      </label>
+      <label class="reflection-label">Where can you apply this?
+        <textarea id="application-text" class="reflection-textarea" rows="3" placeholder="A project, a use case, something you want to build…">{{ topic_notes.application_idea }}</textarea>
+      </label>
+      <div style="display:flex;align-items:center;gap:var(--space-3)">
+        <button class="reflection-save-btn" id="reflection-save-btn" onclick="saveReflection()">Save reflection</button>
+        <span class="reflection-feedback" id="reflection-feedback"></span>
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
 
 <script>
   window.AI2_TOPIC_DETAIL = {
