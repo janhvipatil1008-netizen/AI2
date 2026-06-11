@@ -4,6 +4,7 @@
 import os
 
 import anthropic
+from core.logging import get_logger
 from fastapi import APIRouter, HTTPException, Request
 from services.usage_limit_service import AIActionLimitError
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -24,6 +25,7 @@ import routes.deps as deps
 router = APIRouter()
 
 TEST_MODE = os.getenv("AI2_TEST_MODE") == "1"
+_logger = get_logger(__name__)
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -270,7 +272,12 @@ async def save_topic_notes_endpoint(request: Request, body: TopicNotesRequest):
             limit_enforcer   = deps.build_limit_enforcer(session),
         )
     except AIActionLimitError:
-        pass  # notes are saved; reflection response is a best-effort addition
+        pass  # notes saved; reflection response is best-effort
+    except Exception as exc:
+        _logger.warning(
+            "reflection_response generation failed — notes already saved",
+            extra={"error": str(exc), "topic_id": body.topic_id},
+        )
 
     deps.save_session(body.session_id, session)
     deps.write_through_topic_progress(
