@@ -74,6 +74,15 @@ def build_practice_generation_prompt(context: HarnessContext, practice_type: str
     prompt += (
         f"Topic: {context.topic_title}\n"
         f"Description: {context.topic_description}\n\n"
+    )
+    if context.generated_learning_content:
+        prompt += (
+            "Learning Content (the exact explanation this learner just studied — "
+            "every question, task, and scenario must test something specifically "
+            "covered in this content, not general topic knowledge):\n"
+            f"{context.generated_learning_content}\n\n"
+        )
+    prompt += (
         f"{_PRACTICE_PROMPTS[practice_type]}\n"
         "Use plain text without markdown. Be role-aware and syllabus-agnostic."
     )
@@ -90,6 +99,11 @@ def build_quiz_evaluation_prompt(
         f"Topic: {context.topic_title}\n"
         f"Track: {context.track_label}\n"
     )
+    if context.generated_learning_content:
+        prompt += (
+            f"\nLearning Content (what this learner studied before the quiz):\n"
+            f"{context.generated_learning_content}\n"
+        )
     if quiz_content:
         prompt += f"\nQuiz Questions:\n{quiz_content}\n"
     prompt += (
@@ -98,10 +112,12 @@ def build_quiz_evaluation_prompt(
         "Evaluate the answers using exactly this structure:\n\n"
         "Overall Score: X/10\n"
         "Correct Understanding:\n"
-        "Mistakes / Gaps:\n"
+        "Mistakes / Gaps (for each: name the content section it relates to, then restate the correct idea in one sentence):\n"
         "Explanation of Correct Answers:\n"
         "What To Revise:\n"
-        "Next Action:\n\n"
+        "Closing (1–2 sentences in your own warm voice — invite the learner to think about what they "
+        "would say to explain this topic to someone else, or what question is still open for them. "
+        "Speak directly to the learner; no reference to any part of the interface):\n\n"
         "Be encouraging but accurate. Use plain text without markdown."
     )
     return prompt
@@ -117,6 +133,11 @@ def build_portfolio_feedback_prompt(
         f"Topic: {context.topic_title}\n"
         f"Track: {context.track_label}\n"
     )
+    if context.generated_learning_content:
+        prompt += (
+            f"\nLearning Content (what this learner studied before the task):\n"
+            f"{context.generated_learning_content}\n"
+        )
     if task_content:
         prompt += f"\nPortfolio Task:\n{task_content}\n"
     prompt += (
@@ -125,11 +146,13 @@ def build_portfolio_feedback_prompt(
         "Review the submission using exactly this structure:\n\n"
         "Overall Feedback:\n"
         "What Is Strong:\n"
-        "What Can Improve:\n"
+        "What Can Improve (for each point: name the content section it relates to, then restate the correct approach in one sentence):\n"
         "Missing Details:\n"
         "Suggested Improved Version:\n"
         "Portfolio Readiness Score: X/10\n"
-        "Next Action:\n\n"
+        "Closing (1–2 sentences in your own warm voice — invite the learner to reflect on what they "
+        "would say this topic is really about, or what they would do differently next time. "
+        "Speak directly to the learner; no reference to any part of the interface):\n\n"
         "Be encouraging but honest. Use plain text without markdown."
     )
     return prompt
@@ -145,6 +168,11 @@ def build_interview_feedback_prompt(
         f"Topic: {context.topic_title}\n"
         f"Track: {context.track_label}\n"
     )
+    if context.generated_learning_content:
+        prompt += (
+            f"\nLearning Content (what this learner studied before the practice):\n"
+            f"{context.generated_learning_content}\n"
+        )
     if interview_content:
         prompt += f"\nInterview Practice Questions:\n{interview_content}\n"
     prompt += (
@@ -153,11 +181,13 @@ def build_interview_feedback_prompt(
         "Review the answer using exactly this structure:\n\n"
         "Overall Score: X/10\n"
         "Clarity:\n"
-        "Accuracy:\n"
-        "Depth:\n"
+        "Accuracy (if there are gaps: name the content section and restate the correct idea in one sentence):\n"
+        "Depth (if shallow: name the content section that goes deeper and restate the key insight in one sentence):\n"
         "Interview Readiness:\n"
         "Improved Answer:\n"
-        "What To Practice Next:\n\n"
+        "Closing (1–2 sentences in your own warm voice — invite the learner to think about what they "
+        "would say if asked this question cold tomorrow, or what part of their answer they are least "
+        "confident in. Speak directly to the learner; no reference to any part of the interface):\n\n"
         "Be encouraging but honest. Use plain text without markdown."
     )
     return prompt

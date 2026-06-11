@@ -17,6 +17,7 @@ from services.content_service import (
     generate_learning_content_for_topic,
     generate_practice_content_for_topic,
 )
+from services.submission_service import generate_reflection_response
 
 import routes.deps as deps
 
@@ -248,6 +249,29 @@ async def save_topic_notes_endpoint(request: Request, body: TopicNotesRequest):
     if any([notes["reflection"], notes["confusions"], notes["application_idea"]]):
         session.mark_topic_step(body.topic_id, "reflection", "done")
 
+    # Generate mentor response to the reflection (best-effort — notes are already saved).
+    reflection_feedback = None
+    try:
+        quiz_score = session.get_quiz_submission(body.topic_id).get("score")
+        quiz_score = quiz_score if isinstance(quiz_score, int) else None
+
+        reflection_feedback = await generate_reflection_response(
+            session          = session,
+            topic            = topic,
+            track_label      = TRACK_DISPLAY_NAMES[session.track],
+            reflection       = body.reflection,
+            confusions       = body.confusions,
+            application_idea = body.application_idea,
+            quiz_score       = quiz_score,
+            make_client      = deps.make_client,
+            run_blocking     = deps.run_blocking,
+            test_mode        = TEST_MODE,
+            model            = AGENT_MODEL,
+            limit_enforcer   = deps.build_limit_enforcer(session),
+        )
+    except AIActionLimitError:
+        pass  # notes are saved; reflection response is a best-effort addition
+
     deps.save_session(body.session_id, session)
     deps.write_through_topic_progress(
         session,
@@ -267,12 +291,19 @@ async def save_topic_notes_endpoint(request: Request, body: TopicNotesRequest):
         legacy_topic_id=body.topic_id,
     )
 
-    return {
+    response: dict = {
         "topic_id":           body.topic_id,
         "notes":              notes,
         "topic_progress":     session.get_topic_progress(body.topic_id),
         "completion_percent": session.topic_completion_percent(body.topic_id),
     }
+    if reflection_feedback is not None:
+        response["reflection_feedback"] = {
+            "mentor_reply":        reflection_feedback.mentor_reply,
+            "lingering_confusion": reflection_feedback.lingering_confusion,
+            "is_low_effort":       reflection_feedback.is_low_effort,
+        }
+    return response
 
 
 @router.post("/topic/outcome/baseline")

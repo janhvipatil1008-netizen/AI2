@@ -60,7 +60,7 @@ def build_basic_harness_context(
         prior_content=session.get_generated_topic_content(topic_id),
         usage_summary=usage_summary,
         completion_percent=completion_percent,
-        generated_learning_content=summarize_text_for_context(raw_learning_content),
+        generated_learning_content=summarize_text_for_context(raw_learning_content, max_chars=3000),
     )
 
 
