@@ -31,11 +31,18 @@
 
 /* step nav */
 .td-step-nav { display:flex; gap:var(--space-2); flex-wrap:wrap; padding:var(--space-3) 0; margin-bottom:var(--space-6); border-bottom:1px solid var(--border); }
-.td-step-pill { display:inline-flex; align-items:center; gap:var(--space-1); font-size:var(--text-sm); font-weight:var(--weight-medium); padding:var(--space-2) var(--space-3); border-radius:var(--radius-pill); text-decoration:none; background:var(--surface); border:1px solid var(--border); color:var(--text-muted); transition:all var(--duration-fast) var(--ease-out); }
+.td-step-pill { display:inline-flex; align-items:center; gap:var(--space-1); font-size:var(--text-sm); font-weight:var(--weight-medium); padding:var(--space-2) var(--space-3); border-radius:var(--radius-pill); text-decoration:none; background:var(--surface); border:1px solid var(--border); color:var(--text-muted); transition:all var(--duration-fast) var(--ease-out); cursor:pointer; font-family:var(--font-body); }
 .td-step-pill:hover { background:var(--surface-2); color:var(--text); text-decoration:none; }
 .td-step-pill--done        { background:var(--success-soft); color:var(--success); border-color:var(--success); }
 .td-step-pill--in-progress { background:var(--accent-soft);  color:var(--accent);  border-color:var(--accent);  }
+.td-step-pill--active      { background:var(--accent); color:var(--text-on-accent) !important; border-color:var(--accent); box-shadow:0 2px 8px rgba(232,93,38,.25); }
 .td-step-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+
+/* panel system */
+.td-panel { display:none; }
+.td-panel--active { display:block; }
+.td-panel-nav-bar { display:flex; align-items:center; justify-content:space-between; max-width:var(--content-max); padding:var(--space-4) 0; margin:var(--space-2) 0 var(--space-6); border-top:1px solid var(--border); }
+.td-panel-nav-label { font-size:var(--text-sm); color:var(--text-muted); font-weight:var(--weight-medium); }
 
 /* section */
 .td-section { margin-bottom:var(--space-8); scroll-margin-top:var(--space-6); }
@@ -202,9 +209,9 @@
   <nav class="td-step-nav" aria-label="Topic sections">
     {% for sk, sl, sh in _snav %}
       {% set _s = topic_progress.get(sk,'not_started') %}
-      <a href="{{ sh }}" class="td-step-pill {% if _s=='done' %}td-step-pill--done{% elif _s=='in_progress' %}td-step-pill--in-progress{% endif %}">
+      <button onclick="showPanel('{{ sh[1:] }}')" data-panel="{{ sh[1:] }}" class="td-step-pill {% if _s=='done' %}td-step-pill--done{% elif _s=='in_progress' %}td-step-pill--in-progress{% endif %}">
         <span class="td-step-dot"></span>{{ sl }}
-      </a>
+      </button>
     {% endfor %}
   </nav>
 
@@ -260,7 +267,7 @@
   </section>
 
   {# ══ Screen 2 — Learn ══ #}
-  <section class="td-section" id="ai-learning-content">
+  <section class="td-section td-panel" id="ai-learning-content">
     <div class="td-section-label">Step 1 · Learn</div>
     <h2 class="td-section-title">Understanding {{ topic.topic_title }}</h2>
     <div class="td-section-meta">
@@ -291,7 +298,7 @@
 
   {# ══ Screen 3 — Quiz ══ #}
   {% set quiz_p = generated_topic_practice.quiz %}
-  <section class="td-section" id="ai-quiz">
+  <section class="td-section td-panel" id="ai-quiz">
     <div class="td-section-label">Step 2 · Quiz</div>
     <h2 class="td-section-title">Test your understanding</h2>
     <p class="td-section-framing">Mistakes are how you learn — there's no penalty here, only signal.</p>
@@ -385,7 +392,7 @@
 
   {# ══ Screen 4 — Portfolio ══ #}
   {% set portfolio_p = generated_topic_practice.portfolio_task %}
-  <section class="td-section" id="ai-portfolio-task">
+  <section class="td-section td-panel" id="ai-portfolio-task">
     <div class="td-section-label">Step 3 · Portfolio</div>
     <h2 class="td-section-title">Turn this into something real</h2>
     <p class="td-section-framing">A short hands-on task that puts this topic to work — your submission will be reviewed seriously.</p>
@@ -450,10 +457,10 @@
 
   {# ══ Screen 5 — Interview ══ #}
   {% set interview_p = generated_topic_practice.interview_practice %}
-  <section class="td-section" id="ai-interview-practice">
+  <section class="td-section td-panel" id="ai-interview-practice">
     <div class="td-section-label">Step 4 · Interview</div>
-    <h2 class="td-section-title">Practice, not a verdict</h2>
-    <p class="td-section-framing">These questions are your rehearsal space — stumbling here is the point, not a failure.</p>
+    <h2 class="td-section-title">Practice questions</h2>
+    <p class="td-section-framing">One question at a time — answer aloud, in your head, or in a notebook. Nothing to submit.</p>
     <div class="td-section-meta">
       {% if interview_p.content %}
         <span>{{ interview_p.generated_at[:10] if interview_p.generated_at else '' }}</span>
@@ -462,56 +469,47 @@
     </div>
     {% if interview_p.content %}
     <div class="td-content-card td-prose-col">
-      <pre class="ai-content-text">{{ interview_p.content }}</pre>
+      {# Raw content — hidden, parsed by JS #}
+      <textarea id="interview-raw-content" style="display:none">{{ interview_p.content }}</textarea>
+
+      {# Card player (JS shows this when format is parseable) #}
+      <div id="interview-player" style="display:none">
+        <div class="td-iq-progress" id="interview-progress"></div>
+        <p class="td-iq-question" id="interview-question-text"></p>
+        <div class="td-iq-nav">
+          <button class="td-btn-ghost" id="interview-prev-btn" onclick="interviewPrev()" style="visibility:hidden">&#8592; Prev</button>
+          <button class="td-btn-ghost" id="interview-next-btn" onclick="interviewNext()">Next &#8594;</button>
+        </div>
+        <p class="td-iq-hint">Pause — think through your answer before moving on.</p>
+      </div>
+
+      {# Legacy fallback (JS shows if format can't be parsed) #}
+      <div id="interview-legacy" style="display:none">
+        <pre class="ai-content-text" id="interview-legacy-content"></pre>
+      </div>
+
       <div class="td-content-actions">
         <button class="td-btn-ghost" id="practice-btn-interview_practice" onclick="generatePractice('interview_practice',true)">&#8635; Refresh</button>
-        <button class="td-btn-done"  onclick="markStepFromContent(this,'interview_practice')">Mark done ✓</button>
+        <button class="td-btn-done" onclick="markStepFromContent(this,'interview_practice')">Mark done ✓</button>
         <span class="ai-content-feedback" id="practice-feedback-interview_practice"></span>
       </div>
     </div>
     {% else %}
     <div class="td-generate-card td-prose-col">
       <div class="td-generate-card__title">Ready to rehearse?</div>
-      <p class="td-generate-card__desc">Interview questions around {{ topic.topic_title }} — answering in writing is the fastest way to find your gaps.</p>
-      <button class="td-btn-primary" id="practice-btn-interview_practice" onclick="markStep('interview_practice','in_progress');generatePractice('interview_practice',false)">Generate practice &rarr;</button>
+      <p class="td-generate-card__desc">Likely interview questions for {{ topic.topic_title }} — one at a time, answer aloud, find your gaps.</p>
+      <button class="td-btn-primary" id="practice-btn-interview_practice" onclick="markStep('interview_practice','in_progress');generatePractice('interview_practice',false)">Generate questions &rarr;</button>
       <span class="ai-content-feedback" id="practice-feedback-interview_practice" style="display:block;margin-top:var(--space-3)"></span>
     </div>
     {% endif %}
-    <div class="td-submission td-prose-col">
-      <h3 class="td-submission-heading">Your answer</h3>
-      <textarea id="interview-submission-text" class="td-textarea" rows="6" placeholder="Answer as if you're in a real interview — structure your thoughts, be direct.">{{ interview_submission.answer }}</textarea>
-      <div class="td-submission-actions">
-        <button class="td-btn-ghost"   id="interview-save-btn"     onclick="saveInterviewAnswer()">Save</button>
-        <button class="td-btn-primary" id="interview-feedback-btn" onclick="getInterviewFeedback(false)">Get AI feedback</button>
-        <span class="interview-submission-feedback" id="interview-submission-feedback"></span>
-      </div>
-      {% if interview_submission.submitted_at %}<div class="td-submitted-meta">Submitted {{ interview_submission.submitted_at[:10] }}</div>{% endif %}
-      {% if interview_submission.feedback %}
-      <div class="td-eval-block">
-        <div class="td-eval-heading">
-          <span class="td-eval-label">Coaching feedback</span>
-          {% if interview_submission.score is not none %}<span class="td-score-chip">{{ interview_submission.score }}/10</span>{% endif %}
-          {% if interview_submission.reviewed_at %}<span class="td-eval-meta">{{ interview_submission.reviewed_at[:10] }}</span>{% endif %}
-        </div>
-        <pre class="interview-feedback-text">{{ interview_submission.feedback }}</pre>
-        <div class="td-eval-actions"><button class="td-btn-ghost" onclick="getInterviewFeedback(true)">&#8635; Refresh</button></div>
-        <form class="beta-feedback-form" method="post" action="/feedback/beta">
-          <h4>How useful was this feedback?</h4>
-          <input type="hidden" name="session_id" value="{{ session_id }}">
-          <input type="hidden" name="legacy_topic_id" value="{{ topic.topic_id }}">
-          <input type="hidden" name="feedback_context" value="interview_feedback">
-          <input type="hidden" name="redirect_to" value="/topic/{{ session_id }}/{{ topic.topic_id }}#ai-interview-practice">
-          <label class="reflection-label">Usefulness<select name="usefulness_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
-          <label class="reflection-label">Clarity<select name="clarity_score" class="reflection-textarea"><option value="">1–5</option>{% for s in range(1,6) %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select></label>
-          <label class="reflection-label">What confused you?<textarea name="confusion" class="reflection-textarea" rows="2"></textarea></label>
-          <label class="reflection-label">What would make this better?<textarea name="improvement_suggestion" class="reflection-textarea" rows="2"></textarea></label>
-          <label class="reflection-label">Would you pay for this after the free trial?<textarea name="willingness_to_pay" class="reflection-textarea" rows="2"></textarea></label>
-          <button class="reflection-save-btn" type="submit">Send feedback</button>
-        </form>
-      </div>
-      {% endif %}
-    </div>
   </section>
+
+  {# ══ Panel navigation bar ══ #}
+  <div class="td-panel-nav-bar" id="td-panel-nav-bar">
+    <button class="td-btn-ghost" id="panel-prev-btn" onclick="panelPrev()">&#8592; Previous</button>
+    <span class="td-panel-nav-label" id="panel-nav-label"></span>
+    <button class="td-btn-primary" id="panel-next-btn" onclick="panelNext()">Next &#8594;</button>
+  </div>
 
   {# ══ Topic Journey cards ══ #}
   <section class="td-section">
@@ -602,7 +600,7 @@
   </section>
 
   {# ══ Screen 6 — Reflection ══ #}
-  <section class="td-section td-prose-col" id="td-reflection" style="scroll-margin-top:var(--space-6)">
+  <section class="td-section td-panel td-prose-col" id="td-reflection">
     <div class="td-section-label">Step 5 · Reflect</div>
     <h2 class="td-section-title">Your space to think</h2>
     <p class="td-section-framing">No right answers here — just your honest thoughts on what clicked, what didn't, and where you'll take this.</p>
@@ -642,6 +640,7 @@
     quizEvaluateUrl:          "/quiz/evaluate",
     interviewSubmitUrl:       "/interview/submit",
     interviewFeedbackUrl:     "/interview/feedback",
+    stepProgress:             {{ topic_progress | tojson }},
   };
 </script>
 <script src="/static/topic_detail.js"></script>

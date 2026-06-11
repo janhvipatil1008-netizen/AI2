@@ -29,13 +29,15 @@ _PRACTICE_PROMPTS = {
         "Keep it achievable in 1-2 hours for a beginner."
     ),
     "interview_practice": (
-        "Generate interview practice material with exactly this format:\n\n"
-        "Title:\n"
-        "How To Practice:\n"
-        "8 Interview Questions:\n"
-        "What Strong Answers Should Include:\n"
-        "Common Mistakes:\n\n"
-        "Cover beginner to intermediate difficulty."
+        "Generate 8 to 12 interview questions a learner should be able to answer "
+        "on this topic. Questions only — no model answers, no tips, no sections.\n\n"
+        "Use exactly this format:\n\n"
+        "Q1. [question]\n\n"
+        "Q2. [question]\n\n"
+        "Continue through Q8–Q12.\n\n"
+        "Order: first 3 conceptual (testing core understanding), then 3 scenario-based "
+        "(applying to a real situation), then 2–6 behavioral or advanced. "
+        "Beginner to mid-level. No answers, no headers, no commentary."
     ),
 }
 

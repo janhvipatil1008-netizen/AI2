@@ -543,6 +543,12 @@ button { cursor: pointer; border: none; font-family: var(--font); }
 .quiz-evaluation-text { white-space: pre-wrap; font-family: var(--font); font-size: 0.85rem; line-height: 1.6; color: var(--text); }
 .quiz-evaluation-actions { margin-top: 0.5rem; }
 
+/* ── Topic-detail interview question card browser ────────────────────── */
+.td-iq-progress { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-3); }
+.td-iq-question { font-size: 1.1rem; font-weight: 500; color: var(--text); line-height: 1.65; min-height: 3.5em; margin-bottom: var(--space-5); }
+.td-iq-nav { display: flex; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3); }
+.td-iq-hint { font-size: var(--text-sm); color: var(--text-dim); font-style: italic; margin-top: var(--space-2); }
+
 /* ── Topic-detail interactive quiz player ─────────────────────────────── */
 .td-quiz-progress { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-3); }
 .td-quiz-question { font-size: 1rem; font-weight: 500; color: var(--text); line-height: 1.55; margin-bottom: var(--space-4); }

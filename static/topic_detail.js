@@ -406,6 +406,159 @@
     }
   }
 
+  // ── Panel navigation system ───────────────────────────────────────────────
+
+  var _PANELS = [
+    { key: 'learn',              id: 'ai-learning-content', label: 'Learn'     },
+    { key: 'quiz',               id: 'ai-quiz',             label: 'Quiz'      },
+    { key: 'portfolio_task',     id: 'ai-portfolio-task',   label: 'Portfolio' },
+    { key: 'interview_practice', id: 'ai-interview-practice', label: 'Interview' },
+    { key: 'reflection',         id: 'td-reflection',       label: 'Reflect'   },
+  ];
+  var _currentPanelIdx = 0;
+
+  function showPanel(panelId) {
+    for (var i = 0; i < _PANELS.length; i++) {
+      var el = document.getElementById(_PANELS[i].id);
+      var btn = document.querySelector('[data-panel="' + _PANELS[i].id + '"]');
+      if (!el) continue;
+      if (_PANELS[i].id === panelId) {
+        el.classList.add('td-panel--active');
+        el.classList.remove('td-panel');
+        _currentPanelIdx = i;
+        if (btn) { btn.classList.add('td-step-pill--active'); }
+        history.replaceState(null, '', '#' + panelId);
+      } else {
+        el.classList.remove('td-panel--active');
+        el.classList.add('td-panel');
+        if (btn) { btn.classList.remove('td-step-pill--active'); }
+      }
+    }
+    _updatePanelNav();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function _updatePanelNav() {
+    var prevBtn   = document.getElementById('panel-prev-btn');
+    var nextBtn   = document.getElementById('panel-next-btn');
+    var label     = document.getElementById('panel-nav-label');
+    var navBar    = document.getElementById('td-panel-nav-bar');
+    if (!navBar) return;
+    var i = _currentPanelIdx;
+    if (label) label.textContent = 'Step ' + (i + 1) + ' of ' + _PANELS.length + ' — ' + _PANELS[i].label;
+    if (prevBtn) prevBtn.style.visibility = i > 0 ? 'visible' : 'hidden';
+    if (nextBtn) {
+      if (i < _PANELS.length - 1) {
+        nextBtn.textContent   = _PANELS[i + 1].label + ' →';
+        nextBtn.style.display = 'inline-flex';
+      } else {
+        nextBtn.textContent   = 'Done ✓';
+        nextBtn.style.display = 'inline-flex';
+      }
+    }
+  }
+
+  function panelNext() {
+    var next = Math.min(_currentPanelIdx + 1, _PANELS.length - 1);
+    showPanel(_PANELS[next].id);
+  }
+
+  function panelPrev() {
+    var prev = Math.max(_currentPanelIdx - 1, 0);
+    showPanel(_PANELS[prev].id);
+  }
+
+  function _initPanelNav() {
+    var panels = document.querySelectorAll('.td-panel');
+    if (!panels.length) return;
+
+    // Determine which panel to show first: URL hash, then first incomplete, then first
+    var hash = window.location.hash ? window.location.hash.slice(1) : '';
+    var targetId = null;
+    for (var j = 0; j < _PANELS.length; j++) {
+      if (_PANELS[j].id === hash) { targetId = hash; break; }
+    }
+    if (!targetId) {
+      var progress = (_cfg.stepProgress || {});
+      for (var k = 0; k < _PANELS.length; k++) {
+        if (progress[_PANELS[k].key] !== 'done') { targetId = _PANELS[k].id; break; }
+      }
+    }
+    if (!targetId) targetId = _PANELS[0].id;
+    showPanel(targetId);
+  }
+
+  // ── Interview question card browser ───────────────────────────────────────
+
+  var _interview = { questions: [], idx: 0 };
+
+  function _parseInterviewContent(text) {
+    var questions = [];
+    var parts = text.split(/\n(?=Q\d+\.)/);
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i].trim();
+      var m = part.match(/^Q\d+\.\s*([\s\S]+)/);
+      if (!m) continue;
+      var q = m[1].trim();
+      if (q) questions.push(q);
+    }
+    return questions;
+  }
+
+  function _renderInterviewCard(idx) {
+    var q        = _interview.questions[idx];
+    var total    = _interview.questions.length;
+    var progress = document.getElementById('interview-progress');
+    var qText    = document.getElementById('interview-question-text');
+    var prevBtn  = document.getElementById('interview-prev-btn');
+    var nextBtn  = document.getElementById('interview-next-btn');
+
+    if (progress) progress.textContent = 'Question ' + (idx + 1) + ' of ' + total;
+    if (qText)    qText.textContent    = q;
+    if (prevBtn)  prevBtn.style.visibility = idx > 0 ? 'visible' : 'hidden';
+    if (nextBtn) {
+      if (idx < total - 1) {
+        nextBtn.textContent = 'Next →';
+        nextBtn.disabled    = false;
+      } else {
+        nextBtn.textContent = 'Done ✓';
+        nextBtn.disabled    = false;
+      }
+    }
+  }
+
+  function interviewNext() {
+    if (_interview.idx < _interview.questions.length - 1) {
+      _interview.idx += 1;
+    }
+    _renderInterviewCard(_interview.idx);
+  }
+
+  function interviewPrev() {
+    if (_interview.idx > 0) {
+      _interview.idx -= 1;
+    }
+    _renderInterviewCard(_interview.idx);
+  }
+
+  function initInterviewCards() {
+    var rawEl = document.getElementById('interview-raw-content');
+    if (!rawEl) return;
+    var questions = _parseInterviewContent(rawEl.value);
+    if (questions.length < 2) {
+      var legacyEl      = document.getElementById('interview-legacy');
+      var legacyContent = document.getElementById('interview-legacy-content');
+      if (legacyEl)      legacyEl.style.display   = 'block';
+      if (legacyContent) legacyContent.textContent = rawEl.value;
+      return;
+    }
+    _interview.questions = questions;
+    _interview.idx       = 0;
+    var playerEl = document.getElementById('interview-player');
+    if (playerEl) playerEl.style.display = 'block';
+    _renderInterviewCard(0);
+  }
+
   // ── Interactive MCQ quiz player ───────────────────────────────────────────
 
   var _quiz = { questions: [], idx: 0, answers: [] };
@@ -584,7 +737,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    if (document.getElementById('quiz-raw-content')) initInteractiveQuiz();
+    _initPanelNav();
+    if (document.getElementById('quiz-raw-content'))      initInteractiveQuiz();
+    if (document.getElementById('interview-raw-content')) initInterviewCards();
   });
 
   // One-click suggested plan: Learn + Quiz as daily, Portfolio Task + Interview Practice as weekly.
@@ -615,6 +770,12 @@
   window.quizNextQuestion        = quizNextQuestion;
   window.quizSubmitAndEvaluate   = quizSubmitAndEvaluate;
   window.initInteractiveQuiz     = initInteractiveQuiz;
+  window.showPanel               = showPanel;
+  window.panelNext               = panelNext;
+  window.panelPrev               = panelPrev;
+  window.interviewNext           = interviewNext;
+  window.interviewPrev           = interviewPrev;
+  window.initInterviewCards      = initInterviewCards;
   window.savePortfolioSubmission = savePortfolioSubmission;
   window.getPortfolioFeedback    = getPortfolioFeedback;
   window.saveInterviewAnswer     = saveInterviewAnswer;
