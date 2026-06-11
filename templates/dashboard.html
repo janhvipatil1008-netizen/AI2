@@ -4,414 +4,498 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI² — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/css/tokens.css" />
   <style>
-    .dash-header {
-      background: #161b22;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 1.5rem;
-      height: 52px;
-      gap: 1rem;
-    }
-    .dash-logo-chip {
-      background: #1c6ef5;
-      color: #fff;
-      font-weight: 700;
-      font-size: 0.95rem;
-      padding: 0.2rem 0.65rem;
-      border-radius: 6px;
-      letter-spacing: 0.02em;
-    }
-    .dash-divider {
-      width: 1px;
-      height: 20px;
-      background: var(--border);
-    }
-    .dash-welcome {
-      color: var(--text);
-      font-size: 0.95rem;
-      flex: 1;
-    }
-    .dash-nav-link {
-      color: var(--muted);
-      font-size: 0.85rem;
-      text-decoration: none;
-    }
-    .dash-signout {
-      color: var(--muted);
-      font-size: 0.85rem;
-      text-decoration: none;
-      border: 1px solid var(--border);
-      padding: 0.25rem 0.75rem;
-      border-radius: 6px;
-    }
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.1rem 1.25rem;
-      border-bottom: 2px solid #00b4d8;
-    }
-    .resume-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.1rem 1.4rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.7rem;
-    }
-    .resume-btn {
-      background: linear-gradient(135deg, #7c6af7, #4fc3f7);
-      color: #fff;
-      border: none;
-      border-radius: 50px;
-      padding: 0.45rem 1.25rem;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      white-space: nowrap;
-      display: inline-block;
-    }
-    .progress-track {
-      height: 6px;
-      border-radius: 3px;
-      background: var(--border);
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      border-radius: 3px;
-      background: linear-gradient(90deg, #7c6af7, #4fc3f7);
-    }
-    .track-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-      cursor: pointer;
-      transition: border-color 0.15s;
-    }
-    .track-card:hover { border-color: #7c6af7; }
-    .track-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-    .session-action-links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 0.25rem;
-    }
-    .session-action-link {
-      font-size: 0.8rem;
-      color: var(--muted);
-      text-decoration: none;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.2rem 0.65rem;
-    }
-    .session-action-link:hover { color: var(--text); border-color: #7c6af7; }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-    }
-    .summary-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.1rem 1.25rem;
-      border-bottom: 2px solid #7c6af7;
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-    .summary-card-title {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .summary-stat-big {
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1;
-    }
-    .summary-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-    }
-    .summary-chip {
-      font-size: 0.7rem;
-      background: #1e2433;
-      border-radius: 4px;
-      padding: 0.15rem 0.5rem;
-      color: var(--muted);
-    }
-    .summary-chip-done    { color: #4ade80; }
-    .summary-chip-inprog  { color: #facc15; }
-    .summary-rows { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; }
-    .summary-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.82rem;
-      color: var(--text);
-    }
-    .summary-row span:last-child { font-weight: 600; }
-    .summary-link {
-      font-size: 0.82rem;
-      color: #7c6af7;
-      text-decoration: none;
-      margin-top: auto;
-      padding-top: 0.25rem;
-    }
-    .summary-link:hover { text-decoration: underline; }
+  /* ── Dashboard shell ───────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    font-size:   var(--text-base);
+    line-height: var(--lh-body);
+    color:       var(--text);
+    background:  var(--bg);
+    min-height:  100vh;
+  }
+
+  /* ── Header ────────────────────────────────────────────────────────── */
+  .db-header {
+    display:       flex;
+    align-items:   center;
+    gap:           var(--space-3);
+    padding:       0 var(--space-6);
+    height:        52px;
+    background:    var(--surface);
+    border-bottom: 1px solid var(--border);
+    position:      sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .db-logo {
+    font-family:  var(--font-display);
+    font-size:    var(--text-lg);
+    font-weight:  var(--weight-bold);
+    color:        var(--accent);
+    text-decoration: none;
+  }
+  .db-logo sup { font-size: .65em; }
+  .db-welcome {
+    font-size:  var(--text-sm);
+    color:      var(--text-muted);
+    flex: 1;
+  }
+  .db-welcome strong { color: var(--text); font-weight: var(--weight-semibold); }
+  .db-nav-link {
+    font-size:    var(--text-sm);
+    color:        var(--text-muted);
+    text-decoration: none;
+    transition:   color var(--duration-fast) var(--ease-out);
+  }
+  .db-nav-link:hover { color: var(--accent); }
+  .db-signout {
+    font-size:    var(--text-sm);
+    color:        var(--text-muted);
+    text-decoration: none;
+    border:       1px solid var(--border);
+    border-radius: var(--radius-pill);
+    padding:      3px var(--space-4);
+    transition:   all var(--duration-fast) var(--ease-out);
+  }
+  .db-signout:hover { color: var(--text); border-color: var(--text-muted); }
+
+  /* ── Page body ─────────────────────────────────────────────────────── */
+  .db-body {
+    max-width: 900px;
+    margin:    0 auto;
+    padding:   var(--space-6) var(--space-5) var(--space-8);
+  }
+
+  /* ── Page title ────────────────────────────────────────────────────── */
+  .db-eyebrow {
+    font-size:      var(--text-xs);
+    font-weight:    var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color:          var(--accent);
+    margin-bottom:  var(--space-2);
+  }
+  .db-title {
+    font-family:   var(--font-display);
+    font-size:     var(--text-3xl);
+    font-weight:   var(--weight-bold);
+    color:         var(--text);
+    line-height:   var(--leading-tight);
+    margin-bottom: var(--space-2);
+  }
+  .db-subtitle {
+    font-size:     var(--text-base);
+    color:         var(--text-muted);
+    margin-bottom: var(--space-6);
+  }
+
+  /* ── Resume card ───────────────────────────────────────────────────── */
+  .db-resume {
+    background:    var(--surface-raised);
+    border:        1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding:       var(--space-5) var(--space-6);
+    box-shadow:    var(--shadow-md);
+    margin-bottom: var(--space-6);
+    position:      relative;
+    overflow:      hidden;
+  }
+  .db-resume::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--accent);
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  }
+  .db-resume-top {
+    display:     flex;
+    align-items: center;
+    gap:         var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+  .db-resume-icon {
+    font-size:   1.8rem;
+    flex-shrink: 0;
+  }
+  .db-resume-info { flex: 1; min-width: 0; }
+  .db-resume-track {
+    font-size:   var(--text-lg);
+    font-weight: var(--weight-bold);
+    color:       var(--text);
+    line-height: var(--leading-tight);
+    margin-bottom: 3px;
+  }
+  .db-resume-meta {
+    font-size: var(--text-sm);
+    color:     var(--text-muted);
+  }
+  .db-resume-btn {
+    display:       inline-flex;
+    align-items:   center;
+    gap:           var(--space-2);
+    font-family:   var(--font-body);
+    font-size:     var(--text-base);
+    font-weight:   var(--weight-semibold);
+    color:         var(--text-on-accent);
+    background:    var(--accent);
+    border:        none;
+    border-radius: var(--radius-pill);
+    padding:       var(--space-3) var(--space-5);
+    text-decoration: none;
+    white-space:   nowrap;
+    flex-shrink:   0;
+    transition:    background var(--duration-base) var(--ease-out),
+                   box-shadow  var(--duration-base) var(--ease-out),
+                   transform   var(--duration-fast) var(--ease-out);
+    box-shadow:    0 2px 8px rgba(232,93,38,.25);
+  }
+  .db-resume-btn:hover {
+    background: var(--accent-hover);
+    box-shadow: 0 4px 16px rgba(232,93,38,.35);
+    transform:  translateY(-1px);
+    color:      var(--text-on-accent);
+    text-decoration: none;
+  }
+
+  /* progress bar */
+  .db-progress-bar {
+    height:        6px;
+    background:    var(--surface-2);
+    border-radius: var(--radius-pill);
+    overflow:      hidden;
+    margin-bottom: var(--space-3);
+  }
+  .db-progress-fill {
+    height:        100%;
+    background:    var(--accent);
+    border-radius: var(--radius-pill);
+    transition:    width var(--duration-slow) var(--ease-out);
+    min-width:     3px;
+  }
+
+  /* quick links under progress */
+  .db-quick-links {
+    display:   flex;
+    flex-wrap: wrap;
+    gap:       var(--space-2);
+  }
+  .db-quick-link {
+    font-size:     var(--text-sm);
+    font-weight:   var(--weight-medium);
+    color:         var(--text-muted);
+    background:    var(--surface);
+    border:        1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding:       var(--space-2) var(--space-4);
+    text-decoration: none;
+    transition:    all var(--duration-fast) var(--ease-out);
+  }
+  .db-quick-link:hover {
+    color:        var(--text);
+    border-color: var(--text-muted);
+    background:   var(--surface-2);
+    text-decoration: none;
+  }
+
+  /* ── Stats row ─────────────────────────────────────────────────────── */
+  .db-stats {
+    display:       grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:           var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+  .db-stat {
+    background:    var(--surface);
+    border:        1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding:       var(--space-4) var(--space-4);
+    box-shadow:    var(--shadow-sm);
+  }
+  .db-stat__label {
+    font-size:      var(--text-xs);
+    font-weight:    var(--weight-medium);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color:          var(--text-muted);
+    margin-bottom:  var(--space-2);
+  }
+  .db-stat__num {
+    font-size:   var(--text-2xl);
+    font-weight: var(--weight-bold);
+    color:       var(--text);
+    line-height: 1;
+  }
+
+  /* ── Section label ─────────────────────────────────────────────────── */
+  .db-section-label {
+    font-size:      var(--text-xs);
+    font-weight:    var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color:          var(--text-muted);
+    margin-bottom:  var(--space-4);
+  }
+
+  /* ── Summary cards ─────────────────────────────────────────────────── */
+  .db-summary-grid {
+    display:       grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:           var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+  .db-summary-card {
+    background:    var(--surface);
+    border:        1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding:       var(--space-4) var(--space-5);
+    display:       flex;
+    flex-direction: column;
+    gap:           var(--space-3);
+    box-shadow:    var(--shadow-sm);
+  }
+  .db-summary-card__title {
+    font-size:      var(--text-xs);
+    font-weight:    var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color:          var(--text-muted);
+  }
+  .db-summary-card__big {
+    font-size:   var(--text-3xl);
+    font-weight: var(--weight-bold);
+    color:       var(--text);
+    line-height: 1;
+  }
+  .db-summary-chips {
+    display:   flex;
+    flex-wrap: wrap;
+    gap:       var(--space-1);
+  }
+  .db-chip {
+    font-size:     var(--text-xs);
+    padding:       3px var(--space-2);
+    border-radius: var(--radius-sm);
+    background:    var(--surface-2);
+    color:         var(--text-muted);
+  }
+  .db-chip--done    { background: var(--success-soft); color: var(--success); }
+  .db-chip--inprog  { background: var(--accent-soft);  color: var(--accent);  }
+  .db-summary-rows { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
+  .db-summary-row {
+    display:         flex;
+    justify-content: space-between;
+    font-size:       var(--text-sm);
+    color:           var(--text);
+  }
+  .db-summary-row span:last-child { font-weight: var(--weight-semibold); }
+  .db-summary-link {
+    font-size:   var(--text-sm);
+    font-weight: var(--weight-medium);
+    color:       var(--accent);
+    text-decoration: none;
+    margin-top:  auto;
+    padding-top: var(--space-2);
+    transition:  color var(--duration-fast) var(--ease-out);
+  }
+  .db-summary-link:hover { color: var(--accent-hover); text-decoration: underline; }
+
+  /* ── Track grid ────────────────────────────────────────────────────── */
+  .db-track-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+  }
+  .db-track-card {
+    background:    var(--surface);
+    border:        1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding:       var(--space-5);
+    cursor:        pointer;
+    transition:    border-color var(--duration-fast) var(--ease-out),
+                   box-shadow   var(--duration-fast) var(--ease-out),
+                   background   var(--duration-fast) var(--ease-out);
+    box-shadow:    var(--shadow-sm);
+  }
+  .db-track-card:hover {
+    border-color: var(--accent);
+    background:   var(--accent-soft);
+    box-shadow:   var(--shadow-md);
+  }
+  .db-track-card__icon { font-size: 1.6rem; margin-bottom: var(--space-3); }
+  .db-track-card__name {
+    font-size:   var(--text-base);
+    font-weight: var(--weight-semibold);
+    color:       var(--text);
+    margin-bottom: var(--space-1);
+  }
+  .db-track-card__tagline {
+    font-size: var(--text-sm);
+    color:     var(--text-muted);
+    line-height: var(--lh-body);
+  }
+
+  @media (max-width: 600px) {
+    .db-stats         { grid-template-columns: repeat(2,1fr); }
+    .db-summary-grid  { grid-template-columns: 1fr; }
+    .db-track-grid    { grid-template-columns: 1fr; }
+    .db-resume-top    { flex-wrap: wrap; }
+    .db-resume-btn    { width: 100%; justify-content: center; }
+  }
   </style>
 </head>
 <body>
 
-  <!-- Custom header -->
-  <header class="dash-header">
-    <span class="dash-logo-chip">AI²</span>
-    <div class="dash-divider"></div>
-    <span class="dash-welcome">Welcome back, <strong>{{ display_name }}</strong></span>
+  <header class="db-header">
+    <a href="/" class="db-logo">AI<sup>2</sup></a>
+    <span class="db-welcome">Welcome back, <strong>{{ display_name }}</strong></span>
     {% if test_mode %}<span class="test-badge">TEST MODE</span>{% endif %}
-    <a href="/history" class="dash-nav-link">📜 History</a>
-    <a href="/logout" class="dash-signout">Sign out</a>
+    <a href="/history" class="db-nav-link">History</a>
+    <a href="/logout"  class="db-signout">Sign out</a>
   </header>
 
-  <main style="max-width: 900px; margin: 0 auto; padding: 2rem 1rem;">
+  <main class="db-body">
 
-    <!-- Hero -->
-    <div style="margin-bottom: 2rem;">
-      <div style="font-size: 0.7rem; font-weight: 700; color: #00b4d8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem;">Learner Home</div>
-      <h1 style="margin: 0 0 0.4rem; font-size: 1.75rem; font-weight: 700;">Your adaptive learning dashboard</h1>
-      <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">Track progress, jump back into your current course, or start something new.</p>
+    {# ── Page title ── #}
+    <div class="db-eyebrow">Learner Home</div>
+    <h1 class="db-title">Your adaptive learning dashboard</h1>
+    <p class="db-subtitle">Pick up where you left off, check your progress, or start something new.</p>
+
+    {# ══ Resume card ══ #}
+    {% if recent_sessions %}
+    {% set s = recent_sessions[0] %}
+    {% set pct = ((s.current_week / 5) * 100) | int %}
+    <div class="db-resume">
+      <div class="db-resume-top">
+        <div class="db-resume-icon">
+          {% if s.track == "aipm" %}📦{% elif s.track == "evals" %}🔬{% else %}🧩{% endif %}
+        </div>
+        <div class="db-resume-info">
+          <div class="db-resume-track">
+            {% if s.track == "aipm" %}AI Product Manager
+            {% elif s.track == "evals" %}AI Evals Specialist
+            {% else %}Context Engineer{% endif %}
+          </div>
+          <div class="db-resume-meta">
+            Module {{ s.current_week }}
+            {%- if position_summary and position_summary.available and position_summary.current_topic_key %}
+              &nbsp;·&nbsp;{{ position_summary.current_topic_key | replace('-', ' ') | title }}
+            {%- elif s.current_week <= 1 %}&nbsp;·&nbsp;AI Foundations
+            {%- elif s.current_week <= 2 %}&nbsp;·&nbsp;Engineering Practice
+            {%- elif s.current_week <= 4 %}&nbsp;·&nbsp;Agri-Saathi Build
+            {%- else %}&nbsp;·&nbsp;Portfolio &amp; Launch{% endif %}
+          </div>
+        </div>
+        <a href="/topics/{{ s.session_id }}" class="db-resume-btn">Resume &rarr;</a>
+      </div>
+
+      <div class="db-progress-bar">
+        <div class="db-progress-fill" style="width:{{ pct }}%"></div>
+      </div>
+      {% if learning_summary %}
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3)">
+        {{ learning_summary.average_completion_percent }}% of this module complete
+        &nbsp;·&nbsp;{{ learning_summary.completed_topics }}/{{ learning_summary.total_topics }} topics done
+      </div>
+      {% endif %}
+
+      <div class="db-quick-links">
+        <a href="/topics/{{ s.session_id }}"   class="db-quick-link">&#128218; Browse Topics</a>
+        <a href="/todos/{{ s.session_id }}"    class="db-quick-link">&#128203; My Planner</a>
+        <a href="/syllabus/{{ s.session_id }}" class="db-quick-link">&#128196; Syllabus</a>
+      </div>
     </div>
+    {% endif %}
 
-    <!-- Stats bar -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem;">
-      {% set stat_items = [
-        ("Sessions", stats.session_count),
-        ("Quizzes taken", stats.total_quizzes),
-        ("Topics mastered", stats.topics_mastered),
-        ("Total exchanges", stats.total_exchanges)
+    {# ══ Stats row ══ #}
+    <div class="db-stats">
+      {% for label, val in [
+        ("Sessions",       stats.session_count),
+        ("Topics mastered",stats.topics_mastered),
+        ("Quizzes taken",  stats.total_quizzes),
+        ("Total exchanges",stats.total_exchanges),
       ] %}
-      {% for label, val in stat_items %}
-      <div class="stat-card">
-        <div style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;">{{ label }}</div>
-        <div style="font-size: 1.75rem; font-weight: 700; color: var(--text);">{{ val }}</div>
+      <div class="db-stat">
+        <div class="db-stat__label">{{ label }}</div>
+        <div class="db-stat__num">{{ val }}</div>
       </div>
       {% endfor %}
     </div>
 
-    <!-- Continue Learning — most recent session only -->
-    {% if recent_sessions %}
-    {% set s = recent_sessions[0] %}
-    {% set pct = ((s.current_week / 5) * 100)|int %}
-    <div style="margin-bottom: 2rem;">
-      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Continue Learning</div>
-      <div class="resume-card">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <span style="font-size: 1.6rem;">
-            {% if s.track == "aipm" %}📦
-            {% elif s.track == "evals" %}🔬
-            {% else %}🧩{% endif %}
-          </span>
-          <div style="flex: 1;">
-            <div style="font-weight: 700; font-size: 1rem;">
-              {% if s.track == "aipm" %}AI Product Manager
-              {% elif s.track == "evals" %}AI Evals Specialist
-              {% else %}Context Engineer{% endif %}
-            </div>
-            <div style="font-size: 0.8rem; color: var(--muted);">
-              Module {{ s.current_week }} ·
-              {% if s.current_week <= 1 %}AI Foundations
-              {% elif s.current_week <= 2 %}Engineering Practice
-              {% elif s.current_week <= 4 %}Agri-Saathi Build
-              {% else %}Portfolio &amp; Launch{% endif %}
-            </div>
-          </div>
-          <a href="/chat/{{ s.session_id }}" class="resume-btn">Resume →</a>
-        </div>
-        <div class="progress-track">
-          <div class="progress-fill" style="width: {{ pct }}%;"></div>
-        </div>
-        <div class="session-action-links">
-          <a href="/chat/{{ s.session_id }}"     class="session-action-link">Continue Chat</a>
-          <a href="/topics/{{ s.session_id }}"   class="session-action-link">Browse Module Topics</a>
-          <a href="/todos/{{ s.session_id }}"    class="session-action-link">My Planner</a>
-          <a href="/syllabus/{{ s.session_id }}" class="session-action-link">View Syllabus</a>
-          <a href="/onboarding/{{ s.session_id }}" class="session-action-link">Set up learning path</a>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Current Focus — position derived from modular progress or session fallback -->
-    {% if position_summary and (position_summary.available or position_summary.current_module_label) %}
-    <div style="margin-bottom: 2rem;">
-      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Current Focus</div>
-      <div class="summary-card">
-        <div class="summary-rows">
-          {% if position_summary.available %}
-            {% if position_summary.current_topic_key %}
-            <div class="summary-row"><span>Topic</span><span>{{ position_summary.current_topic_key }}</span></div>
-            {% endif %}
-            {% if position_summary.current_module_key %}
-            <div class="summary-row"><span>Module</span><span>{{ position_summary.current_module_key }}</span></div>
-            {% endif %}
-            {% if not position_summary.current_topic_key and not position_summary.current_module_key %}
-            <div class="summary-row"><span>Getting started</span><span>—</span></div>
-            {% endif %}
-            {% if position_summary.next_topic_key %}
-            <div class="summary-row"><span>Up next</span><span>{{ position_summary.next_topic_key }}</span></div>
-            {% endif %}
-            {% if position_summary.progress_percent %}
-            <div class="progress-track" style="margin-top: 0.35rem;">
-              <div class="progress-fill" style="width: {{ position_summary.progress_percent }}%;"></div>
-            </div>
-            {% endif %}
-          {% else %}
-            <div class="summary-row"><span>Current module</span><span>{{ position_summary.current_module_label }}</span></div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if enrollment_summary and enrollment_summary.source == "db" %}
-    <div style="margin-bottom: 2rem;">
-      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Learning path</div>
-      <div class="summary-card">
-        <div class="summary-rows">
-          <div class="summary-row"><span>Course</span><span>{{ enrollment_summary.course_key }}</span></div>
-          <div class="summary-row"><span>Progress</span><span>{{ enrollment_summary.progress_percent }}%</span></div>
-          {% if enrollment_summary.current_module_key %}
-          <div class="summary-row"><span>Current module</span><span>{{ enrollment_summary.current_module_key }}</span></div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if modular_progress_summary and modular_progress_summary.available %}
-    <div style="margin-bottom: 2rem;">
-      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Learning progress</div>
-      <div class="summary-card">
-        <div class="summary-rows">
-          {% if modular_progress_summary.course_key %}
-          <div class="summary-row"><span>Course</span><span>{{ modular_progress_summary.course_key }}</span></div>
-          {% endif %}
-          <div class="summary-row"><span>Progress</span><span>{{ modular_progress_summary.progress_percent }}%</span></div>
-          {% if modular_progress_summary.current_module_key %}
-          <div class="summary-row"><span>Current module</span><span>{{ modular_progress_summary.current_module_key }}</span></div>
-          {% endif %}
-          {% if modular_progress_summary.current_topic_key %}
-          <div class="summary-row"><span>Current topic</span><span>{{ modular_progress_summary.current_topic_key }}</span></div>
-          {% endif %}
-          {% for module in modular_progress_summary.modules %}
-            {% if loop.index <= 3 %}
-            <div class="summary-row"><span>{{ module.module_key }}</span><span>{{ module.progress_percent }}%</span></div>
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Your Learning Summary -->
+    {# ══ Learning summary ══ #}
     {% if learning_summary %}
-    <div style="margin-bottom: 2rem;">
-      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Your Learning Summary</div>
-      <div class="summary-grid">
+    <div class="db-section-label">This module</div>
+    <div class="db-summary-grid">
 
-        <!-- Card 1: Module Progress -->
-        <div class="summary-card">
-          <div class="summary-card-title">Module {{ learning_summary.current_week }} Progress</div>
-          <div class="summary-stat-big">{{ learning_summary.average_completion_percent }}%</div>
-          <div class="summary-chips">
-            <span class="summary-chip summary-chip-done">Completed: {{ learning_summary.completed_topics }} / {{ learning_summary.total_topics }}</span>
-            <span class="summary-chip summary-chip-inprog">In progress: {{ learning_summary.in_progress_topics }}</span>
-            <span class="summary-chip">Not started: {{ learning_summary.not_started_topics }}</span>
-          </div>
-          <a href="/topics/{{ recent_session_id }}" class="summary-link">Browse Module Topics →</a>
+      <div class="db-summary-card">
+        <div class="db-summary-card__title">Progress</div>
+        <div class="db-summary-card__big">{{ learning_summary.average_completion_percent }}%</div>
+        <div class="db-summary-chips">
+          <span class="db-chip db-chip--done">Done: {{ learning_summary.completed_topics }}/{{ learning_summary.total_topics }}</span>
+          <span class="db-chip db-chip--inprog">Active: {{ learning_summary.in_progress_topics }}</span>
+          <span class="db-chip">Not started: {{ learning_summary.not_started_topics }}</span>
         </div>
-
-        <!-- Card 2: Planner -->
-        <div class="summary-card">
-          <div class="summary-card-title">Planner</div>
-          <div class="summary-rows">
-            <div class="summary-row"><span>Daily todos</span><span>{{ learning_summary.daily_todos }}</span></div>
-            <div class="summary-row"><span>Module-plan todos</span><span>{{ learning_summary.weekly_todos }}</span></div>
-            <div class="summary-row"><span>Done</span><span>{{ learning_summary.done_todos }}</span></div>
-            <div class="summary-row"><span>In progress</span><span>{{ learning_summary.in_progress_todos }}</span></div>
-          </div>
-          <a href="/todos/{{ recent_session_id }}" class="summary-link">Open Planner →</a>
-        </div>
-
-        <!-- Card 3: Practice & Reflection -->
-        <div class="summary-card">
-          <div class="summary-card-title">Practice &amp; Reflection</div>
-          <div class="summary-rows">
-            <div class="summary-row"><span>Quiz evaluations</span><span>{{ learning_summary.quiz_evaluations_done }}</span></div>
-            <div class="summary-row"><span>Portfolio reviews</span><span>{{ learning_summary.portfolio_reviews_done }}</span></div>
-            <div class="summary-row"><span>Interview feedback</span><span>{{ learning_summary.interview_feedback_done }}</span></div>
-            <div class="summary-row"><span>Reflections saved</span><span>{{ learning_summary.reflections_saved }}</span></div>
-          </div>
-          <a href="/topics/{{ recent_session_id }}" class="summary-link">Continue Learning →</a>
-        </div>
-
+        <a href="/topics/{{ recent_session_id }}" class="db-summary-link">Browse topics &rarr;</a>
       </div>
+
+      <div class="db-summary-card">
+        <div class="db-summary-card__title">Planner</div>
+        <div class="db-summary-rows">
+          <div class="db-summary-row"><span>Daily todos</span><span>{{ learning_summary.daily_todos }}</span></div>
+          <div class="db-summary-row"><span>Module-plan todos</span><span>{{ learning_summary.weekly_todos }}</span></div>
+          <div class="db-summary-row"><span>Done</span><span>{{ learning_summary.done_todos }}</span></div>
+          <div class="db-summary-row"><span>In progress</span><span>{{ learning_summary.in_progress_todos }}</span></div>
+        </div>
+        <a href="/todos/{{ recent_session_id }}" class="db-summary-link">Open planner &rarr;</a>
+      </div>
+
+      <div class="db-summary-card">
+        <div class="db-summary-card__title">Practice &amp; Reflection</div>
+        <div class="db-summary-rows">
+          <div class="db-summary-row"><span>Quiz evaluations</span><span>{{ learning_summary.quiz_evaluations_done }}</span></div>
+          <div class="db-summary-row"><span>Portfolio reviews</span><span>{{ learning_summary.portfolio_reviews_done }}</span></div>
+          <div class="db-summary-row"><span>Interview feedback</span><span>{{ learning_summary.interview_feedback_done }}</span></div>
+          <div class="db-summary-row"><span>Reflections saved</span><span>{{ learning_summary.reflections_saved }}</span></div>
+        </div>
+        <a href="/topics/{{ recent_session_id }}" class="db-summary-link">Continue learning &rarr;</a>
+      </div>
+
     </div>
     {% endif %}
 
-    <!-- Feature pills -->
-    <div class="feature-pills" style="margin-bottom: 2rem;">
-      <span class="pill">🧠 Learning Coach</span>
-      <span class="pill">📝 MCQ Quizzes</span>
-      <span class="pill">🎯 Interview Practice</span>
-      <span class="pill">📦 Portfolio Tasks</span>
-      <span class="pill">⚡ Daily Review</span>
-      <a href="/jobs" class="pill" style="text-decoration:none;">💼 AI Job Search</a>
-    </div>
-
-    <!-- Start new track -->
-    <div>
-      <div style="font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.75rem;">Start New Track</div>
-      <div class="track-grid" id="track-grid">
-        {% for track in tracks %}
-        <div class="track-card" data-value="{{ track.value }}">
-          <div style="font-size: 1.4rem; margin-bottom: 0.5rem;">
-            {% if track.value == "aipm" %}📦
-            {% elif track.value == "evals" %}🔬
-            {% else %}🧩{% endif %}
-          </div>
-          <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem;">{{ track.label }}</div>
-          <div style="font-size: 0.82rem; color: var(--muted);">{{ track.tagline }}</div>
+    {# ══ Start a different track ══ #}
+    <div class="db-section-label">Start a different track</div>
+    <div class="db-track-grid" id="track-grid">
+      {% for track in tracks %}
+      <div class="db-track-card" data-value="{{ track.value }}">
+        <div class="db-track-card__icon">
+          {% if track.value == "aipm" %}📦{% elif track.value == "evals" %}🔬{% else %}🧩{% endif %}
         </div>
-        {% endfor %}
+        <div class="db-track-card__name">{{ track.label }}</div>
+        <div class="db-track-card__tagline">{{ track.tagline }}</div>
       </div>
+      {% endfor %}
     </div>
 
   </main>
 
   <script>
-    document.querySelectorAll('.track-card').forEach(card => {
-      card.addEventListener('click', async () => {
-        const track = card.dataset.value;
+    document.querySelectorAll('.db-track-card').forEach(function(card) {
+      card.addEventListener('click', async function() {
+        var track = card.dataset.value;
         card.style.opacity = '0.6';
-        const resp = await fetch('/session/start', {
+        var resp = await fetch('/session/start', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ track })
+          body: JSON.stringify({ track: track })
         });
-        const data = await resp.json();
-        window.location.href = `/chat/${data.session_id}`;
+        var data = await resp.json();
+        window.location.href = '/chat/' + data.session_id;
       });
     });
   </script>
