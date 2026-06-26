@@ -579,6 +579,9 @@ app.include_router(chat_router)
 from routes.topics import router as topics_router, get_next_topic_step  # noqa: E402,F401
 app.include_router(topics_router)
 
+from routes.course_select import router as course_select_router  # noqa: E402
+app.include_router(course_select_router)
+
 from routes.todos import router as todos_router  # noqa: E402
 app.include_router(todos_router)
 

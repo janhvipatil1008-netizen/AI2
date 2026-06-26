@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block title %}AI² — Choose your learning path{% endblock %}
+
+{% block head %}
+<style>
+/* ══ Course + Role Selector ══════════════════════════════════════════════════ */
+
+.cs {
+  font-family: var(--font-body);
+  font-size:   var(--text-base);
+  color:       var(--text);
+  background:  var(--bg);
+  min-height:  100vh;
+  padding-bottom: var(--space-8);
+}
+
+.cs-inner {
+  max-width: 760px;
+  margin:    0 auto;
+  padding:   0 var(--page-px);
+}
+
+/* ── Nav ──────────────────────────────────────────────────────────────────── */
+.cs-nav {
+  display:       flex;
+  align-items:   center;
+  padding:       var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cs-nav__back {
+  font-size:   var(--text-sm);
+  font-weight: var(--weight-medium);
+  color:       var(--text-muted);
+  text-decoration: none;
+}
+.cs-nav__back:hover { color: var(--text); }
+
+/* ── Page header ──────────────────────────────────────────────────────────── */
+.cs-header {
+  padding: var(--space-6) 0 var(--space-5);
+}
+
+.cs-eyebrow {
+  font-size:      var(--text-sm);
+  font-weight:    var(--weight-medium);
+  color:          var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom:  var(--space-2);
+}
+
+.cs-title {
+  font-family:  var(--font-display);
+  font-size:    var(--text-3xl);
+  font-weight:  var(--weight-bold);
+  line-height:  1.15;
+  margin-bottom: var(--space-2);
+}
+
+.cs-subtitle {
+  color:     var(--text-muted);
+  font-size: var(--text-base);
+  margin:    0;
+}
+
+/* ── Error / alert ───────────────────────────────────────────────────────── */
+.cs-alert {
+  border:        1px solid #f97373;
+  color:         #ffd1d1;
+  background:    rgba(249,115,115,0.08);
+  border-radius: 8px;
+  padding:       var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  font-size:     var(--text-sm);
+}
+
+/* ── On-ramp banner ──────────────────────────────────────────────────────── */
+.cs-onramp {
+  border:        1px solid var(--success, #22c55e);
+  border-radius: 10px;
+  background:    rgba(34,197,94,0.06);
+  padding:       var(--space-5);
+  margin-bottom: var(--space-6);
+  display:       flex;
+  gap:           var(--space-4);
+  align-items:   flex-start;
+}
+
+.cs-onramp__icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top:  2px;
+}
+
+.cs-onramp__body { flex: 1; min-width: 0; }
+
+.cs-onramp__badge {
+  display:       inline-block;
+  font-size:     var(--text-xs, 0.75rem);
+  font-weight:   var(--weight-semibold);
+  color:         var(--success, #22c55e);
+  background:    rgba(34,197,94,0.12);
+  border-radius: 99px;
+  padding:       2px 8px;
+  margin-bottom: var(--space-2);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cs-onramp__title {
+  font-size:    var(--text-lg, 1.125rem);
+  font-weight:  var(--weight-semibold);
+  margin-bottom: var(--space-1);
+}
+
+.cs-onramp__desc {
+  font-size: var(--text-sm);
+  color:     var(--text-muted);
+  margin:    0 0 var(--space-3);
+}
+
+.cs-onramp__link {
+  font-size:   var(--text-sm);
+  font-weight: var(--weight-medium);
+  color:       var(--success, #22c55e);
+  text-decoration: none;
+}
+.cs-onramp__link:hover { text-decoration: underline; }
+
+/* ── Section heading ─────────────────────────────────────────────────────── */
+.cs-section-label {
+  font-size:      var(--text-sm);
+  font-weight:    var(--weight-semibold);
+  color:          var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom:  var(--space-4);
+}
+
+/* ── Course cards ─────────────────────────────────────────────────────────── */
+.cs-course-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.cs-course {
+  border:        1px solid var(--border);
+  border-radius: 10px;
+  background:    var(--surface);
+  overflow:      hidden;
+  transition:    border-color var(--duration-fast, 150ms) ease;
+}
+
+/* Highlight the card whose role is selected */
+.cs-course:has(input[type=radio]:checked) {
+  border-color: var(--accent);
+}
+
+.cs-course__head {
+  padding: var(--space-4) var(--space-5) var(--space-3);
+}
+
+.cs-course__title {
+  font-size:    var(--text-lg, 1.125rem);
+  font-weight:  var(--weight-semibold);
+  margin-bottom: var(--space-1);
+}
+
+.cs-course__desc {
+  font-size: var(--text-sm);
+  color:     var(--text-muted);
+  margin:    0;
+  line-height: var(--lh-body, 1.5);
+}
+
+.cs-course__divider {
+  height:     1px;
+  background: var(--border);
+  margin:     0 var(--space-5);
+}
+
+/* ── Role options ─────────────────────────────────────────────────────────── */
+.cs-roles {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cs-role {
+  display:       flex;
+  align-items:   flex-start;
+  gap:           var(--space-3);
+  padding:       var(--space-3) var(--space-3);
+  border-radius: 8px;
+  cursor:        pointer;
+  transition:    background var(--duration-fast, 150ms) ease;
+}
+.cs-role:hover { background: rgba(255,255,255,0.04); }
+
+/* Highlight selected role card */
+.cs-role:has(input[type=radio]:checked) {
+  background: rgba(28,110,245,0.10);
+}
+
+.cs-role input[type=radio] {
+  margin-top:  3px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+
+.cs-role__body { flex: 1; min-width: 0; }
+
+.cs-role__label {
+  font-size:    var(--text-base);
+  font-weight:  var(--weight-semibold);
+  display:      block;
+  margin-bottom: 2px;
+}
+
+.cs-role__desc {
+  font-size: var(--text-sm);
+  color:     var(--text-muted);
+  line-height: 1.4;
+}
+
+.cs-role__desc::before { content: "For you if you want to "; }
+
+/* ── Submit strip ────────────────────────────────────────────────────────── */
+.cs-submit-strip {
+  display:    flex;
+  align-items: center;
+  gap:        var(--space-4);
+  padding:    var(--space-5) 0 var(--space-8);
+  border-top: 1px solid var(--border);
+}
+
+.cs-submit-btn {
+  border:        0;
+  border-radius: 8px;
+  background:    var(--accent, #1c6ef5);
+  color:         white;
+  font-size:     var(--text-base);
+  font-weight:   var(--weight-semibold);
+  padding:       0.65rem 1.4rem;
+  cursor:        pointer;
+  transition:    opacity var(--duration-fast, 150ms) ease;
+}
+.cs-submit-btn:hover { opacity: 0.88; }
+
+.cs-submit-hint {
+  font-size: var(--text-sm);
+  color:     var(--text-muted);
+}
+
+/* ── Error state (no selector data) ─────────────────────────────────────── */
+.cs-unavailable {
+  text-align:  center;
+  padding:     var(--space-8) 0;
+  color:       var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cs">
+<div class="cs-inner">
+
+  <nav class="cs-nav">
+    <a href="/topics/{{ session_id }}" class="cs-nav__back">← Back to topics</a>
+  </nav>
+
+  <header class="cs-header">
+    <div class="cs-eyebrow">Learning path</div>
+    <h1 class="cs-title">Choose your track</h1>
+    <p class="cs-subtitle">Pick the domain and the role that fits where you're headed.</p>
+  </header>
+
+  {% if selector_error %}
+  <div class="cs-alert">{{ selector_error }}</div>
+  {% endif %}
+
+  {% if not selector %}
+  <div class="cs-unavailable">
+    <p>Course list unavailable — please refresh or try again shortly.</p>
+    <a href="/topics/{{ session_id }}">Return to your topics</a>
+  </div>
+
+  {% else %}
+
+  {# ── Optional on-ramp ── #}
+  {% if selector.on_ramp %}
+  <div class="cs-onramp">
+    <div class="cs-onramp__icon">🌱</div>
+    <div class="cs-onramp__body">
+      <div class="cs-onramp__badge">Optional first step</div>
+      <div class="cs-onramp__title">{{ selector.on_ramp.title }}</div>
+      <p class="cs-onramp__desc">{{ selector.on_ramp.description }}</p>
+      <a class="cs-onramp__link" href="/topics/{{ session_id }}">New to AI? Start with Foundations first →</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── Course + role form ── #}
+  {% if selector.courses %}
+  <p class="cs-section-label">Then pick your specialisation</p>
+
+  <form method="post" action="/select-course/{{ session_id }}">
+
+    {% if request.query_params.get('error') %}
+    <div class="cs-alert">Please select a role before continuing.</div>
+    {% endif %}
+
+    <div class="cs-course-list">
+      {% for course in selector.courses %}
+      <div class="cs-course">
+        <div class="cs-course__head">
+          <div class="cs-course__title">{{ course.title }}</div>
+          <p class="cs-course__desc">{{ course.description }}</p>
+        </div>
+        <div class="cs-course__divider"></div>
+        <div class="cs-roles">
+          {% for role in course.roles %}
+          {% set sel_val = course.course_key ~ ":" ~ role.track_key %}
+          {% set is_current = (current_course_key == course.course_key and current_role_key == role.track_key) %}
+          <label class="cs-role">
+            <input type="radio" name="selection" value="{{ sel_val }}"
+                   {% if is_current %}checked{% endif %}>
+            <div class="cs-role__body">
+              <span class="cs-role__label">{{ role.label }}</span>
+              <span class="cs-role__desc">{{ role.for_you_if }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="cs-submit-strip">
+      <button type="submit" class="cs-submit-btn">Start learning →</button>
+      <span class="cs-submit-hint">You can change this any time.</span>
+    </div>
+
+  </form>
+  {% endif %}
+
+  {% endif %}{# selector #}
+
+</div>{# cs-inner #}
+</div>{# cs #}
+{% endblock %}

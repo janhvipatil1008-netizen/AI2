@@ -98,7 +98,21 @@ async def topics_page(request: Request, session_id: str):
     session = data["session"]
     track   = session.track.value
     current_week = session.current_week
-    topics  = _topics_for_listing(track=track, current_week=current_week)
+
+    onboarding = session.onboarding if isinstance(session.onboarding, dict) else {}
+    course_key = onboarding.get("course_key") or None
+    role_key   = onboarding.get("role_key")   or None
+
+    # When the v3 curriculum reads are live, a learner with no (course, role)
+    # selection must pick before we can build their topic list.
+    from services.storage_flags import is_modular_curriculum_reads_enabled
+    if is_modular_curriculum_reads_enabled() and not (course_key and role_key):
+        return RedirectResponse(f"/select-course/{session_id}", status_code=302)
+
+    topics = _topics_for_listing(
+        track=track, current_week=current_week,
+        course_key=course_key, role_key=role_key,
+    )
 
     progress_by_topic = {}
     for topic in topics:
@@ -133,6 +147,8 @@ async def topics_page(request: Request, session_id: str):
         "average_completion_percent": avg_pct,
     }
 
+    role_label = _role_label_for(course_key, role_key) if (course_key and role_key) else None
+
     return deps.templates.TemplateResponse(
         request=request,
         name="topics.html",
@@ -145,6 +161,8 @@ async def topics_page(request: Request, session_id: str):
             "track":                 track,
             "current_week":          current_week,
             "test_mode":             bool(TEST_MODE),
+            "role_label":            role_label,
+            "course_key":            course_key,
         },
     )
 
@@ -584,16 +602,46 @@ async def generate_topic_practice(request: Request, body: TopicPracticeGenerateR
     }
 
 
-def _topics_for_listing(*, track: str, current_week: int):
+def _topics_for_listing(
+    *,
+    track: str,
+    current_week: int,
+    course_key: str | None = None,
+    role_key: str | None = None,
+):
     from services.storage_flags import is_modular_curriculum_reads_enabled
 
     if not is_modular_curriculum_reads_enabled():
         return get_topics_for_week(track, current_week)
 
+    # v3 path: learner has made a (course, role) selection via the new picker
+    if course_key and role_key:
+        try:
+            return _modular_topics_for_role(course_key=course_key, role_key=role_key) or get_topics_for_week(track, current_week)
+        except Exception:
+            return get_topics_for_week(track, current_week)
+
+    # Legacy flag-on path: old track enum, falls back to static if course key not in DB
     try:
         return _modular_topics_for_listing(track=track) or get_topics_for_week(track, current_week)
     except Exception:
         return get_topics_for_week(track, current_week)
+
+
+def _modular_topics_for_role(*, course_key: str, role_key: str):
+    import database.pool as pool
+    from services.modular_curriculum_fallback_service import get_course_structure_with_fallback
+    from services.modular_topic_adapter import course_structure_to_role_topic_cards
+
+    with pool.get_conn() as conn:
+        result = get_course_structure_with_fallback(
+            conn,
+            course_key=course_key,
+            fallback_track_key=None,
+        )
+
+    cs = result.get("course_structure")
+    return course_structure_to_role_topic_cards(cs, track_key=role_key, role_key=role_key) if cs else []
 
 
 def _modular_topics_for_listing(*, track: str):
@@ -612,6 +660,16 @@ def _modular_topics_for_listing(*, track: str):
         result.get("course_structure"),
         track_key=track,
     )
+
+
+def _role_label_for(course_key: str | None, role_key: str | None) -> str | None:
+    if not course_key or not role_key:
+        return None
+    from services.course_selector import COURSE_ROLE_CONFIG
+    for role in COURSE_ROLE_CONFIG.get(course_key, []):
+        if role["track_key"] == role_key:
+            return role["label"]
+    return None
 
 
 def _course_key_for_track(track: str) -> str:

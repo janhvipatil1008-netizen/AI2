@@ -3,8 +3,12 @@
 Builds the modular curriculum export and upserts it into the new schema tables:
 courses, course_modules, skills, course_topics, topic_skills, topic_activities.
 
+Data source: curriculum.curriculum_catalog.build_full_curriculum_export()
+             (v3 AI-careers catalog — 6 courses, 32 modules, 102 topics)
+
 Usage:
-    python scripts/seed_modular_curriculum.py
+    python scripts/seed_modular_curriculum.py            # real seed
+    python scripts/seed_modular_curriculum.py --dry-run  # counts only, no DB
 
 Requires SUPABASE_DATABASE_URL to be set in the environment (or .env loaded
 before running).  The script never runs automatically — it must be invoked
@@ -45,7 +49,7 @@ def run_seed(conn) -> dict:
         {"courses": int, "modules": int, "topics": int,
          "skills": int, "topic_skills": int, "activities": int}
     """
-    from curriculum.modular_seed_export import build_modular_curriculum_seed_export
+    from curriculum.curriculum_catalog import build_full_curriculum_export
     from repositories.modular_curriculum_repository import (
         link_topic_skill,
         upsert_course,
@@ -55,7 +59,7 @@ def run_seed(conn) -> dict:
         upsert_topic_activity,
     )
 
-    export = build_modular_curriculum_seed_export()
+    export = build_full_curriculum_export()
 
     counts: dict[str, int] = {
         "courses":     0,
@@ -182,9 +186,48 @@ def run_seed(conn) -> dict:
     return counts
 
 
+def dry_run() -> None:
+    """Print what a real seed would write — no DB connection required."""
+    from curriculum.curriculum_catalog import build_full_curriculum_export
+
+    print("AI² Modular Curriculum Seed Script — DRY RUN (no DB writes)")
+    print("Building export from curriculum.curriculum_catalog v3...")
+    export = build_full_curriculum_export()
+
+    skill_set: set[str] = set()
+    total_topic_skills = 0
+    total_activities = 0
+    for t in export.topics:
+        for s in t.skills:
+            skill_set.add(s.skill_key)
+            total_topic_skills += 1
+        total_activities += len(t.activities)
+
+    print()
+    print("Would write to DB:")
+    print(f"  courses          : {len(export.courses)}")
+    print(f"  modules          : {len(export.modules)}")
+    print(f"  topics           : {len(export.topics)}")
+    print(f"  skills (unique)  : {len(skill_set)}")
+    print(f"  topic_skills     : {total_topic_skills}")
+    print(f"  activities       : {total_activities}")
+    print()
+    print("Topics per course:")
+    from collections import Counter
+    per_course = Counter(t.course_key for t in export.topics)
+    for course in export.courses:
+        print(f"  {course.course_key:<35} {per_course[course.course_key]:>3} topics")
+    print()
+    print("DRY RUN complete — nothing written.")
+
+
 def main() -> None:
     """Entry point — connect, seed, commit, and report counts."""
-    print("AI² Modular Curriculum Seed Script")
+    if "--dry-run" in sys.argv:
+        dry_run()
+        return
+
+    print("AI² Modular Curriculum Seed Script (v3 catalog)")
     print("Building modular curriculum export...")
 
     try:

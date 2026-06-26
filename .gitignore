@@ -9,3 +9,4 @@ sessions.db
 *.db-wal
 .pytest_tmp/
 manual_tmp/
+database/backup_*.sql

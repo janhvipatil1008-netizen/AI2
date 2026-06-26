@@ -179,18 +179,26 @@ def list_available_courses(conn, *, status: str | None = "active") -> list[dict]
 
 
 def get_topic_structure_by_legacy_id(conn, *, legacy_topic_id: str) -> dict | None:
-    """Look up a topic by its old SessionContext topic ID and attach skills/activities.
+    """Look up a topic by legacy ID or, for v3 catalog-native topics, by topic_key.
 
-    This is the bridge for old-format IDs (e.g. 'aipm-week-1-transformers') stored
-    in SessionContext and topic_progress rows.  Returns None if not found.
+    Lookup order:
+    1. legacy_topic_id match — covers old static-curriculum topics migrated into the DB.
+    2. topic_key match — covers v3 catalog topics that have no legacy ancestor
+       (legacy_topic_id is empty in the DB row, so the adapter uses topic_key as the
+       URL slug; that slug arrives here as the lookup value).
+
+    Returns None if not found by either path.
     """
     from repositories.modular_curriculum_repository import (
         get_topic_by_legacy_id,
+        get_topic_by_topic_key,
         list_activities_for_topic,
         list_skills_for_topic,
     )
 
     topic_row = get_topic_by_legacy_id(conn, legacy_topic_id=legacy_topic_id)
+    if topic_row is None:
+        topic_row = get_topic_by_topic_key(conn, topic_key=legacy_topic_id)
     if topic_row is None:
         return None
 

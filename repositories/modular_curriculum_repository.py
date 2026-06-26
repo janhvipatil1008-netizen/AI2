@@ -332,6 +332,24 @@ def get_topic_by_legacy_id(conn, *, legacy_topic_id: str) -> dict | None:
         return dict(zip(cols, row))
 
 
+def get_topic_by_topic_key(conn, *, topic_key: str) -> dict | None:
+    sql = """
+        SELECT topic_id, course_id, module_id, legacy_topic_id, topic_key,
+               title, description, difficulty_level, sequence_order,
+               estimated_minutes, status, metadata, created_at, updated_at
+        FROM course_topics
+        WHERE topic_key = %s
+        LIMIT 1
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (topic_key,))
+        row = cur.fetchone()
+        if row is None:
+            return None
+        cols = [d[0] for d in cur.description]
+        return dict(zip(cols, row))
+
+
 def list_activities_for_topic(conn, *, topic_id: int) -> list[dict]:
     sql = """
         SELECT activity_id, topic_id, activity_key, activity_type, title,
