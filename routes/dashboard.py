@@ -24,11 +24,17 @@ from services.modular_position_service import (
 router = APIRouter()
 
 
-def build_dashboard_learning_summary(session) -> dict:
-    """Compute a quick learner stats dict for the dashboard. Pure - no Claude calls."""
+def build_dashboard_learning_summary(session, topics=None) -> dict:
+    """Compute a quick learner stats dict for the dashboard. Pure - no Claude calls.
+
+    Pass `topics` explicitly to count progress against a specific topic list
+    (e.g. the v3 core-then-branch set).  When None the static curriculum for
+    the session's track/week is used — flag-OFF callers need not change.
+    """
     track = session.track.value
     current_week = session.current_week
-    topics = get_topics_for_week(track, current_week)
+    if topics is None:
+        topics = get_topics_for_week(track, current_week)
     total_topics = len(topics)
 
     pcts = [session.topic_completion_percent(t.topic_id) for t in topics]
@@ -122,8 +128,10 @@ async def dashboard(request: Request):
             }
         ]
 
+    summary_topics = _v3_summary_topics(recent_session) if recent_session else None
     learning_summary = (
-        build_dashboard_learning_summary(recent_session) if recent_session else None
+        build_dashboard_learning_summary(recent_session, topics=summary_topics)
+        if recent_session else None
     )
     enrollment_user_id = ""
     if recent_session is not None:
@@ -190,6 +198,37 @@ async def dashboard(request: Request):
             "test_mode": bool(deps.TEST_MODE),
         },
     )
+
+
+def _v3_summary_topics(session) -> list | None:
+    """Return the v3 topic list for the session's selected course/role, or None.
+
+    Returns None (→ static fallback) when:
+    - the flag is OFF
+    - the session has no (course_key, role_key) in onboarding
+    - the DB lookup fails or returns an empty list
+    """
+    from services.storage_flags import is_modular_curriculum_reads_enabled
+    if not is_modular_curriculum_reads_enabled():
+        return None
+    onboarding = session.onboarding if isinstance(session.onboarding, dict) else {}
+    course_key = onboarding.get("course_key") or None
+    role_key   = onboarding.get("role_key")   or None
+    if not (course_key and role_key):
+        return None
+    try:
+        import database.pool as pool
+        from services.modular_curriculum_fallback_service import get_course_structure_with_fallback
+        from services.modular_topic_adapter import course_structure_to_role_topic_cards
+        with pool.get_conn() as conn:
+            result = get_course_structure_with_fallback(
+                conn, course_key=course_key, fallback_track_key=None
+            )
+        cs = result.get("course_structure")
+        topics = course_structure_to_role_topic_cards(cs, track_key=role_key, role_key=role_key) if cs else []
+        return topics or None
+    except Exception:
+        return None
 
 
 def _dashboard_enrollment_summary(
