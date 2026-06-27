@@ -171,8 +171,7 @@ async def topics_page(request: Request, session_id: str):
 async def topic_detail_page(request: Request, session_id: str, topic_id: str):
     data    = deps.get_session_data(session_id, request.state.user_id or "")
     session = data["session"]
-    track   = session.track.value
-    topic   = get_topic(track, topic_id)
+    topic   = _resolve_topic_card(session, topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
@@ -219,7 +218,7 @@ async def update_topic_progress(request: Request, body: TopicProgressRequest):
     data    = deps.get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
-    topic = get_topic(session.track.value, body.topic_id)
+    topic = _resolve_topic_card(session, body.topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
@@ -255,7 +254,7 @@ async def save_topic_notes_endpoint(request: Request, body: TopicNotesRequest):
     data    = deps.get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
-    topic = get_topic(session.track.value, body.topic_id)
+    topic = _resolve_topic_card(session, body.topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
@@ -465,7 +464,7 @@ async def generate_topic_content(request: Request, body: TopicContentGenerateReq
     data    = deps.get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
-    topic = get_topic(session.track.value, body.topic_id)
+    topic = _resolve_topic_card(session, body.topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
@@ -535,7 +534,7 @@ async def generate_topic_practice(request: Request, body: TopicPracticeGenerateR
     data    = deps.get_session_data(body.session_id, request.state.user_id or "")
     session = data["session"]
 
-    topic = get_topic(session.track.value, body.topic_id)
+    topic = _resolve_topic_card(session, body.topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
@@ -600,6 +599,34 @@ async def generate_topic_practice(request: Request, body: TopicPracticeGenerateR
         "content":            result["content"],
         "generated_practice": result["generated_practice"],
     }
+
+
+def _resolve_topic_card(session, topic_id: str):
+    """Return a TopicCard for topic_id, with v3 catalog fallback.
+
+    For v3 topic keys (e.g. 'ev-core-why-testing-ai-is-different') the static
+    curriculum returns None.  When the modular-reads flag is ON we fall through
+    to the modular DB, which indexes by topic_key as well as legacy_topic_id.
+    """
+    topic = get_topic(session.track.value, topic_id)
+    if topic is not None:
+        return topic
+
+    from services.storage_flags import is_modular_curriculum_reads_enabled
+    if not is_modular_curriculum_reads_enabled():
+        return None
+
+    try:
+        import database.pool as pool
+        from services.modular_curriculum_read_service import get_topic_structure_by_legacy_id
+        from services.modular_topic_adapter import modular_topic_to_topic_card
+        with pool.get_conn() as conn:
+            topic_dict = get_topic_structure_by_legacy_id(conn, legacy_topic_id=topic_id)
+        if topic_dict:
+            return modular_topic_to_topic_card(topic_dict, track_key=session.track.value)
+    except Exception:
+        pass
+    return None
 
 
 def _topics_for_listing(
@@ -788,7 +815,7 @@ def _safe_modular_topic_error(exc_or_msg) -> str:
 def _get_session_for_topic(request: Request, session_id: str, topic_id: str):
     data = deps.get_session_data(session_id, request.state.user_id or "")
     session = data["session"]
-    topic = get_topic(session.track.value, topic_id)
+    topic = _resolve_topic_card(session, topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
     return session
