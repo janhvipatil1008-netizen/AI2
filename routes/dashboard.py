@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 
 import routes.deps as deps
 from config import CareerTrack, TRACK_DISPLAY_NAMES, TRACK_TAGLINES
+from services.storage_flags import is_modular_curriculum_reads_enabled
 from context.session import SessionContext
 from curriculum.topics import get_topics_for_week
 from database.pool import _connect as _open_db_connection, get_conn
@@ -22,6 +23,15 @@ from services.modular_position_service import (
 )
 
 router = APIRouter()
+
+_COURSE_DISPLAY_NAMES: dict[str, str] = {
+    "ai-product-business":     "AI for Product & Business",
+    "ai-engineering-building": "AI Engineering & Building",
+    "ai-evaluation-quality":   "AI Evaluation & Quality",
+    "ai-data-analytics":       "AI Data & Analytics",
+    "ai-experience-growth":    "AI for Experience & Growth",
+    "ai-foundations":          "AI Foundations",
+}
 
 
 def build_dashboard_learning_summary(session, topics=None) -> dict:
@@ -128,6 +138,22 @@ async def dashboard(request: Request):
             }
         ]
 
+    modular_reads_enabled = is_modular_curriculum_reads_enabled()
+
+    resume_role_label: str | None = None
+    resume_course_label: str | None = None
+    if recent_session:
+        _ob = recent_session.onboarding if isinstance(recent_session.onboarding, dict) else {}
+        _ck = _ob.get("course_key") or None
+        _rk = _ob.get("role_key") or None
+        if _ck and _rk:
+            from services.course_selector import COURSE_ROLE_CONFIG
+            for _role in COURSE_ROLE_CONFIG.get(_ck, []):
+                if _role["track_key"] == _rk:
+                    resume_role_label = _role["label"]
+                    break
+            resume_course_label = _COURSE_DISPLAY_NAMES.get(_ck)
+
     summary_topics = _v3_summary_topics(recent_session) if recent_session else None
     learning_summary = (
         build_dashboard_learning_summary(recent_session, topics=summary_topics)
@@ -195,6 +221,9 @@ async def dashboard(request: Request):
             "modular_progress_summary": modular_progress_summary,
             "position_summary": position_summary,
             "recent_session_id": recent_session_id,
+            "modular_reads_enabled": modular_reads_enabled,
+            "resume_role_label": resume_role_label,
+            "resume_course_label": resume_course_label,
             "test_mode": bool(deps.TEST_MODE),
         },
     )

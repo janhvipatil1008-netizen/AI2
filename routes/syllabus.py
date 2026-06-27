@@ -1,7 +1,7 @@
 """Syllabus and task routes."""
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 
 import routes.deps as deps
@@ -25,6 +25,14 @@ class TaskToggleRequest(BaseModel):
 async def syllabus_page(request: Request, session_id: str):
     data = deps.get_session_data(session_id, request.state.user_id or "")
     session = data["session"]
+
+    from services.storage_flags import is_modular_curriculum_reads_enabled
+    if is_modular_curriculum_reads_enabled():
+        _ob = session.onboarding if isinstance(session.onboarding, dict) else {}
+        _has_selection = bool(_ob.get("course_key") and _ob.get("role_key"))
+        _dest = f"/topics/{session_id}" if _has_selection else f"/select-course/{session_id}"
+        return RedirectResponse(_dest, status_code=302)
+
     role = session.track.value
 
     phases_data = []

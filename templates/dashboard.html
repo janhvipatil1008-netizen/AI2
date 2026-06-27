@@ -305,6 +305,23 @@
   }
   .db-summary-link:hover { color: var(--accent-hover); text-decoration: underline; }
 
+  /* ── Explore prompt (v3 flag-on replacement for track grid) ────────── */
+  .db-explore-prompt {
+    font-size:   var(--text-base);
+    color:       var(--text-muted);
+    line-height: var(--lh-body);
+  }
+  .db-explore-link {
+    display:       inline-block;
+    margin-top:    var(--space-3);
+    font-size:     var(--text-base);
+    font-weight:   var(--weight-semibold);
+    color:         var(--accent);
+    text-decoration: none;
+    transition:    color var(--duration-fast) var(--ease-out);
+  }
+  .db-explore-link:hover { color: var(--accent-hover); text-decoration: underline; }
+
   /* ── Track grid ────────────────────────────────────────────────────── */
   .db-track-grid {
     display: grid;
@@ -377,18 +394,24 @@
         </div>
         <div class="db-resume-info">
           <div class="db-resume-track">
-            {% if s.track == "aipm" %}AI Product Manager
+            {% if resume_role_label %}{{ resume_role_label }}
+            {% elif s.track == "aipm" %}AI Product Manager
             {% elif s.track == "evals" %}AI Evals Specialist
             {% else %}Context Engineer{% endif %}
           </div>
           <div class="db-resume-meta">
-            Module {{ s.current_week }}
-            {%- if position_summary and position_summary.available and position_summary.current_topic_key %}
-              &nbsp;·&nbsp;{{ position_summary.current_topic_key | replace('-', ' ') | title }}
-            {%- elif s.current_week <= 1 %}&nbsp;·&nbsp;AI Foundations
-            {%- elif s.current_week <= 2 %}&nbsp;·&nbsp;Engineering Practice
-            {%- elif s.current_week <= 4 %}&nbsp;·&nbsp;Agri-Saathi Build
-            {%- else %}&nbsp;·&nbsp;Portfolio &amp; Launch{% endif %}
+            {% if resume_course_label %}{{ resume_course_label }}
+              {%- if position_summary and position_summary.available and position_summary.current_topic_key %}
+                &nbsp;·&nbsp;{{ position_summary.current_topic_key | replace('-', ' ') | title }}
+              {%- endif %}
+            {% else %}Module {{ s.current_week }}
+              {%- if position_summary and position_summary.available and position_summary.current_topic_key %}
+                &nbsp;·&nbsp;{{ position_summary.current_topic_key | replace('-', ' ') | title }}
+              {%- elif s.current_week <= 1 %}&nbsp;·&nbsp;AI Foundations
+              {%- elif s.current_week <= 2 %}&nbsp;·&nbsp;Engineering Practice
+              {%- elif s.current_week <= 4 %}&nbsp;·&nbsp;Agri-Saathi Build
+              {%- else %}&nbsp;·&nbsp;Portfolio &amp; Launch{% endif %}
+            {% endif %}
           </div>
         </div>
         <a href="/topics/{{ s.session_id }}" class="db-resume-btn">Resume &rarr;</a>
@@ -468,7 +491,17 @@
     </div>
     {% endif %}
 
-    {# ══ Start a different track ══ #}
+    {# ══ Explore / start a different track ══ #}
+    {% if modular_reads_enabled %}
+      {% if recent_session_id %}
+      <div class="db-section-label">Explore other paths</div>
+      <p class="db-explore-prompt">
+        You're not locked in. Browse the full curriculum across product, engineering,
+        evals, data, and more — or switch your current track at any time.
+        <a href="/select-course/{{ recent_session_id }}" class="db-explore-link">See all courses and roles &rarr;</a>
+      </p>
+      {% endif %}
+    {% else %}
     <div class="db-section-label">Start a different track</div>
     <div class="db-track-grid" id="track-grid">
       {% for track in tracks %}
@@ -481,23 +514,28 @@
       </div>
       {% endfor %}
     </div>
+    {% endif %}
 
   </main>
 
   <script>
-    document.querySelectorAll('.db-track-card').forEach(function(card) {
-      card.addEventListener('click', async function() {
-        var track = card.dataset.value;
-        card.style.opacity = '0.6';
-        var resp = await fetch('/session/start', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ track: track })
+    (function() {
+      var cards = document.querySelectorAll('.db-track-card');
+      if (!cards.length) return;
+      cards.forEach(function(card) {
+        card.addEventListener('click', async function() {
+          var track = card.dataset.value;
+          card.style.opacity = '0.6';
+          var resp = await fetch('/session/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ track: track })
+          });
+          var data = await resp.json();
+          window.location.href = '/chat/' + data.session_id;
         });
-        var data = await resp.json();
-        window.location.href = '/chat/' + data.session_id;
       });
-    });
+    })();
   </script>
 </body>
 </html>
